@@ -179,3 +179,24 @@ def test_repeated_sweep_ranking_aggregates_by_candidate() -> None:
     assert report["candidate_aggregates"][0]["success_count"] == 3
     assert report["candidate_aggregates"][1]["failure_count"] == 1
     assert report["objectives"]["throughput"][0]["candidate_id"] == candidate_ids[0]
+
+
+def test_expanded_qwen_sweep_plan_shape() -> None:
+    definition = load_sweep_definition(Path("config/sweeps/qwen-expanded-safe.json"))
+
+    plan = build_sweep_plan(definition)
+    preview = build_sweep_preview(plan)
+
+    assert plan["candidate_count"] == 6
+    assert plan["trial_count"] == 18
+    assert plan["repetitions"] == 3
+    assert preview["blocked"] is False
+    assert {candidate["overrides"]["gpu_memory_utilization"] for candidate in plan["candidates"]} == {
+        0.88,
+        0.9,
+        0.92,
+    }
+    assert {candidate["overrides"]["performance_mode"] for candidate in plan["candidates"]} == {
+        "interactivity",
+        "throughput",
+    }

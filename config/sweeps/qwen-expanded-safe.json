@@ -1,0 +1,27 @@
+{
+  "sweep_id": "qwen-expanded-safe",
+  "profile": "config/profiles/qwen3-coder-next-awq.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "baseline_summary": "artifacts/benchmarks/qwen-baseline/summary.json",
+  "seed": 13,
+  "repetitions": 3,
+  "objectives": [
+    "throughput",
+    "latency",
+    "balanced"
+  ],
+  "parameters": {
+    "gpu_memory_utilization": [
+      0.88,
+      0.9,
+      0.92
+    ],
+    "max_model_len": [
+      32768
+    ],
+    "performance_mode": [
+      "interactivity",
+      "throughput"
+    ]
+  }
+}

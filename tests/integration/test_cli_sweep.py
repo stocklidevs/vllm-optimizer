@@ -86,3 +86,28 @@ def test_repeated_sweep_plan_cli_writes_repeated_trials(tmp_path: Path) -> None:
     plan = read_json(out)
     assert plan["candidate_count"] == 2
     assert plan["trial_count"] == 6
+
+
+def test_expanded_sweep_cli_plan_and_preview(tmp_path: Path) -> None:
+    plan_path = tmp_path / "expanded-plan.json"
+    preview_path = tmp_path / "expanded-preview.json"
+
+    assert (
+        main(
+            [
+                "sweep-plan",
+                "--sweep",
+                "config/sweeps/qwen-expanded-safe.json",
+                "--out",
+                str(plan_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["sweep-preview", "--plan", str(plan_path), "--out", str(preview_path)]) == 0
+
+    plan = read_json(plan_path)
+    preview = read_json(preview_path)
+    assert plan["candidate_count"] == 6
+    assert plan["trial_count"] == 18
+    assert preview["blocked"] is False

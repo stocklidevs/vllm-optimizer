@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 - 2026-05-13
+
+- Added expanded safe Qwen sweep configuration around the current 0.90/32768
+  winner.
+- Added local plan/preview tests for the expanded six-candidate,
+  eighteen-trial repeated sweep.
+- Added SpecKit feature docs for expanded Qwen sweep evaluation.
+
 ## 0.4.0 - 2026-05-13
 
 - Added local run comparison reporting for baseline, sweep, and repeated sweep

@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.4.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.5.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -22,6 +22,8 @@ The project is spec-driven with SpecKit and currently supports:
   spread metrics, baseline deltas, and stability-aware rankings.
 - Local comparison reports that summarize baseline, sweep, and repeated sweep
   artifacts into JSON and Markdown recommendations.
+- Expanded safe Qwen sweep configuration for testing nearby GPU utilization
+  and performance-mode candidates around the current winner.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -91,6 +93,14 @@ uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-top2-repeated/p
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-top2-repeated/plan.json --out artifacts/sweeps/qwen-top2-repeated/live --timeout-seconds 1200 --continue-on-failure
 ```
 
+Expanded safe Qwen sweep:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-expanded-safe.json --out artifacts/sweeps/qwen-expanded-safe/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-expanded-safe/plan.json --out artifacts/sweeps/qwen-expanded-safe/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-expanded-safe/plan.json --out artifacts/sweeps/qwen-expanded-safe/live --timeout-seconds 1200 --continue-on-failure
+```
+
 Rank completed or fixture sweep results:
 
 ```powershell
@@ -125,3 +135,4 @@ Current feature specs:
 - `specs/005-qwen-parameter-sweep/spec.md`
 - `specs/006-repeated-sweep-stability/spec.md`
 - `specs/007-run-comparison-report/spec.md`
+- `specs/008-expanded-qwen-sweep/spec.md`
