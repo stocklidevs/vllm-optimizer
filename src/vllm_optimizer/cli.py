@@ -6,6 +6,7 @@ from pathlib import Path
 
 from . import __version__
 from .artifacts import read_json, read_jsonl, write_json
+from .benchmark import BenchmarkError, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
 from .discovery import DiscoveryError, load_target, run_discovery
 from .experiments import ExperimentValidationError, load_experiment
 from .planner import build_trial_plan
@@ -24,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     except (
         DiscoveryError,
+        BenchmarkError,
         ExperimentValidationError,
         ServeProfileError,
         SmokeServeError,
@@ -82,6 +84,24 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser.add_argument("--out", required=True, type=Path)
     smoke_parser.add_argument("--timeout-seconds", type=int, default=900)
     smoke_parser.set_defaults(func=cmd_smoke_serve)
+
+    benchmark_plan_parser = subparsers.add_parser(
+        "benchmark-plan", help="Render a dry-run baseline benchmark plan"
+    )
+    benchmark_plan_parser.add_argument("--profile", required=True, type=Path)
+    benchmark_plan_parser.add_argument("--prompts", required=True, type=Path)
+    benchmark_plan_parser.add_argument("--out", required=True, type=Path)
+    benchmark_plan_parser.set_defaults(func=cmd_benchmark_plan)
+
+    benchmark_run_parser = subparsers.add_parser(
+        "benchmark-run", help="Run live baseline benchmark"
+    )
+    benchmark_run_parser.add_argument("--config", required=True, type=Path)
+    benchmark_run_parser.add_argument("--profile", required=True, type=Path)
+    benchmark_run_parser.add_argument("--prompts", required=True, type=Path)
+    benchmark_run_parser.add_argument("--out", required=True, type=Path)
+    benchmark_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    benchmark_run_parser.set_defaults(func=cmd_benchmark_run)
 
     return parser
 
@@ -147,3 +167,23 @@ def cmd_smoke_serve(args: argparse.Namespace) -> int:
     result = run_smoke_serve(target, profile, args.out, args.timeout_seconds)
     print(str(args.out))
     return 0 if result["status"] == "completed" else 2
+
+
+def cmd_benchmark_plan(args: argparse.Namespace) -> int:
+    profile = load_serve_profile(args.profile)
+    prompts = load_prompt_set(args.prompts)
+    write_json(args.out, build_benchmark_plan(profile, prompts))
+    print(str(args.out))
+    return 0
+
+
+def cmd_benchmark_run(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    profile = load_serve_profile(args.profile)
+    prompts = load_prompt_set(args.prompts)
+    result = run_baseline_benchmark(
+        target, profile, prompts, args.out, args.timeout_seconds
+    )
+    print(str(args.out))
+    summary = result["summary"]
+    return 0 if summary.get("failure_count", 1) == 0 else 2

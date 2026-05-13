@@ -1,0 +1,38 @@
+{
+  "prompt_set_id": "qwen-baseline-v1",
+  "cases": [
+    {
+      "case_id": "ok",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say OK."
+        }
+      ],
+      "max_tokens": 4,
+      "temperature": 0
+    },
+    {
+      "case_id": "tiny-code",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Write a Python function add(a, b) that returns their sum."
+        }
+      ],
+      "max_tokens": 64,
+      "temperature": 0
+    },
+    {
+      "case_id": "json-shape",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return JSON with keys status and value. Use status ok and value 7."
+        }
+      ],
+      "max_tokens": 64,
+      "temperature": 0
+    }
+  ]
+}
