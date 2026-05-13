@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.3.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.4.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -20,6 +20,8 @@ The project is spec-driven with SpecKit and currently supports:
   ranking for throughput, latency, and balanced objectives.
 - Repeated top-two sweep stability analysis with per-candidate aggregates,
   spread metrics, baseline deltas, and stability-aware rankings.
+- Local comparison reports that summarize baseline, sweep, and repeated sweep
+  artifacts into JSON and Markdown recommendations.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -95,6 +97,12 @@ Rank completed or fixture sweep results:
 uv run vllm-optimizer sweep-rank --plan artifacts/sweeps/qwen-small/plan.json --results artifacts/sweeps/qwen-small/live/results.jsonl --out artifacts/sweeps/qwen-small/ranking.json
 ```
 
+Comparison report:
+
+```powershell
+uv run vllm-optimizer report --baseline artifacts/benchmarks/qwen-baseline/summary.json --sweep-ranking artifacts/sweeps/qwen-small/live/ranking.json --repeated-ranking artifacts/sweeps/qwen-top2-repeated/live/ranking.json --out artifacts/reports/qwen-comparison.json --markdown-out artifacts/reports/qwen-comparison.md
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -116,3 +124,4 @@ Current feature specs:
 - `specs/004-qwen-baseline-benchmark/spec.md`
 - `specs/005-qwen-parameter-sweep/spec.md`
 - `specs/006-repeated-sweep-stability/spec.md`
+- `specs/007-run-comparison-report/spec.md`

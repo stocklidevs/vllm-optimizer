@@ -11,6 +11,7 @@ from .discovery import DiscoveryError, load_target, run_discovery
 from .experiments import ExperimentValidationError, load_experiment
 from .planner import build_trial_plan
 from .ranking import rank_results
+from .report import ReportError, ReportInputs, build_comparison_report
 from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
@@ -40,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         ServeProfileError,
         SmokeServeError,
         SweepError,
+        ReportError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -145,6 +147,16 @@ def build_parser() -> argparse.ArgumentParser:
     sweep_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
     sweep_run_parser.add_argument("--continue-on-failure", action="store_true")
     sweep_run_parser.set_defaults(func=cmd_sweep_run)
+
+    report_parser = subparsers.add_parser(
+        "report", help="Generate a local comparison report from existing artifacts"
+    )
+    report_parser.add_argument("--baseline", type=Path)
+    report_parser.add_argument("--sweep-ranking", type=Path)
+    report_parser.add_argument("--repeated-ranking", type=Path)
+    report_parser.add_argument("--out", required=True, type=Path)
+    report_parser.add_argument("--markdown-out", type=Path)
+    report_parser.set_defaults(func=cmd_report)
 
     return parser
 
@@ -271,3 +283,19 @@ def cmd_sweep_run(args: argparse.Namespace) -> int:
     )
     print(str(args.out))
     return 0 if result["failure_count"] == 0 else 2
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    report = build_comparison_report(
+        ReportInputs(
+            baseline=args.baseline,
+            sweep_ranking=args.sweep_ranking,
+            repeated_ranking=args.repeated_ranking,
+        )
+    )
+    write_json(args.out, report)
+    if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
+    return 0

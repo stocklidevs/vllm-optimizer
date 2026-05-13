@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 - 2026-05-13
+
+- Added local run comparison reporting for baseline, sweep, and repeated sweep
+  artifacts.
+- Added JSON and Markdown report outputs with recommendations, baseline deltas,
+  stability notes, failure counts, and artifact links.
+- Added SpecKit feature docs for run comparison reporting.
+
 ## 0.3.0 - 2026-05-13
 
 - Added deterministic Qwen parameter sweep planning, dry-run preview, live
