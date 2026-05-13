@@ -1,0 +1,36 @@
+{
+  "experiment_id": "demo-throughput",
+  "objective": {
+    "family": "throughput",
+    "primary_metric": "tokens_per_second",
+    "direction": "maximize",
+    "tie_breakers": [
+      {
+        "metric": "p95_latency_ms",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "model": {
+    "id": "demo-model",
+    "path_label": "local-demo-model",
+    "vllm_version": "0.0.fixture"
+  },
+  "workload": {
+    "prompt_corpus_id": "demo-prompts",
+    "request_mix": "short-chat",
+    "concurrency": [1, 4],
+    "seeds": [11]
+  },
+  "parameter_space": {
+    "gpu_memory_utilization": [0.85, 0.9],
+    "max_num_batched_tokens": [4096, 8192]
+  },
+  "target": {
+    "host_label": "gx10",
+    "execution_mode": "dry-run"
+  },
+  "metadata": {
+    "owner": "local-fixture"
+  }
+}

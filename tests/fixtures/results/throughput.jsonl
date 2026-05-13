@@ -1,0 +1,5 @@
+{"trial_id":"demo-throughput-t001","tokens_per_second":1210.5,"p95_latency_ms":420.0,"artifact_refs":["fixtures/result-001.json"]}
+{"trial_id":"demo-throughput-t002","tokens_per_second":1180.0,"p95_latency_ms":390.0,"artifact_refs":["fixtures/result-002.json"]}
+{"trial_id":"demo-throughput-t003","tokens_per_second":1330.25,"p95_latency_ms":450.0,"artifact_refs":["fixtures/result-003.json"]}
+{"trial_id":"demo-throughput-t004","tokens_per_second":1330.25,"p95_latency_ms":440.0,"artifact_refs":["fixtures/result-004.json"]}
+{"trial_id":"not-in-plan","tokens_per_second":9999.0,"p95_latency_ms":999.0,"artifact_refs":["fixtures/unknown.json"]}
