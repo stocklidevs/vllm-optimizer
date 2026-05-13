@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from . import __version__
 from .artifacts import read_json, read_jsonl, write_json
 from .discovery import DiscoveryError, load_target, run_discovery
 from .experiments import ExperimentValidationError, load_experiment
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vllm-optimizer")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     plan_parser = subparsers.add_parser("plan", help="Generate a deterministic trial plan")
