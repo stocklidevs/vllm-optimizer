@@ -1,0 +1,44 @@
+{
+  "connectivity": {
+    "exit_code": 0,
+    "stdout": "gx10\n",
+    "stderr": "",
+    "duration_ms": 12
+  },
+  "os-release": {
+    "exit_code": 0,
+    "stdout": "NAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nPRETTY_NAME=\"Ubuntu 24.04.2 LTS\"\n",
+    "stderr": "",
+    "duration_ms": 8
+  },
+  "kernel": {
+    "exit_code": 0,
+    "stdout": "Linux gx10 6.8.0-59-generic x86_64 GNU/Linux\n",
+    "stderr": "",
+    "duration_ms": 5
+  },
+  "gpu": {
+    "exit_code": 0,
+    "stdout": "NVIDIA GeForce RTX 5090, 575.51.03, 32607 MiB\n",
+    "stderr": "",
+    "duration_ms": 20
+  },
+  "cuda-visible": {
+    "exit_code": 0,
+    "stdout": "True\n",
+    "stderr": "",
+    "duration_ms": 40
+  },
+  "python": {
+    "exit_code": 0,
+    "stdout": "Python 3.12.3\n",
+    "stderr": "",
+    "duration_ms": 6
+  },
+  "vllm": {
+    "exit_code": 0,
+    "stdout": "0.8.5\nmodel_path=/home/mock-user/private-models/demo\n",
+    "stderr": "",
+    "duration_ms": 75
+  }
+}

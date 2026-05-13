@@ -1,0 +1,10 @@
+{
+  "target_label": "gx10",
+  "ssh_destination": "mock-user@100.84.106.41",
+  "redact_values": [
+    "mock-user@100.84.106.41",
+    "100.84.106.41",
+    "/home/mock-user/private-models"
+  ],
+  "timeout_seconds": 10
+}

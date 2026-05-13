@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GX10 Discovery Config",
+  "type": "object",
+  "required": ["target_label", "ssh_destination"],
+  "properties": {
+    "target_label": { "type": "string", "minLength": 1 },
+    "ssh_destination": { "type": "string", "minLength": 1 },
+    "redact_values": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10
+    }
+  }
+}

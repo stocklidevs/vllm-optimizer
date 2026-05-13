@@ -5,10 +5,13 @@ import sys
 from pathlib import Path
 
 from .artifacts import read_json, read_jsonl, write_json
+from .discovery import DiscoveryError, load_target, run_discovery
 from .experiments import ExperimentValidationError, load_experiment
 from .planner import build_trial_plan
 from .ranking import rank_results
 from .safety import build_dry_run_preview
+from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
+from .ssh import MockExecutor, SshExecutor
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -17,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         return args.func(args)
-    except (ExperimentValidationError, ValueError) as exc:
+    except (DiscoveryError, ExperimentValidationError, ServeProfileError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -42,6 +45,20 @@ def build_parser() -> argparse.ArgumentParser:
     rank_parser.add_argument("--results", required=True, type=Path)
     rank_parser.add_argument("--out", required=True, type=Path)
     rank_parser.set_defaults(func=cmd_rank)
+
+    discover_parser = subparsers.add_parser("discover", help="Run read-only discovery")
+    discover_parser.add_argument("--config", required=True, type=Path)
+    discover_parser.add_argument("--out", required=True, type=Path)
+    discover_parser.add_argument("--executor", required=True, choices=["mock", "ssh"])
+    discover_parser.add_argument("--mock-results", type=Path)
+    discover_parser.set_defaults(func=cmd_discover)
+
+    serve_plan_parser = subparsers.add_parser(
+        "serve-plan", help="Render a dry-run vLLM serve command from a profile"
+    )
+    serve_plan_parser.add_argument("--profile", required=True, type=Path)
+    serve_plan_parser.add_argument("--out", required=True, type=Path)
+    serve_plan_parser.set_defaults(func=cmd_serve_plan)
 
     return parser
 
@@ -69,5 +86,26 @@ def cmd_rank(args: argparse.Namespace) -> int:
     results = read_jsonl(args.results)
     report = rank_results(plan, results)
     write_json(args.out, report)
+    print(str(args.out))
+    return 0
+
+
+def cmd_discover(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    if args.executor == "mock":
+        if args.mock_results is None:
+            raise DiscoveryError("--mock-results is required when --executor mock is used")
+        executor = MockExecutor(read_json(args.mock_results))
+    else:
+        executor = SshExecutor(target.ssh_destination)
+    result = run_discovery(target, executor, args.out)
+    print(str(args.out))
+    return 3 if result["status"] == "connectivity-failed" else 0
+
+
+def cmd_serve_plan(args: argparse.Namespace) -> int:
+    profile = load_serve_profile(args.profile)
+    plan = build_serve_plan(profile)
+    write_json(args.out, plan)
     print(str(args.out))
     return 0

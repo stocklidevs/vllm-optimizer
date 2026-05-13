@@ -1,0 +1,13 @@
+{
+  "profile_id": "qwen3-coder-next-awq",
+  "vllm_executable": "$HOME/qwen3next-venv/bin/vllm",
+  "model": "cyankiwi/Qwen3-Coder-Next-AWQ-4bit",
+  "served_model_name": "Qwen3-Coder-Next",
+  "host": "0.0.0.0",
+  "port": 8001,
+  "max_model_len": 32768,
+  "gpu_memory_utilization": 0.9,
+  "enable_auto_tool_choice": true,
+  "tool_call_parser": "qwen3_coder",
+  "performance_mode": "interactivity"
+}

@@ -1,0 +1,9 @@
+{
+  "target_label": "gx10",
+  "ssh_destination": "user@100.x.y.z",
+  "redact_values": [
+    "user@100.x.y.z",
+    "100.x.y.z"
+  ],
+  "timeout_seconds": 10
+}
