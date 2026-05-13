@@ -11,6 +11,7 @@ from .planner import build_trial_plan
 from .ranking import rank_results
 from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
+from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
 
 
@@ -20,7 +21,13 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         return args.func(args)
-    except (DiscoveryError, ExperimentValidationError, ServeProfileError, ValueError) as exc:
+    except (
+        DiscoveryError,
+        ExperimentValidationError,
+        ServeProfileError,
+        SmokeServeError,
+        ValueError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -59,6 +66,20 @@ def build_parser() -> argparse.ArgumentParser:
     serve_plan_parser.add_argument("--profile", required=True, type=Path)
     serve_plan_parser.add_argument("--out", required=True, type=Path)
     serve_plan_parser.set_defaults(func=cmd_serve_plan)
+
+    smoke_plan_parser = subparsers.add_parser(
+        "smoke-serve-plan", help="Render a dry-run smoke serve lifecycle plan"
+    )
+    smoke_plan_parser.add_argument("--profile", required=True, type=Path)
+    smoke_plan_parser.add_argument("--out", required=True, type=Path)
+    smoke_plan_parser.set_defaults(func=cmd_smoke_serve_plan)
+
+    smoke_parser = subparsers.add_parser("smoke-serve", help="Run live smoke serve")
+    smoke_parser.add_argument("--config", required=True, type=Path)
+    smoke_parser.add_argument("--profile", required=True, type=Path)
+    smoke_parser.add_argument("--out", required=True, type=Path)
+    smoke_parser.add_argument("--timeout-seconds", type=int, default=900)
+    smoke_parser.set_defaults(func=cmd_smoke_serve)
 
     return parser
 
@@ -109,3 +130,18 @@ def cmd_serve_plan(args: argparse.Namespace) -> int:
     write_json(args.out, plan)
     print(str(args.out))
     return 0
+
+
+def cmd_smoke_serve_plan(args: argparse.Namespace) -> int:
+    profile = load_serve_profile(args.profile)
+    write_json(args.out, build_smoke_serve_plan(profile))
+    print(str(args.out))
+    return 0
+
+
+def cmd_smoke_serve(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    profile = load_serve_profile(args.profile)
+    result = run_smoke_serve(target, profile, args.out, args.timeout_seconds)
+    print(str(args.out))
+    return 0 if result["status"] == "completed" else 2

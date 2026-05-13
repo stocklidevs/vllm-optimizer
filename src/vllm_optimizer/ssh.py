@@ -64,6 +64,8 @@ class SshExecutor:
                 check=False,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout_seconds + 5,
             )
             duration_ms = int((time.monotonic() - started) * 1000)
