@@ -1,0 +1,37 @@
+{
+  "policy_id": "qwen-safe-policy-v1",
+  "categories": {
+    "safe_session_sweepable": {
+      "gpu-memory-utilization": "Session-level memory allocation bound for vLLM executor.",
+      "max-model-len": "Session-level context length bound already used by existing sweeps.",
+      "performance-mode": "Session-level vLLM performance profile already used by existing sweeps.",
+      "max-num-batched-tokens": "Scheduler token budget; performance-relevant and session-local.",
+      "max-num-seqs": "Scheduler sequence budget; performance-relevant and session-local.",
+      "enable-chunked-prefill": "Prefill scheduling behavior; session-local.",
+      "enable-prefix-caching": "Prefix cache behavior; session-local."
+    },
+    "session_risky": {
+      "kv-cache-dtype": "Can alter memory use and numerical behavior; needs focused validation.",
+      "block-size": "Can affect allocator behavior; needs focused validation.",
+      "swap-space": "Can involve host memory and latency trade-offs.",
+      "cpu-offload-gb": "Can move memory pressure to host RAM and affect stability.",
+      "enforce-eager": "Changes execution mode and CUDA graph behavior.",
+      "speculative-model": "Requires additional model selection and quality validation.",
+      "num-speculative-tokens": "Speculative decoding depends on draft model behavior.",
+      "tensor-parallel-size": "Topology-sensitive and not useful without explicit GPU topology spec.",
+      "pipeline-parallel-size": "Topology-sensitive and out of scope for single-node small sweeps."
+    },
+    "persistent_or_system_blocked": {
+      "download-dir": "Can alter cache paths and storage behavior.",
+      "model-loader-extra-config": "Can introduce arbitrary loader settings.",
+      "tokenizer-mode": "Not a performance knob for the current safe sweep scope."
+    },
+    "not_relevant_now": {
+      "tool-call-parser": "Fixed for Qwen tool-calling compatibility.",
+      "enable-auto-tool-choice": "Fixed for Qwen tool-calling compatibility.",
+      "served-model-name": "Naming only.",
+      "host": "Serving interface only.",
+      "port": "Serving interface only."
+    }
+  }
+}

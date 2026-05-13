@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 - 2026-05-13
+
+- Added read-only vLLM flag discovery from the GX10 profile executable.
+- Added Qwen safe flag policy and catalog generation for performance-relevant
+  vLLM serve flags.
+- Added parser, mock/live capture workflow, and SpecKit feature docs for flag
+  cataloging.
+
 ## 0.5.0 - 2026-05-13
 
 - Added expanded safe Qwen sweep configuration around the current 0.90/32768

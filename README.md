@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.5.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.6.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -24,6 +24,8 @@ The project is spec-driven with SpecKit and currently supports:
   artifacts into JSON and Markdown recommendations.
 - Expanded safe Qwen sweep configuration for testing nearby GPU utilization
   and performance-mode candidates around the current winner.
+- Read-only vLLM flag discovery and safe performance knob cataloging from the
+  installed GX10 vLLM help output.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -113,6 +115,13 @@ Comparison report:
 uv run vllm-optimizer report --baseline artifacts/benchmarks/qwen-baseline/summary.json --sweep-ranking artifacts/sweeps/qwen-small/live/ranking.json --repeated-ranking artifacts/sweeps/qwen-top2-repeated/live/ranking.json --out artifacts/reports/qwen-comparison.json --markdown-out artifacts/reports/qwen-comparison.md
 ```
 
+vLLM flag catalog:
+
+```powershell
+uv run vllm-optimizer flag-catalog --policy config/vllm-flags/qwen-safe-policy.json --help-file tests/fixtures/vllm/serve-help.txt --out artifacts/vllm-flags/fixture/catalog.json
+uv run vllm-optimizer flag-catalog-capture --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq.json --policy config/vllm-flags/qwen-safe-policy.json --out artifacts/vllm-flags/gx10-qwen --executor ssh
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -136,3 +145,4 @@ Current feature specs:
 - `specs/006-repeated-sweep-stability/spec.md`
 - `specs/007-run-comparison-report/spec.md`
 - `specs/008-expanded-qwen-sweep/spec.md`
+- `specs/009-vllm-flag-catalog/spec.md`

@@ -9,6 +9,11 @@ from .artifacts import read_json, read_jsonl, write_json
 from .benchmark import BenchmarkError, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
 from .discovery import DiscoveryError, load_target, run_discovery
 from .experiments import ExperimentValidationError, load_experiment
+from .flag_catalog import (
+    FlagCatalogError,
+    capture_flag_catalog,
+    generate_catalog_from_files,
+)
 from .planner import build_trial_plan
 from .ranking import rank_results
 from .report import ReportError, ReportInputs, build_comparison_report
@@ -42,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
         SmokeServeError,
         SweepError,
         ReportError,
+        FlagCatalogError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -157,6 +163,26 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("--out", required=True, type=Path)
     report_parser.add_argument("--markdown-out", type=Path)
     report_parser.set_defaults(func=cmd_report)
+
+    flag_catalog_parser = subparsers.add_parser(
+        "flag-catalog", help="Generate a vLLM flag catalog from local help text"
+    )
+    flag_catalog_parser.add_argument("--policy", required=True, type=Path)
+    flag_catalog_parser.add_argument("--help-file", required=True, type=Path)
+    flag_catalog_parser.add_argument("--version-file", type=Path)
+    flag_catalog_parser.add_argument("--out", required=True, type=Path)
+    flag_catalog_parser.set_defaults(func=cmd_flag_catalog)
+
+    flag_capture_parser = subparsers.add_parser(
+        "flag-catalog-capture", help="Capture vLLM flag catalog over read-only SSH"
+    )
+    flag_capture_parser.add_argument("--config", required=True, type=Path)
+    flag_capture_parser.add_argument("--profile", required=True, type=Path)
+    flag_capture_parser.add_argument("--policy", required=True, type=Path)
+    flag_capture_parser.add_argument("--out", required=True, type=Path)
+    flag_capture_parser.add_argument("--executor", required=True, choices=["mock", "ssh"])
+    flag_capture_parser.add_argument("--mock-results", type=Path)
+    flag_capture_parser.set_defaults(func=cmd_flag_catalog_capture)
 
     return parser
 
@@ -297,5 +323,25 @@ def cmd_report(args: argparse.Namespace) -> int:
     if args.markdown_out is not None:
         args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
         args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
+    return 0
+
+
+def cmd_flag_catalog(args: argparse.Namespace) -> int:
+    generate_catalog_from_files(args.policy, args.help_file, args.out, args.version_file)
+    print(str(args.out))
+    return 0
+
+
+def cmd_flag_catalog_capture(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    profile = load_serve_profile(args.profile)
+    if args.executor == "mock":
+        if args.mock_results is None:
+            raise FlagCatalogError("--mock-results is required when --executor mock is used")
+        executor = MockExecutor(read_json(args.mock_results))
+    else:
+        executor = SshExecutor(target.ssh_destination)
+    capture_flag_catalog(target, profile, args.policy, executor, args.out)
     print(str(args.out))
     return 0
