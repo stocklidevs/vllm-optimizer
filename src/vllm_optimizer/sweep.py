@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 from itertools import product
 from pathlib import Path
-from statistics import mean
+from statistics import mean, pstdev
 from typing import Any
 
 from .artifacts import read_json, read_jsonl, write_json, write_jsonl
@@ -36,6 +36,7 @@ class SweepDefinition:
     seed: int
     max_trials: int | None
     baseline_summary_path: Path | None
+    repetitions: int
 
 
 def load_sweep_definition(path: Path) -> SweepDefinition:
@@ -61,6 +62,11 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
     if max_trials is not None and (not isinstance(max_trials, int) or max_trials < 1):
         errors.append("max_trials must be a positive integer when provided")
         max_trials = None
+
+    repetitions = data.get("repetitions", 1)
+    if not isinstance(repetitions, int) or repetitions < 1:
+        errors.append("repetitions must be a positive integer")
+        repetitions = 1
 
     objectives_raw = data.get("objectives", ["throughput", "latency", "balanced"])
     if not isinstance(objectives_raw, list) or not objectives_raw:
@@ -110,6 +116,7 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
         seed=seed,
         max_trials=max_trials,
         baseline_summary_path=baseline_summary_path,
+        repetitions=repetitions,
     )
 
 
@@ -124,23 +131,36 @@ def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifact
         raise SweepError("sweep produced no trials")
 
     trials = []
+    candidates = []
     for order, values in enumerate(combinations):
         overrides = dict(zip(parameter_names, values, strict=True))
-        trial_profile = apply_profile_overrides(profile, overrides, order)
-        trial_id = build_trial_id(definition.sweep_id, order, overrides)
-        artifact_dir = f"{artifact_root}/{definition.sweep_id}/{trial_id}"
-        trials.append(
+        candidate_id = build_candidate_id(definition.sweep_id, order, overrides)
+        candidates.append(
             {
-                "trial_id": trial_id,
+                "candidate_id": candidate_id,
                 "order": order,
-                "profile": serve_profile_to_dict(trial_profile),
                 "overrides": overrides,
-                "classification": "session-mutating",
-                "artifact_dir": artifact_dir,
-                "serve_plan": build_serve_plan(trial_profile),
-                "benchmark_plan": build_benchmark_plan(trial_profile, prompts),
+                "repetitions": definition.repetitions,
             }
         )
+        for repetition_index in range(definition.repetitions):
+            trial_profile = apply_profile_overrides(profile, overrides, order, repetition_index)
+            trial_id = build_trial_id(definition.sweep_id, order, repetition_index, overrides)
+            artifact_dir = f"{artifact_root}/{definition.sweep_id}/{trial_id}"
+            trials.append(
+                {
+                    "trial_id": trial_id,
+                    "candidate_id": candidate_id,
+                    "candidate_order": order,
+                    "repetition_index": repetition_index,
+                    "profile": serve_profile_to_dict(trial_profile),
+                    "overrides": overrides,
+                    "classification": "session-mutating",
+                    "artifact_dir": artifact_dir,
+                    "serve_plan": build_serve_plan(trial_profile),
+                    "benchmark_plan": build_benchmark_plan(trial_profile, prompts),
+                }
+            )
 
     return {
         "sweep_id": definition.sweep_id,
@@ -153,7 +173,10 @@ def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifact
         "prompt_set_id": prompts.prompt_set_id,
         "baseline_summary_path": str(definition.baseline_summary_path) if definition.baseline_summary_path else None,
         "safe_parameters": sorted(SAFE_PARAMETERS),
+        "repetitions": definition.repetitions,
+        "candidate_count": len(candidates),
         "trial_count": len(trials),
+        "candidates": candidates,
         "trials": trials,
     }
 
@@ -187,6 +210,8 @@ def build_sweep_preview(plan: dict[str, Any]) -> dict[str, Any]:
         preview_trials.append(
             {
                 "trial_id": trial_id,
+                "candidate_id": trial.get("candidate_id"),
+                "repetition_index": trial.get("repetition_index", 0),
                 "order": trial.get("order"),
                 "changed_parameters": overrides,
                 "classification": classification,
@@ -214,25 +239,28 @@ def rank_sweep_results(plan: dict[str, Any], result_rows: list[dict[str, Any]]) 
     if not isinstance(trials, list) or not trials:
         raise SweepError("plan.trials must be a non-empty array")
     rows_by_trial = {row.get("trial_id"): normalize_trial_result(row) for row in result_rows if row.get("trial_id")}
+    trials_by_id = {trial.get("trial_id"): trial for trial in trials if trial.get("trial_id")}
     plan_trial_ids = [trial["trial_id"] for trial in trials if isinstance(trial.get("trial_id"), str)]
     excluded = []
-    rankable = []
+    normalized_rows = []
     for trial_id in plan_trial_ids:
         row = rows_by_trial.get(trial_id)
         if row is None:
             excluded.append({"trial_id": trial_id, "reason": "missing result row"})
             continue
-        if row["status"] != "completed":
-            excluded.append({"trial_id": trial_id, "reason": row.get("failure_reason") or row["status"]})
-            continue
-        summary = row["summary"]
-        if not isinstance(summary.get("mean_latency_ms"), int | float):
-            excluded.append({"trial_id": trial_id, "reason": "missing mean_latency_ms"})
-            continue
-        if not isinstance(summary.get("aggregate_tokens_per_second"), int | float):
-            excluded.append({"trial_id": trial_id, "reason": "missing aggregate_tokens_per_second"})
-            continue
-        rankable.append(row)
+        trial = trials_by_id.get(trial_id, {})
+        candidate_id = row.get("candidate_id")
+        if candidate_id in (None, trial_id):
+            candidate_id = trial.get("candidate_id") or trial_id
+        row["candidate_id"] = candidate_id
+        row["repetition_index"] = row.get("repetition_index", trial.get("repetition_index", 0))
+        normalized_rows.append(row)
+
+    aggregates = aggregate_candidates(plan, normalized_rows)
+    rankable = [item for item in aggregates if item["success_count"] > 0]
+    for item in aggregates:
+        if item["success_count"] == 0:
+            excluded.append({"candidate_id": item["candidate_id"], "reason": "no successful repetitions"})
 
     if not rankable:
         raise SweepError("no rankable sweep trials")
@@ -247,9 +275,11 @@ def rank_sweep_results(plan: dict[str, Any], result_rows: list[dict[str, Any]]) 
         "sweep_id": plan.get("sweep_id"),
         "objectives": rankings,
         "excluded_trials": excluded,
+        "candidate_aggregates": aggregates,
         "baseline_summary_path": plan.get("baseline_summary_path"),
         "source_trial_count": len(plan_trial_ids),
         "ranked_trial_count": len(rankable),
+        "ranked_candidate_count": len(rankable),
     }
 
 
@@ -276,6 +306,8 @@ def run_sweep(
             results.append(
                 {
                     "trial_id": trial_id,
+                    "candidate_id": trial.get("candidate_id", trial_id),
+                    "repetition_index": trial.get("repetition_index", 0),
                     "status": status,
                     "summary": summary,
                     "artifact_paths": result.get("artifact_paths", {}),
@@ -287,6 +319,8 @@ def run_sweep(
             results.append(
                 {
                     "trial_id": trial_id,
+                    "candidate_id": trial.get("candidate_id", trial_id),
+                    "repetition_index": trial.get("repetition_index", 0),
                     "status": "failed",
                     "summary": {},
                     "artifact_paths": {},
@@ -311,15 +345,27 @@ def load_sweep_results(path: Path) -> list[dict[str, Any]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
-def apply_profile_overrides(profile: ServeProfile, overrides: dict[str, Any], order: int) -> ServeProfile:
+def apply_profile_overrides(
+    profile: ServeProfile, overrides: dict[str, Any], order: int, repetition_index: int = 0
+) -> ServeProfile:
     values = {name: _coerce_profile_value(name, value) for name, value in overrides.items()}
-    return replace(profile, profile_id=f"{profile.profile_id}-sweep-{order + 1:03d}", **values)
+    return replace(
+        profile,
+        profile_id=f"{profile.profile_id}-sweep-{order + 1:03d}-r{repetition_index + 1:02d}",
+        **values,
+    )
 
 
-def build_trial_id(sweep_id: str, order: int, overrides: dict[str, Any]) -> str:
-    material = f"{sweep_id}|{order}|{sorted(overrides.items())}"
+def build_candidate_id(sweep_id: str, order: int, overrides: dict[str, Any]) -> str:
+    material = f"{sweep_id}|candidate|{order}|{sorted(overrides.items())}"
     digest = sha256(material.encode("utf-8")).hexdigest()[:8]
-    return f"{sweep_id}-t{order + 1:03d}-{digest}"
+    return f"{sweep_id}-c{order + 1:03d}-{digest}"
+
+
+def build_trial_id(sweep_id: str, order: int, repetition_index: int, overrides: dict[str, Any]) -> str:
+    material = f"{sweep_id}|trial|{order}|{repetition_index}|{sorted(overrides.items())}"
+    digest = sha256(material.encode("utf-8")).hexdigest()[:8]
+    return f"{sweep_id}-c{order + 1:03d}-r{repetition_index + 1:02d}-{digest}"
 
 
 def serve_profile_to_dict(profile: ServeProfile) -> dict[str, Any]:
@@ -344,6 +390,8 @@ def normalize_trial_result(row: dict[str, Any]) -> dict[str, Any]:
         status = "completed" if summary.get("failure_count", 0) == 0 else "failed"
     return {
         "trial_id": row.get("trial_id"),
+        "candidate_id": row.get("candidate_id", row.get("trial_id")),
+        "repetition_index": row.get("repetition_index", 0),
         "status": status,
         "summary": summary,
         "artifact_paths": row.get("artifact_paths", row.get("artifact_refs", {})),
@@ -351,38 +399,111 @@ def normalize_trial_result(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def aggregate_candidates(plan: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows_by_candidate: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        candidate_id = str(row.get("candidate_id") or row.get("trial_id"))
+        rows_by_candidate.setdefault(candidate_id, []).append(row)
+
+    candidates = plan.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        candidates = [
+            {
+                "candidate_id": trial.get("candidate_id", trial.get("trial_id")),
+                "order": trial.get("candidate_order", trial.get("order", 0)),
+                "overrides": trial.get("overrides", {}),
+            }
+            for trial in plan.get("trials", [])
+        ]
+
+    aggregates = []
+    seen = set()
+    for candidate in candidates:
+        candidate_id = str(candidate.get("candidate_id"))
+        if candidate_id in seen:
+            continue
+        seen.add(candidate_id)
+        candidate_rows = rows_by_candidate.get(candidate_id, [])
+        successful = [
+            row
+            for row in candidate_rows
+            if row.get("status") == "completed"
+            and isinstance(row.get("summary", {}).get("mean_latency_ms"), int | float)
+            and isinstance(row.get("summary", {}).get("aggregate_tokens_per_second"), int | float)
+        ]
+        latencies = [float(row["summary"]["mean_latency_ms"]) for row in successful]
+        throughputs = [float(row["summary"]["aggregate_tokens_per_second"]) for row in successful]
+        failure_count = len(candidate_rows) - len(successful)
+        total_count = len(candidate_rows)
+        aggregates.append(
+            {
+                "candidate_id": candidate_id,
+                "order": candidate.get("order"),
+                "overrides": candidate.get("overrides", {}),
+                "success_count": len(successful),
+                "failure_count": failure_count,
+                "failure_rate": failure_count / total_count if total_count else 1.0,
+                "mean_latency_ms": mean(latencies) if latencies else None,
+                "latency_spread_ms": pstdev(latencies) if len(latencies) > 1 else 0.0 if latencies else None,
+                "mean_tokens_per_second": mean(throughputs) if throughputs else None,
+                "tokens_per_second_spread": pstdev(throughputs) if len(throughputs) > 1 else 0.0 if throughputs else None,
+                "source_trials": [
+                    {
+                        "trial_id": row.get("trial_id"),
+                        "repetition_index": row.get("repetition_index", 0),
+                        "status": row.get("status"),
+                        "artifact_paths": row.get("artifact_paths", {}),
+                        "failure_reason": row.get("failure_reason"),
+                    }
+                    for row in sorted(candidate_rows, key=lambda item: item.get("repetition_index", 0))
+                ],
+                "artifact_paths": {
+                    str(row.get("trial_id")): row.get("artifact_paths", {})
+                    for row in candidate_rows
+                    if row.get("trial_id")
+                },
+            }
+        )
+    return aggregates
+
+
 def rank_for_objective(
     objective: str, rows: list[dict[str, Any]], baseline: dict[str, Any] | None
 ) -> list[dict[str, Any]]:
     scored = []
-    latencies = [float(row["summary"]["mean_latency_ms"]) for row in rows]
-    throughputs = [float(row["summary"]["aggregate_tokens_per_second"]) for row in rows]
+    latencies = [float(_row_latency(row)) for row in rows]
+    throughputs = [float(_row_throughput(row)) for row in rows]
     max_latency = max(latencies)
     min_latency = min(latencies)
     max_throughput = max(throughputs)
     min_throughput = min(throughputs)
     for row in rows:
-        summary = row["summary"]
-        throughput = float(summary["aggregate_tokens_per_second"])
-        latency = float(summary["mean_latency_ms"])
+        throughput = float(_row_throughput(row))
+        latency = float(_row_latency(row))
+        failure_rate = float(row.get("failure_rate", 0.0))
+        latency_spread = float(row.get("latency_spread_ms", 0.0) or 0.0)
+        throughput_spread = float(row.get("tokens_per_second_spread", 0.0) or 0.0)
         if objective == "throughput":
             score = throughput
-            key = (-throughput, latency, str(row["trial_id"]))
+            key = (-throughput, failure_rate, throughput_spread, latency, _row_id(row))
         elif objective == "latency":
             score = latency
-            key = (latency, -throughput, str(row["trial_id"]))
+            key = (latency, failure_rate, latency_spread, -throughput, _row_id(row))
         else:
             throughput_score = _normalize(throughput, min_throughput, max_throughput)
             latency_score = 1 - _normalize(latency, min_latency, max_latency)
-            score = mean([throughput_score, latency_score])
-            key = (-score, latency, -throughput, str(row["trial_id"]))
+            stability_penalty = min(0.2, failure_rate + (latency_spread / max(latency, 1)) * 0.1)
+            score = mean([throughput_score, latency_score]) - stability_penalty
+            key = (-score, failure_rate, latency_spread, -throughput, _row_id(row))
         scored.append(
             {
-                "trial_id": row["trial_id"],
+                "trial_id": row.get("trial_id"),
+                "candidate_id": row.get("candidate_id", row.get("trial_id")),
                 "score": score,
-                "metrics": summary,
-                "baseline_delta": baseline_delta(summary, baseline),
+                "metrics": ranking_metrics(row),
+                "baseline_delta": baseline_delta(ranking_metrics(row), baseline),
                 "artifact_paths": row["artifact_paths"],
+                "source_trials": row.get("source_trials", []),
                 "_key": key,
             }
         )
@@ -403,6 +524,37 @@ def baseline_delta(summary: dict[str, Any], baseline: dict[str, Any] | None) -> 
         if isinstance(current, int | float) and isinstance(base, int | float) and base != 0:
             deltas[key] = {"absolute": current - base, "percent": ((current - base) / base) * 100}
     return deltas
+
+
+def ranking_metrics(row: dict[str, Any]) -> dict[str, Any]:
+    if "summary" in row:
+        return row["summary"]
+    return {
+        "mean_latency_ms": row.get("mean_latency_ms"),
+        "aggregate_tokens_per_second": row.get("mean_tokens_per_second"),
+        "latency_spread_ms": row.get("latency_spread_ms"),
+        "tokens_per_second_spread": row.get("tokens_per_second_spread"),
+        "success_count": row.get("success_count"),
+        "failure_count": row.get("failure_count"),
+        "failure_rate": row.get("failure_rate"),
+        "overrides": row.get("overrides"),
+    }
+
+
+def _row_id(row: dict[str, Any]) -> str:
+    return str(row.get("candidate_id", row.get("trial_id", "")))
+
+
+def _row_latency(row: dict[str, Any]) -> float:
+    if "summary" in row:
+        return float(row["summary"]["mean_latency_ms"])
+    return float(row["mean_latency_ms"])
+
+
+def _row_throughput(row: dict[str, Any]) -> float:
+    if "summary" in row:
+        return float(row["summary"]["aggregate_tokens_per_second"])
+    return float(row["mean_tokens_per_second"])
 
 
 def load_optional_baseline(path_value: Any) -> dict[str, Any] | None:

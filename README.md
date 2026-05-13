@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.2.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.3.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -18,6 +18,8 @@ The project is spec-driven with SpecKit and currently supports:
 - A small Qwen baseline benchmark with fixed prompts and summary metrics.
 - Deterministic small Qwen parameter sweeps with dry-run previews and local
   ranking for throughput, latency, and balanced objectives.
+- Repeated top-two sweep stability analysis with per-candidate aggregates,
+  spread metrics, baseline deltas, and stability-aware rankings.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -79,6 +81,14 @@ uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-small/plan.json
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-small/plan.json --out artifacts/sweeps/qwen-small/live --timeout-seconds 1200 --continue-on-failure
 ```
 
+Repeated top-two stability sweep:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-top2-repeated.json --out artifacts/sweeps/qwen-top2-repeated/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-top2-repeated/plan.json --out artifacts/sweeps/qwen-top2-repeated/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-top2-repeated/plan.json --out artifacts/sweeps/qwen-top2-repeated/live --timeout-seconds 1200 --continue-on-failure
+```
+
 Rank completed or fixture sweep results:
 
 ```powershell
@@ -105,3 +115,4 @@ Current feature specs:
 - `specs/003-qwen-smoke-serve/spec.md`
 - `specs/004-qwen-baseline-benchmark/spec.md`
 - `specs/005-qwen-parameter-sweep/spec.md`
+- `specs/006-repeated-sweep-stability/spec.md`

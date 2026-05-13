@@ -17,9 +17,13 @@ def test_build_sweep_plan_is_deterministic() -> None:
     first = build_sweep_plan(definition)
     second = build_sweep_plan(definition)
 
+    assert first["candidate_count"] == 4
     assert first["trial_count"] == 4
     assert [trial["trial_id"] for trial in first["trials"]] == [
         trial["trial_id"] for trial in second["trials"]
+    ]
+    assert [candidate["candidate_id"] for candidate in first["candidates"]] == [
+        candidate["candidate_id"] for candidate in second["candidates"]
     ]
     assert first["trials"][0]["overrides"] == {
         "gpu_memory_utilization": 0.86,
@@ -109,7 +113,69 @@ def test_rank_sweep_results_reports_objective_rankings() -> None:
 
     report = rank_sweep_results(plan, rows)
 
-    assert report["objectives"]["throughput"][0]["trial_id"] == trial_ids[0]
-    assert report["objectives"]["latency"][0]["trial_id"] == trial_ids[1]
-    assert report["ranked_trial_count"] == 2
-    assert {"trial_id": trial_ids[2], "reason": "readiness timeout"} in report["excluded_trials"]
+    assert report["objectives"]["throughput"][0]["candidate_id"] == plan["trials"][0]["candidate_id"]
+    assert report["objectives"]["latency"][0]["candidate_id"] == plan["trials"][1]["candidate_id"]
+    assert report["ranked_candidate_count"] == 2
+    failed_candidate = plan["trials"][2]["candidate_id"]
+    assert {"candidate_id": failed_candidate, "reason": "no successful repetitions"} in report["excluded_trials"]
+
+
+def test_repeated_sweep_plan_adds_candidate_and_repetition_metadata() -> None:
+    definition = load_sweep_definition(Path("config/sweeps/qwen-top2-repeated.json"))
+
+    plan = build_sweep_plan(definition)
+
+    assert plan["candidate_count"] == 2
+    assert plan["trial_count"] == 6
+    assert [trial["repetition_index"] for trial in plan["trials"]] == [0, 1, 2, 0, 1, 2]
+    assert len({trial["candidate_id"] for trial in plan["trials"]}) == 2
+
+
+def test_repeated_sweep_rejects_invalid_repetitions(tmp_path: Path) -> None:
+    path = tmp_path / "bad-repetitions.json"
+    path.write_text(
+        """{
+  "sweep_id": "bad",
+  "profile": "config/profiles/qwen3-coder-next-awq.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "repetitions": 0,
+  "objectives": ["throughput"],
+  "parameters": {"gpu_memory_utilization": [0.86]}
+}""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SweepError, match="repetitions"):
+        load_sweep_definition(path)
+
+
+def test_repeated_sweep_ranking_aggregates_by_candidate() -> None:
+    plan = build_sweep_plan(load_sweep_definition(Path("config/sweeps/qwen-top2-repeated.json")))
+    candidate_ids = [candidate["candidate_id"] for candidate in plan["candidates"]]
+    rows = []
+    for trial in plan["trials"]:
+        throughput = 48 if trial["candidate_id"] == candidate_ids[0] else 47
+        latency = 1000 if trial["candidate_id"] == candidate_ids[0] else 1010
+        rows.append(
+            {
+                "trial_id": trial["trial_id"],
+                "candidate_id": trial["candidate_id"],
+                "repetition_index": trial["repetition_index"],
+                "status": "completed",
+                "summary": {
+                    "mean_latency_ms": latency + trial["repetition_index"],
+                    "aggregate_tokens_per_second": throughput - trial["repetition_index"],
+                    "failure_count": 0,
+                },
+                "artifact_paths": {"summary": f"{trial['trial_id']}.json"},
+            }
+        )
+    rows[-1]["status"] = "failed"
+    rows[-1]["failure_reason"] = "readiness timeout"
+    rows[-1]["summary"] = {}
+
+    report = rank_sweep_results(plan, rows)
+
+    assert report["candidate_aggregates"][0]["success_count"] == 3
+    assert report["candidate_aggregates"][1]["failure_count"] == 1
+    assert report["objectives"]["throughput"][0]["candidate_id"] == candidate_ids[0]

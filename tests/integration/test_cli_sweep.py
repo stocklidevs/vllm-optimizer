@@ -20,6 +20,7 @@ def test_sweep_plan_cli_writes_plan(tmp_path: Path) -> None:
     assert exit_code == 0
     plan = read_json(out)
     assert plan["trial_count"] == 4
+    assert plan["candidate_count"] == 4
     assert plan["will_execute"] is False
 
 
@@ -65,4 +66,23 @@ def test_sweep_rank_cli_writes_ranking(tmp_path: Path) -> None:
 
     assert exit_code == 0
     ranking = read_json(ranking_path)
-    assert ranking["objectives"]["throughput"][0]["trial_id"] == trial_id
+    assert ranking["objectives"]["throughput"][0]["candidate_id"] == plan["trials"][0]["candidate_id"]
+
+
+def test_repeated_sweep_plan_cli_writes_repeated_trials(tmp_path: Path) -> None:
+    out = tmp_path / "repeated-plan.json"
+
+    exit_code = main(
+        [
+            "sweep-plan",
+            "--sweep",
+            "config/sweeps/qwen-top2-repeated.json",
+            "--out",
+            str(out),
+        ]
+    )
+
+    assert exit_code == 0
+    plan = read_json(out)
+    assert plan["candidate_count"] == 2
+    assert plan["trial_count"] == 6
