@@ -15,6 +15,16 @@ from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
+from .sweep import (
+    SweepError,
+    build_sweep_plan,
+    build_sweep_preview,
+    load_sweep_definition,
+    load_sweep_results,
+    objective_exit_code,
+    rank_sweep_results,
+    run_sweep,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         ExperimentValidationError,
         ServeProfileError,
         SmokeServeError,
+        SweepError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -102,6 +113,38 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_run_parser.add_argument("--out", required=True, type=Path)
     benchmark_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
     benchmark_run_parser.set_defaults(func=cmd_benchmark_run)
+
+    sweep_plan_parser = subparsers.add_parser(
+        "sweep-plan", help="Generate a deterministic parameter sweep plan"
+    )
+    sweep_plan_parser.add_argument("--sweep", required=True, type=Path)
+    sweep_plan_parser.add_argument("--out", required=True, type=Path)
+    sweep_plan_parser.set_defaults(func=cmd_sweep_plan)
+
+    sweep_preview_parser = subparsers.add_parser(
+        "sweep-preview", help="Render a dry-run sweep preview"
+    )
+    sweep_preview_parser.add_argument("--plan", required=True, type=Path)
+    sweep_preview_parser.add_argument("--out", required=True, type=Path)
+    sweep_preview_parser.set_defaults(func=cmd_sweep_preview)
+
+    sweep_rank_parser = subparsers.add_parser(
+        "sweep-rank", help="Rank sweep result artifacts"
+    )
+    sweep_rank_parser.add_argument("--plan", required=True, type=Path)
+    sweep_rank_parser.add_argument("--results", required=True, type=Path)
+    sweep_rank_parser.add_argument("--out", required=True, type=Path)
+    sweep_rank_parser.set_defaults(func=cmd_sweep_rank)
+
+    sweep_run_parser = subparsers.add_parser(
+        "sweep-run", help="Run an approved live sweep sequentially"
+    )
+    sweep_run_parser.add_argument("--config", required=True, type=Path)
+    sweep_run_parser.add_argument("--plan", required=True, type=Path)
+    sweep_run_parser.add_argument("--out", required=True, type=Path)
+    sweep_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    sweep_run_parser.add_argument("--continue-on-failure", action="store_true")
+    sweep_run_parser.set_defaults(func=cmd_sweep_run)
 
     return parser
 
@@ -187,3 +230,44 @@ def cmd_benchmark_run(args: argparse.Namespace) -> int:
     print(str(args.out))
     summary = result["summary"]
     return 0 if summary.get("failure_count", 1) == 0 else 2
+
+
+def cmd_sweep_plan(args: argparse.Namespace) -> int:
+    definition = load_sweep_definition(args.sweep)
+    plan = build_sweep_plan(definition)
+    write_json(args.out, plan)
+    print(str(args.out))
+    return 0
+
+
+def cmd_sweep_preview(args: argparse.Namespace) -> int:
+    plan = read_json(args.plan)
+    preview = build_sweep_preview(plan)
+    write_json(args.out, preview)
+    print(str(args.out))
+    return 2 if preview["blocked"] else 0
+
+
+def cmd_sweep_rank(args: argparse.Namespace) -> int:
+    plan = read_json(args.plan)
+    rows = load_sweep_results(args.results)
+    report = rank_sweep_results(plan, rows)
+    write_json(args.out, report)
+    print(str(args.out))
+    return objective_exit_code(report)
+
+
+def cmd_sweep_run(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    plan = read_json(args.plan)
+    prompts = load_prompt_set(Path(plan["prompts_path"]))
+    result = run_sweep(
+        target,
+        plan,
+        prompts,
+        args.out,
+        args.timeout_seconds,
+        args.continue_on_failure,
+    )
+    print(str(args.out))
+    return 0 if result["failure_count"] == 0 else 2

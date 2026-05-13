@@ -1,0 +1,462 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, replace
+from hashlib import sha256
+from itertools import product
+from pathlib import Path
+from statistics import mean
+from typing import Any
+
+from .artifacts import read_json, read_jsonl, write_json, write_jsonl
+from .benchmark import PromptSet, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
+from .discovery import DiscoveryTarget
+from .serve_profiles import ServeProfile, build_serve_plan, load_serve_profile
+
+
+class SweepError(ValueError):
+    """Raised when a sweep definition, plan, or result set is invalid."""
+
+
+SAFE_PARAMETERS: dict[str, dict[str, Any]] = {
+    "max_model_len": {"type": int, "min": 1024, "max": 65536},
+    "gpu_memory_utilization": {"type": float, "min": 0.5, "max": 0.95},
+    "performance_mode": {"type": str, "allowed": {"interactivity", "throughput"}},
+}
+
+OBJECTIVES = {"throughput", "latency", "balanced"}
+
+
+@dataclass(frozen=True)
+class SweepDefinition:
+    sweep_id: str
+    profile_path: Path
+    prompts_path: Path
+    parameters: dict[str, tuple[Any, ...]]
+    objectives: tuple[str, ...]
+    seed: int
+    max_trials: int | None
+    baseline_summary_path: Path | None
+
+
+def load_sweep_definition(path: Path) -> SweepDefinition:
+    data = read_json(path)
+    errors: list[str] = []
+
+    sweep_id = data.get("sweep_id")
+    if not isinstance(sweep_id, str) or not sweep_id:
+        errors.append("sweep_id is required")
+        sweep_id = ""
+
+    profile = _required_path(data, "profile", errors)
+    prompts = _required_path(data, "prompts", errors)
+    baseline_summary = data.get("baseline_summary")
+    baseline_summary_path = Path(baseline_summary) if isinstance(baseline_summary, str) and baseline_summary else None
+
+    seed = data.get("seed", 0)
+    if not isinstance(seed, int):
+        errors.append("seed must be an integer")
+        seed = 0
+
+    max_trials = data.get("max_trials")
+    if max_trials is not None and (not isinstance(max_trials, int) or max_trials < 1):
+        errors.append("max_trials must be a positive integer when provided")
+        max_trials = None
+
+    objectives_raw = data.get("objectives", ["throughput", "latency", "balanced"])
+    if not isinstance(objectives_raw, list) or not objectives_raw:
+        errors.append("objectives must be a non-empty array")
+        objectives_raw = []
+    objectives: list[str] = []
+    for objective in objectives_raw:
+        if not isinstance(objective, str) or objective not in OBJECTIVES:
+            errors.append(f"unsupported objective {objective!r}")
+            continue
+        objectives.append(objective)
+
+    parameters_raw = data.get("parameters")
+    if not isinstance(parameters_raw, dict) or not parameters_raw:
+        errors.append("parameters must be a non-empty object")
+        parameters_raw = {}
+    parameters: dict[str, tuple[Any, ...]] = {}
+    for name in sorted(parameters_raw):
+        values = parameters_raw[name]
+        if name not in SAFE_PARAMETERS:
+            errors.append(f"parameter {name!r} is not allowed for session-level sweeps")
+            continue
+        if not isinstance(values, list) or not values:
+            errors.append(f"parameters.{name} must be a non-empty array")
+            continue
+        parsed_values = []
+        for value in values:
+            parsed = _validate_parameter_value(name, value, errors)
+            if parsed is not None:
+                parsed_values.append(parsed)
+        if parsed_values:
+            parameters[name] = tuple(parsed_values)
+
+    if not objectives:
+        errors.append("at least one supported objective is required")
+    if not parameters:
+        errors.append("at least one safe parameter is required")
+    if errors:
+        raise SweepError("; ".join(errors))
+
+    return SweepDefinition(
+        sweep_id=sweep_id,
+        profile_path=profile,
+        prompts_path=prompts,
+        parameters=parameters,
+        objectives=tuple(objectives),
+        seed=seed,
+        max_trials=max_trials,
+        baseline_summary_path=baseline_summary_path,
+    )
+
+
+def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifacts/sweeps") -> dict[str, Any]:
+    profile = load_serve_profile(definition.profile_path)
+    prompts = load_prompt_set(definition.prompts_path)
+    parameter_names = sorted(definition.parameters)
+    combinations = list(product(*(definition.parameters[name] for name in parameter_names)))
+    if definition.max_trials is not None:
+        combinations = combinations[: definition.max_trials]
+    if not combinations:
+        raise SweepError("sweep produced no trials")
+
+    trials = []
+    for order, values in enumerate(combinations):
+        overrides = dict(zip(parameter_names, values, strict=True))
+        trial_profile = apply_profile_overrides(profile, overrides, order)
+        trial_id = build_trial_id(definition.sweep_id, order, overrides)
+        artifact_dir = f"{artifact_root}/{definition.sweep_id}/{trial_id}"
+        trials.append(
+            {
+                "trial_id": trial_id,
+                "order": order,
+                "profile": serve_profile_to_dict(trial_profile),
+                "overrides": overrides,
+                "classification": "session-mutating",
+                "artifact_dir": artifact_dir,
+                "serve_plan": build_serve_plan(trial_profile),
+                "benchmark_plan": build_benchmark_plan(trial_profile, prompts),
+            }
+        )
+
+    return {
+        "sweep_id": definition.sweep_id,
+        "mode": "dry-run",
+        "will_execute": False,
+        "seed": definition.seed,
+        "objectives": list(definition.objectives),
+        "profile_path": str(definition.profile_path),
+        "prompts_path": str(definition.prompts_path),
+        "prompt_set_id": prompts.prompt_set_id,
+        "baseline_summary_path": str(definition.baseline_summary_path) if definition.baseline_summary_path else None,
+        "safe_parameters": sorted(SAFE_PARAMETERS),
+        "trial_count": len(trials),
+        "trials": trials,
+    }
+
+
+def build_sweep_preview(plan: dict[str, Any]) -> dict[str, Any]:
+    trials = plan.get("trials")
+    if not isinstance(trials, list) or not trials:
+        raise SweepError("plan.trials must be a non-empty array")
+
+    preview_trials: list[dict[str, Any]] = []
+    blocked_reasons: list[dict[str, str]] = []
+    for trial in trials:
+        trial_id = str(trial.get("trial_id", "unknown"))
+        overrides = trial.get("overrides", {})
+        classification = trial.get("classification")
+        if classification != "session-mutating":
+            blocked_reasons.append(
+                {"trial_id": trial_id, "reason": f"unsupported classification {classification!r}"}
+            )
+        if not isinstance(overrides, dict):
+            blocked_reasons.append({"trial_id": trial_id, "reason": "overrides must be an object"})
+            overrides = {}
+        for name, value in overrides.items():
+            if name not in SAFE_PARAMETERS:
+                blocked_reasons.append({"trial_id": trial_id, "reason": f"unsafe parameter {name!r}"})
+                continue
+            value_errors: list[str] = []
+            _validate_parameter_value(name, value, value_errors)
+            for error in value_errors:
+                blocked_reasons.append({"trial_id": trial_id, "reason": error})
+        preview_trials.append(
+            {
+                "trial_id": trial_id,
+                "order": trial.get("order"),
+                "changed_parameters": overrides,
+                "classification": classification,
+                "will_execute": False,
+                "artifact_dir": trial.get("artifact_dir"),
+                "command_line": trial.get("serve_plan", {}).get("command_line"),
+                "metrics": trial.get("benchmark_plan", {}).get("metrics", []),
+                "cleanup": "stop vLLM process and verify process exit before next trial",
+            }
+        )
+
+    return {
+        "sweep_id": plan.get("sweep_id"),
+        "mode": "dry-run",
+        "will_execute": False,
+        "trial_count": len(preview_trials),
+        "blocked": bool(blocked_reasons),
+        "blocked_reasons": blocked_reasons,
+        "trials": preview_trials,
+    }
+
+
+def rank_sweep_results(plan: dict[str, Any], result_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    trials = plan.get("trials", [])
+    if not isinstance(trials, list) or not trials:
+        raise SweepError("plan.trials must be a non-empty array")
+    rows_by_trial = {row.get("trial_id"): normalize_trial_result(row) for row in result_rows if row.get("trial_id")}
+    plan_trial_ids = [trial["trial_id"] for trial in trials if isinstance(trial.get("trial_id"), str)]
+    excluded = []
+    rankable = []
+    for trial_id in plan_trial_ids:
+        row = rows_by_trial.get(trial_id)
+        if row is None:
+            excluded.append({"trial_id": trial_id, "reason": "missing result row"})
+            continue
+        if row["status"] != "completed":
+            excluded.append({"trial_id": trial_id, "reason": row.get("failure_reason") or row["status"]})
+            continue
+        summary = row["summary"]
+        if not isinstance(summary.get("mean_latency_ms"), int | float):
+            excluded.append({"trial_id": trial_id, "reason": "missing mean_latency_ms"})
+            continue
+        if not isinstance(summary.get("aggregate_tokens_per_second"), int | float):
+            excluded.append({"trial_id": trial_id, "reason": "missing aggregate_tokens_per_second"})
+            continue
+        rankable.append(row)
+
+    if not rankable:
+        raise SweepError("no rankable sweep trials")
+
+    baseline = load_optional_baseline(plan.get("baseline_summary_path"))
+    rankings = {
+        objective: rank_for_objective(objective, rankable, baseline)
+        for objective in plan.get("objectives", ["throughput", "latency", "balanced"])
+        if objective in OBJECTIVES
+    }
+    return {
+        "sweep_id": plan.get("sweep_id"),
+        "objectives": rankings,
+        "excluded_trials": excluded,
+        "baseline_summary_path": plan.get("baseline_summary_path"),
+        "source_trial_count": len(plan_trial_ids),
+        "ranked_trial_count": len(rankable),
+    }
+
+
+def run_sweep(
+    target: DiscoveryTarget,
+    plan: dict[str, Any],
+    prompt_set: PromptSet,
+    out_dir: Path,
+    timeout_seconds: int,
+    continue_on_failure: bool,
+) -> dict[str, Any]:
+    results = []
+    failures = 0
+    for trial in plan.get("trials", []):
+        trial_id = trial["trial_id"]
+        profile = parse_profile_from_plan(trial["profile"])
+        trial_out = out_dir / trial_id
+        try:
+            result = run_baseline_benchmark(target, profile, prompt_set, trial_out, timeout_seconds)
+            summary = result["summary"]
+            status = "completed" if summary.get("failure_count", 1) == 0 else "failed"
+            if status != "completed":
+                failures += 1
+            results.append(
+                {
+                    "trial_id": trial_id,
+                    "status": status,
+                    "summary": summary,
+                    "artifact_paths": result.get("artifact_paths", {}),
+                    "failure_reason": None if status == "completed" else "benchmark failure",
+                }
+            )
+        except Exception as exc:  # pragma: no cover - defensive live-run guard
+            failures += 1
+            results.append(
+                {
+                    "trial_id": trial_id,
+                    "status": "failed",
+                    "summary": {},
+                    "artifact_paths": {},
+                    "failure_reason": str(exc),
+                }
+            )
+        if failures and not continue_on_failure:
+            break
+    write_jsonl(out_dir / "results.jsonl", results)
+    ranking = rank_sweep_results(plan, results)
+    write_json(out_dir / "ranking.json", ranking)
+    return {"results": results, "ranking": ranking, "failure_count": failures}
+
+
+def load_sweep_results(path: Path) -> list[dict[str, Any]]:
+    if path.suffix.lower() == ".jsonl":
+        return read_jsonl(path)
+    data = read_json(path)
+    rows = data.get("results", data.get("trials"))
+    if not isinstance(rows, list):
+        raise SweepError("results file must contain a results or trials array")
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def apply_profile_overrides(profile: ServeProfile, overrides: dict[str, Any], order: int) -> ServeProfile:
+    values = {name: _coerce_profile_value(name, value) for name, value in overrides.items()}
+    return replace(profile, profile_id=f"{profile.profile_id}-sweep-{order + 1:03d}", **values)
+
+
+def build_trial_id(sweep_id: str, order: int, overrides: dict[str, Any]) -> str:
+    material = f"{sweep_id}|{order}|{sorted(overrides.items())}"
+    digest = sha256(material.encode("utf-8")).hexdigest()[:8]
+    return f"{sweep_id}-t{order + 1:03d}-{digest}"
+
+
+def serve_profile_to_dict(profile: ServeProfile) -> dict[str, Any]:
+    return asdict(profile)
+
+
+def parse_profile_from_plan(data: dict[str, Any]) -> ServeProfile:
+    return ServeProfile(**data)
+
+
+def normalize_trial_result(row: dict[str, Any]) -> dict[str, Any]:
+    summary = row.get("summary")
+    if not isinstance(summary, dict):
+        summary = {
+            "mean_latency_ms": row.get("mean_latency_ms"),
+            "aggregate_tokens_per_second": row.get("aggregate_tokens_per_second"),
+            "success_count": row.get("success_count"),
+            "failure_count": row.get("failure_count", 0),
+        }
+    status = row.get("status")
+    if not isinstance(status, str):
+        status = "completed" if summary.get("failure_count", 0) == 0 else "failed"
+    return {
+        "trial_id": row.get("trial_id"),
+        "status": status,
+        "summary": summary,
+        "artifact_paths": row.get("artifact_paths", row.get("artifact_refs", {})),
+        "failure_reason": row.get("failure_reason"),
+    }
+
+
+def rank_for_objective(
+    objective: str, rows: list[dict[str, Any]], baseline: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    scored = []
+    latencies = [float(row["summary"]["mean_latency_ms"]) for row in rows]
+    throughputs = [float(row["summary"]["aggregate_tokens_per_second"]) for row in rows]
+    max_latency = max(latencies)
+    min_latency = min(latencies)
+    max_throughput = max(throughputs)
+    min_throughput = min(throughputs)
+    for row in rows:
+        summary = row["summary"]
+        throughput = float(summary["aggregate_tokens_per_second"])
+        latency = float(summary["mean_latency_ms"])
+        if objective == "throughput":
+            score = throughput
+            key = (-throughput, latency, str(row["trial_id"]))
+        elif objective == "latency":
+            score = latency
+            key = (latency, -throughput, str(row["trial_id"]))
+        else:
+            throughput_score = _normalize(throughput, min_throughput, max_throughput)
+            latency_score = 1 - _normalize(latency, min_latency, max_latency)
+            score = mean([throughput_score, latency_score])
+            key = (-score, latency, -throughput, str(row["trial_id"]))
+        scored.append(
+            {
+                "trial_id": row["trial_id"],
+                "score": score,
+                "metrics": summary,
+                "baseline_delta": baseline_delta(summary, baseline),
+                "artifact_paths": row["artifact_paths"],
+                "_key": key,
+            }
+        )
+    ranked = sorted(scored, key=lambda item: item["_key"])
+    for index, item in enumerate(ranked, start=1):
+        item["rank"] = index
+        del item["_key"]
+    return ranked
+
+
+def baseline_delta(summary: dict[str, Any], baseline: dict[str, Any] | None) -> dict[str, Any]:
+    if not baseline:
+        return {}
+    deltas = {}
+    for key in ("mean_latency_ms", "aggregate_tokens_per_second"):
+        current = summary.get(key)
+        base = baseline.get(key)
+        if isinstance(current, int | float) and isinstance(base, int | float) and base != 0:
+            deltas[key] = {"absolute": current - base, "percent": ((current - base) / base) * 100}
+    return deltas
+
+
+def load_optional_baseline(path_value: Any) -> dict[str, Any] | None:
+    if not isinstance(path_value, str) or not path_value:
+        return None
+    path = Path(path_value)
+    if not path.exists():
+        return None
+    return read_json(path)
+
+
+def _normalize(value: float, low: float, high: float) -> float:
+    if high == low:
+        return 1.0
+    return (value - low) / (high - low)
+
+
+def _required_path(data: dict[str, Any], field: str, errors: list[str]) -> Path:
+    value = data.get(field)
+    if not isinstance(value, str) or not value:
+        errors.append(f"{field} is required")
+        return Path(".")
+    return Path(value)
+
+
+def _validate_parameter_value(name: str, value: Any, errors: list[str]) -> Any:
+    rule = SAFE_PARAMETERS[name]
+    expected = rule["type"]
+    if expected is float and isinstance(value, int | float):
+        parsed = float(value)
+    elif isinstance(value, expected):
+        parsed = value
+    else:
+        errors.append(f"parameters.{name} contains value with invalid type")
+        return None
+    if "allowed" in rule and parsed not in rule["allowed"]:
+        errors.append(f"parameters.{name} contains unsupported value {parsed!r}")
+        return None
+    if "min" in rule and parsed < rule["min"]:
+        errors.append(f"parameters.{name} contains value below safe minimum {rule['min']}")
+        return None
+    if "max" in rule and parsed > rule["max"]:
+        errors.append(f"parameters.{name} contains value above safe maximum {rule['max']}")
+        return None
+    return parsed
+
+
+def _coerce_profile_value(name: str, value: Any) -> Any:
+    if name == "max_model_len":
+        return int(value)
+    if name == "gpu_memory_utilization":
+        return float(value)
+    return value
+
+
+def objective_exit_code(report: dict[str, Any]) -> int:
+    return 0 if report.get("ranked_trial_count", 0) else 2

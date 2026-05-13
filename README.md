@@ -16,9 +16,11 @@ The project is spec-driven with SpecKit and currently supports:
 - Safe smoke serve lifecycle with preflight checks, readiness polling, one
   request, artifact capture, and cleanup.
 - A small Qwen baseline benchmark with fixed prompts and summary metrics.
+- Deterministic small Qwen parameter sweeps with dry-run previews and local
+  ranking for throughput, latency, and balanced objectives.
 
-Persistent Linux/NVIDIA tuning and parameter optimization are intentionally not
-implemented yet. Those will be separate specs with explicit safety gates.
+Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
+handled by separate specs with explicit safety gates.
 
 ## Quickstart
 
@@ -37,6 +39,8 @@ uv run vllm-optimizer rank --plan artifacts/demo/trial-plan.json --results tests
 uv run vllm-optimizer discover --config tests/fixtures/discovery/local.gx10.mock.json --executor mock --mock-results tests/fixtures/discovery/mock_outputs.json --out artifacts/discovery/mock
 uv run vllm-optimizer serve-plan --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/demo/qwen-serve-plan.json
 uv run vllm-optimizer benchmark-plan --profile config/profiles/qwen3-coder-next-awq.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-baseline/plan.json
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-small-sweep.json --out artifacts/sweeps/qwen-small/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-small/plan.json --out artifacts/sweeps/qwen-small/preview.json
 ```
 
 ## GX10 Workflows
@@ -67,6 +71,20 @@ Baseline benchmark:
 uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-baseline --timeout-seconds 1200
 ```
 
+Parameter sweep:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-small-sweep.json --out artifacts/sweeps/qwen-small/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-small/plan.json --out artifacts/sweeps/qwen-small/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-small/plan.json --out artifacts/sweeps/qwen-small/live --timeout-seconds 1200 --continue-on-failure
+```
+
+Rank completed or fixture sweep results:
+
+```powershell
+uv run vllm-optimizer sweep-rank --plan artifacts/sweeps/qwen-small/plan.json --results artifacts/sweeps/qwen-small/live/results.jsonl --out artifacts/sweeps/qwen-small/ranking.json
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -74,6 +92,7 @@ uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile co
 - Discovery probes are read-only.
 - Smoke and benchmark commands are session-mutating and include preflight
   checks plus cleanup verification.
+- Sweep live execution is sequential and session-mutating only.
 - Generated artifacts under `artifacts/` are ignored by git.
 
 ## SpecKit
@@ -85,3 +104,4 @@ Current feature specs:
 - `specs/002-gx10-readonly-discovery/spec.md`
 - `specs/003-qwen-smoke-serve/spec.md`
 - `specs/004-qwen-baseline-benchmark/spec.md`
+- `specs/005-qwen-parameter-sweep/spec.md`

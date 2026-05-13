@@ -1,0 +1,23 @@
+{
+  "sweep_id": "qwen-small-sweep",
+  "profile": "config/profiles/qwen3-coder-next-awq.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "baseline_summary": "artifacts/benchmarks/qwen-baseline/summary.json",
+  "seed": 13,
+  "max_trials": 4,
+  "objectives": [
+    "throughput",
+    "latency",
+    "balanced"
+  ],
+  "parameters": {
+    "gpu_memory_utilization": [
+      0.86,
+      0.9
+    ],
+    "max_model_len": [
+      16384,
+      32768
+    ]
+  }
+}
