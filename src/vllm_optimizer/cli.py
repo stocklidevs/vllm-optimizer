@@ -41,6 +41,12 @@ from .sweep import (
     rank_sweep_results,
     run_sweep,
 )
+from .workload_report import (
+    WorkloadInput,
+    WorkloadReportError,
+    WorkloadReportInputs,
+    build_workload_leaderboard_report,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -60,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         FlagCatalogError,
         PromotionError,
         DefaultReportError,
+        WorkloadReportError,
         AbConfirmationError,
         ValueError,
     ) as exc:
@@ -178,6 +185,15 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("--out", required=True, type=Path)
     report_parser.add_argument("--markdown-out", type=Path)
     report_parser.set_defaults(func=cmd_report)
+
+    workload_report_parser = subparsers.add_parser(
+        "workload-report", help="Generate a workload leaderboard from live sweep rankings"
+    )
+    workload_report_parser.add_argument("--workload", required=True, nargs="+", help="LABEL=ranking.json")
+    workload_report_parser.add_argument("--promoted-profile", nargs="*", default=[], help="LABEL=profile.json")
+    workload_report_parser.add_argument("--out", required=True, type=Path)
+    workload_report_parser.add_argument("--markdown-out", type=Path)
+    workload_report_parser.set_defaults(func=cmd_workload_report)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -400,6 +416,38 @@ def cmd_report(args: argparse.Namespace) -> int:
         args.markdown_out.write_text(report["markdown"], encoding="utf-8")
     print(str(args.out))
     return 0
+
+
+def cmd_workload_report(args: argparse.Namespace) -> int:
+    promoted_profiles = parse_labeled_paths(args.promoted_profile)
+    workloads = []
+    for label, ranking_path in parse_labeled_paths(args.workload).items():
+        workloads.append(
+            WorkloadInput(
+                label=label,
+                ranking_path=ranking_path,
+                promoted_profile_path=promoted_profiles.get(label),
+            )
+        )
+    report = build_workload_leaderboard_report(WorkloadReportInputs(workloads=tuple(workloads)))
+    write_json(args.out, report)
+    if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
+    return 0
+
+
+def parse_labeled_paths(values: list[str]) -> dict[str, Path]:
+    parsed = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"expected LABEL=PATH, got {value!r}")
+        label, path = value.split("=", 1)
+        if not label or not path:
+            raise ValueError(f"expected LABEL=PATH, got {value!r}")
+        parsed[label] = Path(path)
+    return parsed
 
 
 def cmd_flag_catalog(args: argparse.Namespace) -> int:

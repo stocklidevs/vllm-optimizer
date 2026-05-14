@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/017-benchmark-concurrency/plan.md
+specs/018-workload-leaderboard/plan.md
 <!-- SPECKIT END -->
