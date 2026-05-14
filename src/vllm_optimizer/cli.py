@@ -16,6 +16,7 @@ from .flag_catalog import (
     capture_flag_catalog,
     generate_catalog_from_files,
 )
+from .optimizer_pipeline import OptimizerPipelineError, OptimizerPipelineRequest, run_optimizer_pipeline
 from .planner import build_trial_plan
 from .promotion import (
     DEFAULT_OBJECTIVE,
@@ -70,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         SweepError,
         ReportError,
         FlagCatalogError,
+        OptimizerPipelineError,
         PromotionError,
         DefaultReportError,
         WorkloadReportError,
@@ -201,6 +203,18 @@ def build_parser() -> argparse.ArgumentParser:
     workload_report_parser.add_argument("--out", required=True, type=Path)
     workload_report_parser.add_argument("--markdown-out", type=Path)
     workload_report_parser.set_defaults(func=cmd_workload_report)
+
+    optimize_parser = subparsers.add_parser(
+        "optimize-workload", help="Run a staged optimization pipeline for one sweep"
+    )
+    optimize_parser.add_argument("--mode", required=True, choices=["plan", "preview", "run", "report"])
+    optimize_parser.add_argument("--sweep", required=True, type=Path)
+    optimize_parser.add_argument("--out", required=True, type=Path)
+    optimize_parser.add_argument("--config", type=Path)
+    optimize_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    optimize_parser.add_argument("--continue-on-failure", action="store_true")
+    optimize_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    optimize_parser.set_defaults(func=cmd_optimize_workload)
 
     saturation_report_parser = subparsers.add_parser(
         "saturation-report", help="Generate a concurrency saturation report from ranked sweeps"
@@ -450,6 +464,22 @@ def cmd_workload_report(args: argparse.Namespace) -> int:
         args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
         args.markdown_out.write_text(report["markdown"], encoding="utf-8")
     print(str(args.out))
+    return 0
+
+
+def cmd_optimize_workload(args: argparse.Namespace) -> int:
+    summary = run_optimizer_pipeline(
+        OptimizerPipelineRequest(
+            mode=args.mode,
+            sweep_path=args.sweep,
+            out_dir=args.out,
+            config_path=args.config,
+            timeout_seconds=args.timeout_seconds,
+            continue_on_failure=args.continue_on_failure,
+            allow_risky_session_flags=args.allow_risky_session_flags,
+        )
+    )
+    print(summary["artifacts"]["pipeline_summary"])
     return 0
 
 
