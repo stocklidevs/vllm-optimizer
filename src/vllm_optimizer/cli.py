@@ -35,6 +35,11 @@ from .session_tuning import (
     load_session_tuning_profile,
     write_session_tuning_preview,
 )
+from .session_tuning_confirmation import (
+    SessionTuningConfirmationError,
+    SessionTuningConfirmationRequest,
+    run_session_tuning_confirmation,
+)
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
 from .system_tuning import SystemTuningError, run_system_tuning_discovery
@@ -74,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         ExperimentValidationError,
         ServeProfileError,
         SessionTuningError,
+        SessionTuningConfirmationError,
         SmokeServeError,
         SweepError,
         ReportError,
@@ -272,6 +278,22 @@ def build_parser() -> argparse.ArgumentParser:
     session_tuning_parser.add_argument("--catalog", type=Path)
     session_tuning_parser.add_argument("--out", required=True, type=Path)
     session_tuning_parser.set_defaults(func=cmd_session_tuning_preview)
+
+    session_confirm_parser = subparsers.add_parser(
+        "session-tuning-confirm", help="Run repeated A/B confirmation for a session tuning profile"
+    )
+    session_confirm_parser.add_argument("--config", required=True, type=Path)
+    session_confirm_parser.add_argument("--profile", required=True, type=Path)
+    session_confirm_parser.add_argument("--prompts", required=True, type=Path)
+    session_confirm_parser.add_argument("--session-tuning", required=True, type=Path)
+    session_confirm_parser.add_argument("--out", required=True, type=Path)
+    session_confirm_parser.add_argument("--repetitions", type=int, default=5)
+    session_confirm_parser.add_argument("--current-label", default="current")
+    session_confirm_parser.add_argument("--tuned-label", default="tuned")
+    session_confirm_parser.add_argument("--noise-percent", type=float, default=1.0)
+    session_confirm_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    session_confirm_parser.add_argument("--allow-session-tuning", action="store_true")
+    session_confirm_parser.set_defaults(func=cmd_session_tuning_confirm)
 
     system_tuning_parser = subparsers.add_parser(
         "system-tuning-discover", help="Capture read-only Linux/NVIDIA/runtime tuning state"
@@ -584,6 +606,27 @@ def cmd_flag_catalog_capture(args: argparse.Namespace) -> int:
 def cmd_session_tuning_preview(args: argparse.Namespace) -> int:
     write_session_tuning_preview(args.profile, args.catalog, args.out)
     print(str(args.out))
+    return 0
+
+
+def cmd_session_tuning_confirm(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    result = run_session_tuning_confirmation(
+        SessionTuningConfirmationRequest(
+            target=target,
+            profile_path=args.profile,
+            prompts_path=args.prompts,
+            session_tuning_path=args.session_tuning,
+            out_dir=args.out,
+            repetitions=args.repetitions,
+            current_label=args.current_label,
+            tuned_label=args.tuned_label,
+            timeout_seconds=args.timeout_seconds,
+            allow_session_tuning=args.allow_session_tuning,
+            noise_percent=args.noise_percent,
+        )
+    )
+    print(result["artifact_paths"]["summary"])
     return 0
 
 

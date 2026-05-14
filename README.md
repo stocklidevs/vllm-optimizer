@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.24.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.25.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -59,6 +59,8 @@ The project is spec-driven with SpecKit and currently supports:
 - Guarded session-only benchmark tuning profiles for shell-scoped environment
   variables and `ulimit` changes, with deterministic previews and explicit
   live-run opt-in.
+- Repeated A/B confirmation for session tuning profiles against the same serve
+  profile without tuning.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -112,6 +114,12 @@ Session tuning profiles are limited to shell-scoped benchmark changes such as
 
 ```powershell
 uv run vllm-optimizer benchmark-plan --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --session-tuning config/session-tuning/qwen-runtime-env.json --allow-session-tuning --out artifacts/session-tuning/qwen-runtime-env/benchmark-plan.json
+```
+
+Repeated session tuning confirmation:
+
+```powershell
+uv run vllm-optimizer session-tuning-confirm --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --session-tuning config/session-tuning/qwen-runtime-env.json --allow-session-tuning --repetitions 5 --current-label current-c8 --tuned-label runtime-env --out artifacts/session-tuning/qwen-runtime-env-confirmation --timeout-seconds 1200
 ```
 
 Optimization pipeline MVP:
