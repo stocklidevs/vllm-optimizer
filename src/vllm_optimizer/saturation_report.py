@@ -88,7 +88,7 @@ def recommend_level(levels: list[dict[str, Any]]) -> dict[str, Any]:
 def next_actions(levels: list[dict[str, Any]], recommendation: dict[str, Any]) -> list[str]:
     actions = [
         f"Use concurrency {recommendation['concurrency']} as the current saturation candidate for repeated confirmation.",
-        "Run live saturation levels that do not yet have rankings before promoting defaults.",
+        "Run repeated confirmation before promoting any saturation winner as a default.",
     ]
     if any(_failure_rate(level) > 0 for level in levels):
         actions.append("Inspect failed candidates before increasing concurrency further.")

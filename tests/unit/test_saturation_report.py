@@ -29,6 +29,7 @@ def test_saturation_report_recommends_highest_stable_throughput(tmp_path: Path) 
     assert [level["concurrency"] for level in report["levels"]] == [2, 3, 4]
     assert report["recommendation"]["concurrency"] == 3
     assert report["recommendation"]["candidate_id"] == "c3-winner"
+    assert not any("do not yet have rankings" in action for action in report["next_actions"])
     assert "96.000 tokens/sec" in report["markdown"]
 
 

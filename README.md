@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.17.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.18.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -264,7 +264,24 @@ Concurrency saturation sweep:
 uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-concurrency-saturation-c1.json --out artifacts/sweeps/qwen-concurrency-saturation-c1/plan.json
 uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-concurrency-saturation-c1/plan.json --out artifacts/sweeps/qwen-concurrency-saturation-c1/preview.json
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-concurrency-saturation-c1/plan.json --out artifacts/sweeps/qwen-concurrency-saturation-c1/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
-uv run vllm-optimizer saturation-report --ranking 1=artifacts/sweeps/qwen-concurrency-saturation-c1/live/ranking.json 2=artifacts/sweeps/qwen-concurrency-saturation-c2/live/ranking.json 3=artifacts/sweeps/qwen-concurrency-saturation-c3/live/ranking.json 4=artifacts/sweeps/qwen-concurrency-saturation-c4/live/ranking.json 6=artifacts/sweeps/qwen-concurrency-saturation-c6/live/ranking.json 8=artifacts/sweeps/qwen-concurrency-saturation-c8/live/ranking.json --out artifacts/reports/qwen-concurrency-saturation.json --markdown-out artifacts/reports/qwen-concurrency-saturation.md
+uv run vllm-optimizer saturation-report --ranking 1=artifacts/sweeps/qwen-concurrency-saturation-c1/live/ranking.json 2=artifacts/sweeps/qwen-concurrency-saturation-c2/live/ranking.json 3=artifacts/sweeps/qwen-high-impact-interactive-concurrent/live/ranking.json 4=artifacts/sweeps/qwen-concurrency-saturation-c4/live/ranking.json 6=artifacts/sweeps/qwen-concurrency-saturation-c6/live/ranking.json 8=artifacts/sweeps/qwen-concurrency-saturation-c8/live/ranking.json --out artifacts/reports/qwen-concurrency-saturation.json --markdown-out artifacts/reports/qwen-concurrency-saturation.md
+```
+
+Latest GX10 concurrency saturation result:
+
+```text
+Best current saturation candidate: concurrency=8
+Profile: gpu_memory_utilization=0.90, block_size=16,
+max_num_batched_tokens=4096, max_num_seqs=16, performance_mode=interactivity
+
+c1: 41.100 tokens/sec, 5879.333 ms, failures 0/2
+c2: 59.429 tokens/sec, 5932.000 ms, failures 0/2
+c3: 96.667 tokens/sec, 6717.167 ms, failures 0/2
+c4: 97.437 tokens/sec, 6615.500 ms, failures 0/2
+c6: 97.445 tokens/sec, 6601.000 ms, failures 0/2
+c8: 98.415 tokens/sec, 6611.500 ms, failures 0/2
+
+Next action: repeated confirmation for concurrency=8 before promotion.
 ```
 
 Workload leaderboard:
@@ -341,3 +358,4 @@ Current feature specs:
 - `specs/018-workload-leaderboard/spec.md`
 - `specs/019-fp8-ninja-rerun/spec.md`
 - `specs/020-concurrency-saturation/spec.md`
+- `specs/021-live-concurrency-saturation/spec.md`
