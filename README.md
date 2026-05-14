@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.21.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.22.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -50,6 +50,9 @@ The project is spec-driven with SpecKit and currently supports:
 - A local pipeline confirmation stage that turns the ranked winner into a
   candidate profile, aggregates repeated A/B summaries, and only writes a
   confirmed profile when `--allow-promotion` is explicitly provided.
+- A full `optimize-workload` orchestration mode that runs the sweep, report,
+  repeated current-vs-candidate confirmation benchmarks, A/B decision, and
+  optional gated promotion from one deterministic pipeline command.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -98,6 +101,7 @@ uv run vllm-optimizer optimize-workload --mode preview --sweep config/sweeps/qwe
 uv run vllm-optimizer optimize-workload --mode run --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --config config/local.gx10.json --continue-on-failure --allow-risky-session-flags
 uv run vllm-optimizer optimize-workload --mode report --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --allow-risky-session-flags
 uv run vllm-optimizer optimize-workload --mode confirm --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --current-profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --candidate-profile-out artifacts/optimizer-runs/qwen-c8/candidate-profile.json --confirmed-profile-out artifacts/optimizer-runs/qwen-c8/confirmed-profile.json --confirmation-repetitions 5 --original-label current-concurrent --recommended-label c8-saturation --allow-risky-session-flags
+uv run vllm-optimizer optimize-workload --mode full --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8-full --config config/local.gx10.json --current-profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --candidate-profile-out artifacts/optimizer-runs/qwen-c8-full/candidate-profile.json --confirmed-profile-out artifacts/optimizer-runs/qwen-c8-full/confirmed-profile.json --confirmation-repetitions 5 --original-label current-concurrent --recommended-label c8-saturation --continue-on-failure --allow-risky-session-flags
 ```
 
 Pipeline boundaries:
@@ -113,6 +117,12 @@ explicit confirmation-gated command.
 and A/B confirmation report locally. Even when the report says
 `switch-to-recommended`, the pipeline does not write the confirmed profile
 unless `--allow-promotion` is included.
+
+`full` mode is the end-to-end orchestration path. It requires `--config`
+because it performs live GX10 vLLM sessions for both the sweep and repeated
+confirmation benchmarks. It still does not write the confirmed profile unless
+`--allow-promotion` is included and the A/B decision is
+`switch-to-recommended`.
 
 Smoke serve:
 

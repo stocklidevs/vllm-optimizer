@@ -3,14 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from .ab_confirmation import AbConfirmationInputs, build_ab_confirmation_report
 from .artifacts import read_json, write_json
-from .benchmark import load_prompt_set
+from .benchmark import load_prompt_set, run_baseline_benchmark
 from .discovery import load_target
 from .promotion import write_confirmed_promoted_profile, write_promoted_profile
 from .report import ReportInputs, build_comparison_report
+from .serve_profiles import load_serve_profile
 from .sweep import (
     build_sweep_plan,
     build_sweep_preview,
@@ -21,7 +22,9 @@ from .sweep import (
 )
 
 
-PipelineMode = Literal["plan", "preview", "run", "report", "confirm"]
+PipelineMode = Literal["plan", "preview", "run", "report", "confirm", "full"]
+SweepRunner = Callable[["OptimizerPipelineRequest", dict[str, Any], dict[str, str]], None]
+BenchmarkRunner = Callable[[Any, Any, Any, Path, int], dict[str, Any]]
 
 
 class OptimizerPipelineError(ValueError):
@@ -46,6 +49,8 @@ class OptimizerPipelineRequest:
     original_label: str = "current"
     recommended_label: str = "candidate"
     allow_promotion: bool = False
+    sweep_runner: SweepRunner | None = None
+    benchmark_runner: BenchmarkRunner | None = None
 
 
 def run_optimizer_pipeline(request: OptimizerPipelineRequest) -> dict[str, Any]:
@@ -55,14 +60,14 @@ def run_optimizer_pipeline(request: OptimizerPipelineRequest) -> dict[str, Any]:
     write_json(Path(artifacts["pipeline_plan"]), pipeline_plan)
 
     completed = ["plan"]
-    if request.mode in {"preview", "run", "report", "confirm"}:
+    if request.mode in {"preview", "run", "report", "confirm", "full"}:
         sweep_plan = ensure_sweep_plan(request, artifacts)
         preview = build_sweep_preview(sweep_plan)
         write_json(Path(artifacts["sweep_preview"]), preview)
         completed.append("preview")
-    if request.mode == "run":
+    if request.mode in {"run", "full"}:
         if request.config_path is None:
-            raise OptimizerPipelineError("remote config is required for run mode")
+            raise OptimizerPipelineError(f"remote config is required for {request.mode} mode")
         run_live_sweep(request, sweep_plan, artifacts)
         completed.append("run")
     if request.mode == "report":
@@ -73,6 +78,14 @@ def run_optimizer_pipeline(request: OptimizerPipelineRequest) -> dict[str, Any]:
         sweep_plan = ensure_sweep_plan(request, artifacts)
         write_pipeline_report(sweep_plan, artifacts)
         completed.append("report")
+        confirmation = run_confirmation_stage(request, artifacts)
+        completed.append("confirm")
+    elif request.mode == "full":
+        sweep_plan = ensure_sweep_plan(request, artifacts)
+        write_pipeline_report(sweep_plan, artifacts)
+        completed.append("report")
+        run_confirmation_benchmarks(request, artifacts)
+        completed.append("confirmation-benchmarks")
         confirmation = run_confirmation_stage(request, artifacts)
         completed.append("confirm")
     else:
@@ -95,9 +108,10 @@ def build_pipeline_plan(request: OptimizerPipelineRequest, artifacts: dict[str, 
             {"name": "preview", "artifact": artifacts["sweep_preview"], "remote": False},
             {"name": "run", "artifact": artifacts["live_dir"], "remote": True},
             {"name": "report", "artifact": artifacts["report_json"], "remote": False},
+            {"name": "confirmation-benchmarks", "artifact": artifacts["confirmation_dir"], "remote": True},
             {"name": "confirm", "artifact": artifacts["confirmation_report_json"], "remote": False},
         ],
-        "remote_actions": [] if request.mode in {"plan", "preview", "report", "confirm"} else ["run live sweep"],
+        "remote_actions": remote_actions_for_mode(request.mode),
         "promotion": {"automatic": False, "note": "Promotion remains an explicit separate command."},
         "safety": {
             "allow_risky_session_flags": request.allow_risky_session_flags,
@@ -117,6 +131,9 @@ def ensure_sweep_plan(request: OptimizerPipelineRequest, artifacts: dict[str, st
 
 
 def run_live_sweep(request: OptimizerPipelineRequest, sweep_plan: dict[str, Any], artifacts: dict[str, str]) -> None:
+    if request.sweep_runner is not None:
+        request.sweep_runner(request, sweep_plan, artifacts)
+        return
     if sweep_plan.get("has_risky_session_flags") and not request.allow_risky_session_flags:
         raise OptimizerPipelineError("risky-session sweep requires --allow-risky-session-flags")
     target = load_target(request.config_path)  # type: ignore[arg-type]
@@ -164,13 +181,7 @@ def run_confirmation_stage(request: OptimizerPipelineRequest, artifacts: dict[st
     current_profile_id = str(current_profile.get("profile_id") or fallback_profile_id)
     confirmation_report = Path(artifacts["confirmation_report_json"])
     confirmation_markdown = Path(artifacts["confirmation_report_markdown"])
-    write_promoted_profile(
-        ranking_path=Path(artifacts["ranking"]),
-        profile_out=candidate_profile,  # type: ignore[arg-type]
-        summary_out=Path(artifacts["candidate_summary_markdown"]),
-        profile_id=(candidate_profile.stem if candidate_profile is not None else "candidate"),
-        force=True,
-    )
+    write_candidate_profile(request, artifacts)
     original_summaries = confirmation_summary_paths(
         Path(artifacts["confirmation_dir"]), "current", request.confirmation_repetitions
     )
@@ -213,7 +224,37 @@ def run_confirmation_stage(request: OptimizerPipelineRequest, artifacts: dict[st
     }
 
 
-def validate_confirmation_request(request: OptimizerPipelineRequest) -> None:
+def run_confirmation_benchmarks(request: OptimizerPipelineRequest, artifacts: dict[str, str]) -> None:
+    validate_confirmation_request(request, require_config=True, require_confirmed=True)
+    target = load_target(request.config_path)  # type: ignore[arg-type]
+    prompt_set = load_prompt_set(request.prompts_path)  # type: ignore[arg-type]
+    current_profile = load_serve_profile(request.current_profile_path)  # type: ignore[arg-type]
+    write_candidate_profile(request, artifacts)
+    candidate_profile = load_serve_profile(request.candidate_profile_out)  # type: ignore[arg-type]
+    benchmark_runner = request.benchmark_runner or run_baseline_benchmark
+    root = Path(artifacts["confirmation_dir"])
+    for index in range(1, request.confirmation_repetitions + 1):
+        benchmark_runner(target, current_profile, prompt_set, root / f"current-r{index}", request.timeout_seconds)
+        benchmark_runner(target, candidate_profile, prompt_set, root / f"candidate-r{index}", request.timeout_seconds)
+
+
+def write_candidate_profile(request: OptimizerPipelineRequest, artifacts: dict[str, str]) -> None:
+    candidate_profile = request.candidate_profile_out
+    write_promoted_profile(
+        ranking_path=Path(artifacts["ranking"]),
+        profile_out=candidate_profile,  # type: ignore[arg-type]
+        summary_out=Path(artifacts["candidate_summary_markdown"]),
+        profile_id=(candidate_profile.stem if candidate_profile is not None else "candidate"),
+        force=True,
+    )
+
+
+def validate_confirmation_request(
+    request: OptimizerPipelineRequest,
+    *,
+    require_config: bool = False,
+    require_confirmed: bool = False,
+) -> None:
     missing = []
     for name, value in (
         ("current profile", request.current_profile_path),
@@ -224,6 +265,10 @@ def validate_confirmation_request(request: OptimizerPipelineRequest) -> None:
             missing.append(name)
     if missing:
         raise OptimizerPipelineError("confirm mode requires " + ", ".join(missing))
+    if require_config and request.config_path is None:
+        raise OptimizerPipelineError("remote config is required for full mode")
+    if require_confirmed and request.confirmed_profile_out is None:
+        raise OptimizerPipelineError("confirmed profile output is required for full mode")
     if request.confirmation_repetitions < 1:
         raise OptimizerPipelineError("confirmation repetitions must be positive")
 
@@ -268,6 +313,14 @@ def pipeline_artifacts(out_dir: Path) -> dict[str, str]:
         "candidate_summary_markdown": (out_dir / "confirmation" / "candidate-profile.md").as_posix(),
         "promotion_summary_markdown": (out_dir / "confirmation" / "promotion-summary.md").as_posix(),
     }
+
+
+def remote_actions_for_mode(mode: PipelineMode) -> list[str]:
+    if mode == "run":
+        return ["run live sweep"]
+    if mode == "full":
+        return ["run live sweep", "run confirmation benchmarks"]
+    return []
 
 
 def _now() -> str:

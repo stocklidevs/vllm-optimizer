@@ -207,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_parser = subparsers.add_parser(
         "optimize-workload", help="Run a staged optimization pipeline for one sweep"
     )
-    optimize_parser.add_argument("--mode", required=True, choices=["plan", "preview", "run", "report", "confirm"])
+    optimize_parser.add_argument("--mode", required=True, choices=["plan", "preview", "run", "report", "confirm", "full"])
     optimize_parser.add_argument("--sweep", required=True, type=Path)
     optimize_parser.add_argument("--out", required=True, type=Path)
     optimize_parser.add_argument("--config", type=Path)

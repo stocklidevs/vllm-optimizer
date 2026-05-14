@@ -159,6 +159,82 @@ def test_pipeline_confirm_mode_promotes_only_when_allowed(tmp_path: Path) -> Non
     assert result["promotion"]["promoted"] is True
 
 
+def test_pipeline_full_mode_runs_confirmation_benchmarks_without_promotion(tmp_path: Path) -> None:
+    calls: list[tuple[str, Path]] = []
+    current_profile = tmp_path / "current-profile.json"
+    prompts = tmp_path / "prompts.json"
+    _write_profile(current_profile, profile_id="current")
+    _write_prompt_set(prompts)
+
+    def benchmark_runner(_target, profile, _prompt_set, out_dir, _timeout_seconds):
+        calls.append((profile.profile_id, out_dir))
+        if "current" in profile.profile_id:
+            _write_summary(out_dir / "summary.json", latency=1000, throughput=50)
+        else:
+            _write_summary(out_dir / "summary.json", latency=970, throughput=53)
+        return {"summary": read_json(out_dir / "summary.json")}
+
+    def sweep_runner(_request, _sweep_plan, _artifacts):
+        _write_full_results(tmp_path)
+
+    result = run_optimizer_pipeline(
+        OptimizerPipelineRequest(
+            mode="full",
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            out_dir=tmp_path,
+            config_path=Path("config/gx10.example.json"),
+            current_profile_path=current_profile,
+            prompts_path=prompts,
+            candidate_profile_out=tmp_path / "candidate.json",
+            confirmed_profile_out=tmp_path / "confirmed.json",
+            confirmation_repetitions=2,
+            original_label="current",
+            recommended_label="candidate",
+            benchmark_runner=benchmark_runner,
+            sweep_runner=sweep_runner,
+        )
+    )
+
+    assert result["completed_stages"] == [
+        "plan",
+        "preview",
+        "run",
+        "report",
+        "confirmation-benchmarks",
+        "confirm",
+    ]
+    assert [path for _profile, path in calls] == [
+        tmp_path / "confirmation" / "current-r1",
+        tmp_path / "confirmation" / "candidate-r1",
+        tmp_path / "confirmation" / "current-r2",
+        tmp_path / "confirmation" / "candidate-r2",
+    ]
+    assert (tmp_path / "candidate.json").exists()
+    assert (tmp_path / "confirmation" / "confirmation-report.json").exists()
+    assert not (tmp_path / "confirmed.json").exists()
+    assert result["promotion"]["decision"]["status"] == "switch-to-recommended"
+
+
+def test_pipeline_full_mode_requires_remote_config(tmp_path: Path) -> None:
+    current_profile = tmp_path / "current-profile.json"
+    prompts = tmp_path / "prompts.json"
+    _write_profile(current_profile, profile_id="current")
+    _write_prompt_set(prompts)
+
+    with pytest.raises(OptimizerPipelineError, match="remote config"):
+        run_optimizer_pipeline(
+            OptimizerPipelineRequest(
+                mode="full",
+                sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+                out_dir=tmp_path,
+                current_profile_path=current_profile,
+                prompts_path=prompts,
+                candidate_profile_out=tmp_path / "candidate.json",
+                confirmed_profile_out=tmp_path / "confirmed.json",
+            )
+        )
+
+
 def _result_row(trial_id: str, candidate_id: str, latency: float, throughput: float) -> str:
     return (
         "{"
@@ -251,6 +327,50 @@ def _write_confirm_fixture(tmp_path: Path) -> Path:
     return live / "ranking.json"
 
 
+def _write_full_results(tmp_path: Path) -> None:
+    plan = read_json(tmp_path / "sweep-plan.json")
+    trial = plan["trials"][0]
+    trial_dir = tmp_path / "live" / trial["trial_id"]
+    trial_dir.mkdir(parents=True, exist_ok=True)
+    source_plan = {
+        "serve_plan": {
+            "serve_command": [
+                "$HOME/qwen3next-venv/bin/vllm",
+                "serve",
+                "model",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8001",
+                "--served-model-name",
+                "served",
+                "--max-model-len",
+                "32768",
+                "--gpu-memory-utilization",
+                "0.90",
+                "--enable-auto-tool-choice",
+                "--tool-call-parser",
+                "qwen3_coder",
+                "--performance-mode",
+                "interactivity",
+            ]
+        }
+    }
+    from vllm_optimizer.artifacts import write_json
+
+    write_json(trial_dir / "plan.json", source_plan)
+    (tmp_path / "live" / "results.jsonl").write_text(
+        "{"
+        f'"trial_id":"{trial["trial_id"]}",'
+        f'"candidate_id":"{trial["candidate_id"]}",'
+        '"status":"completed",'
+        '"summary":{"mean_latency_ms":970,"aggregate_tokens_per_second":53,"success_count":1,"failure_count":0},'
+        f'"artifact_paths":{{"summary":"summary.json","plan":"{(trial_dir / "plan.json").as_posix()}"}}'
+        "}",
+        encoding="utf-8",
+    )
+
+
 def _write_profile(path: Path, profile_id: str) -> None:
     from vllm_optimizer.artifacts import write_json
 
@@ -269,6 +389,26 @@ def _write_profile(path: Path, profile_id: str) -> None:
             "tool_call_parser": "qwen3_coder",
             "performance_mode": "interactivity",
             "optional_flags": {"block_size": 16},
+        },
+    )
+
+
+def _write_prompt_set(path: Path) -> None:
+    from vllm_optimizer.artifacts import write_json
+
+    write_json(
+        path,
+        {
+            "prompt_set_id": "confirm-prompts",
+            "concurrency": 1,
+            "cases": [
+                {
+                    "case_id": "case-1",
+                    "messages": [{"role": "user", "content": "hello"}],
+                    "max_tokens": 8,
+                    "temperature": 0,
+                }
+            ],
         },
     )
 
