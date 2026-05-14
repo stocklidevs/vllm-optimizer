@@ -1,0 +1,42 @@
+{
+  "nvidia-driver": {
+    "exit_code": 0,
+    "stdout": "575.51.03\n"
+  },
+  "gpu-power": {
+    "exit_code": 0,
+    "stdout": "250.00 W, 600.00 W\n"
+  },
+  "gpu-clocks": {
+    "exit_code": 0,
+    "stdout": "210, 2400, P2\n"
+  },
+  "gpu-persistence": {
+    "exit_code": 0,
+    "stdout": "Disabled\n"
+  },
+  "cpu-governor": {
+    "exit_code": 0,
+    "stdout": "performance\n"
+  },
+  "cpu-topology": {
+    "exit_code": 0,
+    "stdout": "CPU(s): 20\nCore(s) per socket: 10\nThread(s) per core: 2\n"
+  },
+  "memory": {
+    "exit_code": 0,
+    "stdout": "MemTotal:       131900000 kB\nSwapTotal:       8388604 kB\n"
+  },
+  "transparent-hugepages": {
+    "exit_code": 0,
+    "stdout": "always [madvise] never\n"
+  },
+  "kernel-limits": {
+    "exit_code": 0,
+    "stdout": "1048576\n"
+  },
+  "vllm-env": {
+    "exit_code": 0,
+    "stdout": "VLLM_WORKER_MULTIPROC_METHOD=spawn\nCUDA_VISIBLE_DEVICES=0\n"
+  }
+}

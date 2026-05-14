@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.22.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.23.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -53,6 +53,9 @@ The project is spec-driven with SpecKit and currently supports:
 - A full `optimize-workload` orchestration mode that runs the sweep, report,
   repeated current-vs-candidate confirmation benchmarks, A/B decision, and
   optional gated promotion from one deterministic pipeline command.
+- Read-only Linux/NVIDIA/runtime system tuning discovery that captures current
+  GX10 tuning state and classifies future knobs before any session or
+  persistent tuning is attempted.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -91,7 +94,13 @@ Read-only discovery:
 
 ```powershell
 uv run vllm-optimizer discover --config config/local.gx10.json --executor ssh --out artifacts/discovery/gx10-live
+uv run vllm-optimizer system-tuning-discover --config config/local.gx10.json --executor ssh --out artifacts/system-tuning/gx10-live
 ```
+
+System tuning discovery is observational only. It records raw probe output,
+parsed tuning entries, redaction metadata, and future action classifications
+such as `read-only`, `session-mutating`, and `persistent-mutating`; it does not
+change Linux, NVIDIA, GPU, CPU, memory, kernel, or runtime settings.
 
 Optimization pipeline MVP:
 

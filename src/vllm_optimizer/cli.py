@@ -32,6 +32,7 @@ from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
+from .system_tuning import SystemTuningError, run_system_tuning_discovery
 from .saturation_report import (
     SaturationInput,
     SaturationReportError,
@@ -76,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         DefaultReportError,
         WorkloadReportError,
         SaturationReportError,
+        SystemTuningError,
         AbConfirmationError,
         ValueError,
     ) as exc:
@@ -252,6 +254,15 @@ def build_parser() -> argparse.ArgumentParser:
     flag_capture_parser.add_argument("--executor", required=True, choices=["mock", "ssh"])
     flag_capture_parser.add_argument("--mock-results", type=Path)
     flag_capture_parser.set_defaults(func=cmd_flag_catalog_capture)
+
+    system_tuning_parser = subparsers.add_parser(
+        "system-tuning-discover", help="Capture read-only Linux/NVIDIA/runtime tuning state"
+    )
+    system_tuning_parser.add_argument("--config", required=True, type=Path)
+    system_tuning_parser.add_argument("--out", required=True, type=Path)
+    system_tuning_parser.add_argument("--executor", required=True, choices=["mock", "ssh"])
+    system_tuning_parser.add_argument("--mock-results", type=Path)
+    system_tuning_parser.set_defaults(func=cmd_system_tuning_discover)
 
     promote_preview_parser = subparsers.add_parser(
         "promote-preview", help="Preview promotion of a ranked sweep candidate"
@@ -546,6 +557,19 @@ def cmd_flag_catalog_capture(args: argparse.Namespace) -> int:
     else:
         executor = SshExecutor(target.ssh_destination)
     capture_flag_catalog(target, profile, args.policy, executor, args.out)
+    print(str(args.out))
+    return 0
+
+
+def cmd_system_tuning_discover(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    if args.executor == "mock":
+        if args.mock_results is None:
+            raise SystemTuningError("--mock-results is required when --executor mock is used")
+        executor = MockExecutor(read_json(args.mock_results))
+    else:
+        executor = SshExecutor(target.ssh_destination)
+    run_system_tuning_discovery(target, executor, args.out)
     print(str(args.out))
     return 0
 
