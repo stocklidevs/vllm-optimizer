@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.16.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.17.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -43,6 +43,8 @@ The project is spec-driven with SpecKit and currently supports:
   profiles, failed risky candidates, and next actions.
 - FP8 KV cache rerun sweeps that expose the vLLM venv binary directory on
   remote `PATH` so helpers such as `ninja` are available to child processes.
+- Concurrency saturation prompt sets, sweep configs, and local reports for
+  mapping where concurrent interactive throughput flattens or destabilizes.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -256,6 +258,15 @@ Delta: -195.333 ms (-2.845%), +1.676 tokens/sec (+1.766%)
 Failures: 0/9 requests per side
 ```
 
+Concurrency saturation sweep:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-concurrency-saturation-c1.json --out artifacts/sweeps/qwen-concurrency-saturation-c1/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-concurrency-saturation-c1/plan.json --out artifacts/sweeps/qwen-concurrency-saturation-c1/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-concurrency-saturation-c1/plan.json --out artifacts/sweeps/qwen-concurrency-saturation-c1/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
+uv run vllm-optimizer saturation-report --ranking 1=artifacts/sweeps/qwen-concurrency-saturation-c1/live/ranking.json 2=artifacts/sweeps/qwen-concurrency-saturation-c2/live/ranking.json 3=artifacts/sweeps/qwen-concurrency-saturation-c3/live/ranking.json 4=artifacts/sweeps/qwen-concurrency-saturation-c4/live/ranking.json 6=artifacts/sweeps/qwen-concurrency-saturation-c6/live/ranking.json 8=artifacts/sweeps/qwen-concurrency-saturation-c8/live/ranking.json --out artifacts/reports/qwen-concurrency-saturation.json --markdown-out artifacts/reports/qwen-concurrency-saturation.md
+```
+
 Workload leaderboard:
 
 ```powershell
@@ -329,3 +340,4 @@ Current feature specs:
 - `specs/017-benchmark-concurrency/spec.md`
 - `specs/018-workload-leaderboard/spec.md`
 - `specs/019-fp8-ninja-rerun/spec.md`
+- `specs/020-concurrency-saturation/spec.md`

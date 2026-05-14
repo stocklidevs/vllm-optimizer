@@ -31,6 +31,12 @@ from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
+from .saturation_report import (
+    SaturationInput,
+    SaturationReportError,
+    SaturationReportInputs,
+    build_saturation_report,
+)
 from .sweep import (
     SweepError,
     build_sweep_plan,
@@ -67,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         PromotionError,
         DefaultReportError,
         WorkloadReportError,
+        SaturationReportError,
         AbConfirmationError,
         ValueError,
     ) as exc:
@@ -194,6 +201,14 @@ def build_parser() -> argparse.ArgumentParser:
     workload_report_parser.add_argument("--out", required=True, type=Path)
     workload_report_parser.add_argument("--markdown-out", type=Path)
     workload_report_parser.set_defaults(func=cmd_workload_report)
+
+    saturation_report_parser = subparsers.add_parser(
+        "saturation-report", help="Generate a concurrency saturation report from ranked sweeps"
+    )
+    saturation_report_parser.add_argument("--ranking", required=True, nargs="+", help="CONCURRENCY=ranking.json")
+    saturation_report_parser.add_argument("--out", required=True, type=Path)
+    saturation_report_parser.add_argument("--markdown-out", type=Path)
+    saturation_report_parser.set_defaults(func=cmd_saturation_report)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -430,6 +445,23 @@ def cmd_workload_report(args: argparse.Namespace) -> int:
             )
         )
     report = build_workload_leaderboard_report(WorkloadReportInputs(workloads=tuple(workloads)))
+    write_json(args.out, report)
+    if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
+    return 0
+
+
+def cmd_saturation_report(args: argparse.Namespace) -> int:
+    rankings = []
+    for label, ranking_path in parse_labeled_paths(args.ranking).items():
+        try:
+            concurrency = int(label)
+        except ValueError as exc:
+            raise SaturationReportError(f"expected integer concurrency label, got {label!r}") from exc
+        rankings.append(SaturationInput(concurrency=concurrency, ranking_path=ranking_path))
+    report = build_saturation_report(SaturationReportInputs(rankings=tuple(rankings)))
     write_json(args.out, report)
     if args.markdown_out is not None:
         args.markdown_out.parent.mkdir(parents=True, exist_ok=True)

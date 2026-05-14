@@ -255,6 +255,8 @@ def classify_failure(source_trials: Any) -> str:
                 if isinstance(server_log, str):
                     texts.append(_safe_read_text(Path(server_log)))
     joined = "\n".join(texts)
+    if "fp8_e5m2 kv-cache is not supported with fp8 checkpoints" in joined:
+        return "`fp8_e5m2` KV cache is unsupported for this FP8 checkpoint."
     if "No such file or directory: 'ninja'" in joined or "ninja" in joined:
         return "vLLM/FlashInfer JIT failed because `ninja` is missing on the GX10."
     if "benchmark failure" in joined:

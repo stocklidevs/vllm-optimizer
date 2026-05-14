@@ -1,0 +1,39 @@
+{
+  "prompt_set_id": "qwen-coding-interactive-concurrency-8-v1",
+  "concurrency": 8,
+  "cases": [
+    {
+      "case_id": "small-refactor",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Refactor this Python snippet to be clearer without changing behavior:\n\ndef f(xs):\n    r=[]\n    for x in xs:\n        if x and x%2==0:\n            r.append(x*x)\n    return r"
+        }
+      ],
+      "max_tokens": 180,
+      "temperature": 0
+    },
+    {
+      "case_id": "bugfix-explain",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Find the bug and return a corrected JavaScript function plus one sentence explaining it:\n\nfunction total(items) {\n  let sum = 0;\n  for (const item in items) {\n    sum += item.price;\n  }\n  return sum;\n}"
+        }
+      ],
+      "max_tokens": 220,
+      "temperature": 0
+    },
+    {
+      "case_id": "tiny-test",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Write three pytest tests for a function slugify(text) that lowercases text, replaces spaces with hyphens, and removes punctuation."
+        }
+      ],
+      "max_tokens": 220,
+      "temperature": 0
+    }
+  ]
+}

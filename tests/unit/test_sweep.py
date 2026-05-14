@@ -357,3 +357,17 @@ def test_fp8_rerun_sweeps_are_risky_session_only() -> None:
     assert all(plan["has_risky_session_flags"] for plan in plans)
     assert all(plan["allow_risky_session_flags"] for plan in plans)
     assert all("kv_cache_dtype" in plan["risk_tiers"] for plan in plans)
+
+
+def test_concurrency_saturation_sweep_plan_shapes() -> None:
+    levels = [1, 2, 3, 4, 6, 8]
+    paths = [Path(f"config/sweeps/qwen-concurrency-saturation-c{level}.json") for level in levels]
+
+    plans = [build_sweep_plan(load_sweep_definition(path)) for path in paths]
+
+    assert [plan["prompt_set_id"] for plan in plans] == [
+        f"qwen-coding-interactive-concurrency-{level}-v1" for level in levels
+    ]
+    assert [plan["candidate_count"] for plan in plans] == [5, 5, 5, 5, 5, 5]
+    assert [plan["trial_count"] for plan in plans] == [10, 10, 10, 10, 10, 10]
+    assert [plan["trials"][0]["benchmark_plan"]["concurrency"] for plan in plans] == levels

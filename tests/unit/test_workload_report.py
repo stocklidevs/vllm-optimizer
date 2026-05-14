@@ -42,6 +42,20 @@ def test_workload_report_requires_workloads() -> None:
         build_workload_leaderboard_report(WorkloadReportInputs(workloads=()))
 
 
+def test_workload_report_classifies_unsupported_fp8_e5m2(tmp_path: Path) -> None:
+    ranking = _write_ranking(tmp_path)
+    log = tmp_path / "server-log.json"
+    write_json(log, {"log": "ValueError: fp8_e5m2 kv-cache is not supported with fp8 checkpoints."})
+
+    report = build_workload_leaderboard_report(
+        WorkloadReportInputs(workloads=(WorkloadInput(label="fp8", ranking_path=ranking),))
+    )
+
+    summary = report["failed_candidate_findings"][0]["failure_summary"]
+    assert "fp8_e5m2" in summary
+    assert "unsupported" in summary
+
+
 def _write_ranking(tmp_path: Path) -> Path:
     log = tmp_path / "server-log.json"
     write_json(log, {"log": "FileNotFoundError: [Errno 2] No such file or directory: 'ninja'"})
