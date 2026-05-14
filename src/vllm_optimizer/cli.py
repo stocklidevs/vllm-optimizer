@@ -42,8 +42,10 @@ from .session_tuning_confirmation import (
 )
 from .session_tuning_sweep import (
     SessionTuningSweepError,
+    run_session_tuning_sweep,
     write_session_tuning_sweep_plan,
     write_session_tuning_sweep_preview,
+    write_session_tuning_sweep_ranking,
 )
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
@@ -314,6 +316,25 @@ def build_parser() -> argparse.ArgumentParser:
     session_sweep_preview_parser.add_argument("--plan", required=True, type=Path)
     session_sweep_preview_parser.add_argument("--out", required=True, type=Path)
     session_sweep_preview_parser.set_defaults(func=cmd_session_tuning_sweep_preview)
+
+    session_sweep_run_parser = subparsers.add_parser(
+        "session-tuning-sweep-run", help="Run a live session tuning sweep"
+    )
+    session_sweep_run_parser.add_argument("--config", required=True, type=Path)
+    session_sweep_run_parser.add_argument("--plan", required=True, type=Path)
+    session_sweep_run_parser.add_argument("--out", required=True, type=Path)
+    session_sweep_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    session_sweep_run_parser.add_argument("--continue-on-failure", action="store_true")
+    session_sweep_run_parser.add_argument("--allow-session-tuning", action="store_true")
+    session_sweep_run_parser.set_defaults(func=cmd_session_tuning_sweep_run)
+
+    session_sweep_rank_parser = subparsers.add_parser(
+        "session-tuning-sweep-rank", help="Rank session tuning sweep results"
+    )
+    session_sweep_rank_parser.add_argument("--plan", required=True, type=Path)
+    session_sweep_rank_parser.add_argument("--results", required=True, type=Path)
+    session_sweep_rank_parser.add_argument("--out", required=True, type=Path)
+    session_sweep_rank_parser.set_defaults(func=cmd_session_tuning_sweep_rank)
 
     system_tuning_parser = subparsers.add_parser(
         "system-tuning-discover", help="Capture read-only Linux/NVIDIA/runtime tuning state"
@@ -660,6 +681,26 @@ def cmd_session_tuning_sweep_preview(args: argparse.Namespace) -> int:
     write_session_tuning_sweep_preview(args.plan, args.out)
     print(str(args.out))
     return 0
+
+
+def cmd_session_tuning_sweep_run(args: argparse.Namespace) -> int:
+    target = load_target(args.config)
+    summary = run_session_tuning_sweep(
+        target,
+        read_json(args.plan),
+        args.out,
+        timeout_seconds=args.timeout_seconds,
+        continue_on_failure=args.continue_on_failure,
+        allow_session_tuning=args.allow_session_tuning,
+    )
+    print(summary["artifact_paths"]["results"])
+    return 0 if summary["failure_count"] == 0 else 2
+
+
+def cmd_session_tuning_sweep_rank(args: argparse.Namespace) -> int:
+    ranking = write_session_tuning_sweep_ranking(args.plan, args.results, args.out)
+    print(str(args.out))
+    return 0 if ranking.get("ranked_trial_count", 0) else 2
 
 
 def cmd_system_tuning_discover(args: argparse.Namespace) -> int:
