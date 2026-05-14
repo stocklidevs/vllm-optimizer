@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .ab_confirmation import AbConfirmationError, AbConfirmationInputs, build_ab_confirmation_report
 from .artifacts import read_json, read_jsonl, write_json
 from .benchmark import BenchmarkError, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
 from .discovery import DiscoveryError, load_target, run_discovery
@@ -58,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         FlagCatalogError,
         PromotionError,
         DefaultReportError,
+        AbConfirmationError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -224,6 +226,19 @@ def build_parser() -> argparse.ArgumentParser:
     recommended_report_parser.add_argument("--out", required=True, type=Path)
     recommended_report_parser.add_argument("--markdown-out", type=Path)
     recommended_report_parser.set_defaults(func=cmd_recommended_report)
+
+    ab_report_parser = subparsers.add_parser(
+        "ab-report", help="Aggregate repeated A/B benchmark summaries"
+    )
+    ab_report_parser.add_argument("--original-label", required=True)
+    ab_report_parser.add_argument("--recommended-label", required=True)
+    ab_report_parser.add_argument("--original-summaries", required=True, type=Path, nargs="+")
+    ab_report_parser.add_argument("--recommended-summaries", required=True, type=Path, nargs="+")
+    ab_report_parser.add_argument("--prompt-set-id", required=True)
+    ab_report_parser.add_argument("--noise-percent", type=float, default=1.0)
+    ab_report_parser.add_argument("--out", required=True, type=Path)
+    ab_report_parser.add_argument("--markdown-out", type=Path)
+    ab_report_parser.set_defaults(func=cmd_ab_report)
 
     return parser
 
@@ -415,6 +430,25 @@ def cmd_recommended_report(args: argparse.Namespace) -> int:
             recommended=args.recommended,
             profile=args.profile,
             source_ranking=args.source_ranking,
+        )
+    )
+    write_json(args.out, report)
+    if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
+    return 0
+
+
+def cmd_ab_report(args: argparse.Namespace) -> int:
+    report = build_ab_confirmation_report(
+        AbConfirmationInputs(
+            original_label=args.original_label,
+            recommended_label=args.recommended_label,
+            original_summaries=tuple(args.original_summaries),
+            recommended_summaries=tuple(args.recommended_summaries),
+            prompt_set_id=args.prompt_set_id,
+            noise_percent=args.noise_percent,
         )
     )
     write_json(args.out, report)
