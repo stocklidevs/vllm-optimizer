@@ -1,0 +1,69 @@
+{
+  "enable_auto_tool_choice": true,
+  "gpu_memory_utilization": 0.9,
+  "host": "0.0.0.0",
+  "max_model_len": 32768,
+  "model": "cyankiwi/Qwen3-Coder-Next-AWQ-4bit",
+  "optional_flags": {
+    "enable_chunked_prefill": true,
+    "enable_prefix_caching": false,
+    "max_num_batched_tokens": 4096,
+    "max_num_seqs": 16
+  },
+  "performance_mode": "interactivity",
+  "port": 8001,
+  "profile_id": "qwen3-coder-next-awq-recommended",
+  "promotion": {
+    "baseline_delta": {
+      "aggregate_tokens_per_second": {
+        "absolute": 0.6394695418573306,
+        "percent": 1.3455321187632523
+      },
+      "mean_latency_ms": {
+        "absolute": -13.0,
+        "percent": -1.27826941986234
+      }
+    },
+    "candidate_id": "qwen-scheduler-safe-c005-8b1dabfa",
+    "generated_at": "2026-05-14T00:41:12Z",
+    "metrics": {
+      "aggregate_tokens_per_second": 48.16487104955972,
+      "failure_count": 0,
+      "failure_rate": 0.0,
+      "latency_spread_ms": 22.291004663067316,
+      "mean_latency_ms": 1004.0,
+      "overrides": {
+        "enable_chunked_prefill": true,
+        "enable_prefix_caching": false,
+        "gpu_memory_utilization": 0.9,
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "performance_mode": "interactivity"
+      },
+      "success_count": 3,
+      "tokens_per_second_spread": 1.0855277897005222
+    },
+    "objective": "balanced",
+    "overrides": {
+      "enable_chunked_prefill": true,
+      "enable_prefix_caching": false,
+      "gpu_memory_utilization": 0.9,
+      "max_model_len": 32768,
+      "max_num_batched_tokens": 4096,
+      "max_num_seqs": 16,
+      "performance_mode": "interactivity"
+    },
+    "rank": 1,
+    "ranking_path": "artifacts/sweeps/qwen-scheduler-safe/live/ranking.json",
+    "source_trial_ids": [
+      "qwen-scheduler-safe-c005-r01-b2b9fb46",
+      "qwen-scheduler-safe-c005-r02-8795b069",
+      "qwen-scheduler-safe-c005-r03-fbbfebca"
+    ],
+    "sweep_id": "qwen-scheduler-safe"
+  },
+  "served_model_name": "Qwen3-Coder-Next",
+  "tool_call_parser": "qwen3_coder",
+  "vllm_executable": "$HOME/qwen3next-venv/bin/vllm"
+}

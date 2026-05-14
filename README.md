@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.7.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.8.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -28,6 +28,8 @@ The project is spec-driven with SpecKit and currently supports:
   installed GX10 vLLM help output.
 - Scheduler and prefill knob sweep support for approved vLLM serve flags such
   as batched tokens, sequence count, chunked prefill, and prefix caching.
+- Local promotion of ranked sweep winners into reusable recommended serve
+  profiles with provenance.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -144,6 +146,14 @@ uv run vllm-optimizer flag-catalog --policy config/vllm-flags/qwen-safe-policy.j
 uv run vllm-optimizer flag-catalog-capture --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq.json --policy config/vllm-flags/qwen-safe-policy.json --out artifacts/vllm-flags/gx10-qwen --executor ssh
 ```
 
+Promote a ranked winner to a recommended profile:
+
+```powershell
+uv run vllm-optimizer promote-preview --ranking artifacts/sweeps/qwen-scheduler-safe/live/ranking.json --objective balanced --out artifacts/promotions/qwen-scheduler-safe-preview.json
+uv run vllm-optimizer promote-profile --ranking artifacts/sweeps/qwen-scheduler-safe/live/ranking.json --objective balanced --profile-out config/profiles/qwen3-coder-next-awq-recommended.json --summary-out artifacts/promotions/qwen3-coder-next-awq-recommended.md
+uv run vllm-optimizer serve-plan --profile config/profiles/qwen3-coder-next-awq-recommended.json --out artifacts/promotions/recommended-serve-plan.json
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -152,6 +162,7 @@ uv run vllm-optimizer flag-catalog-capture --config config/local.gx10.json --pro
 - Smoke and benchmark commands are session-mutating and include preflight
   checks plus cleanup verification.
 - Sweep live execution is sequential and session-mutating only.
+- Promotion commands are local-only and do not contact the GX10.
 - Generated artifacts under `artifacts/` are ignored by git.
 
 ## SpecKit
@@ -169,3 +180,4 @@ Current feature specs:
 - `specs/008-expanded-qwen-sweep/spec.md`
 - `specs/009-vllm-flag-catalog/spec.md`
 - `specs/010-scheduler-knob-sweep/spec.md`
+- `specs/011-promote-winner-profile/spec.md`

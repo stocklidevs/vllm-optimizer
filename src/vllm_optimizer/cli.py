@@ -15,6 +15,13 @@ from .flag_catalog import (
     generate_catalog_from_files,
 )
 from .planner import build_trial_plan
+from .promotion import (
+    DEFAULT_OBJECTIVE,
+    DEFAULT_PROFILE_ID,
+    PromotionError,
+    build_promotion_preview,
+    write_promoted_profile,
+)
 from .ranking import rank_results
 from .report import ReportError, ReportInputs, build_comparison_report
 from .safety import build_dry_run_preview
@@ -48,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         SweepError,
         ReportError,
         FlagCatalogError,
+        PromotionError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -183,6 +191,26 @@ def build_parser() -> argparse.ArgumentParser:
     flag_capture_parser.add_argument("--executor", required=True, choices=["mock", "ssh"])
     flag_capture_parser.add_argument("--mock-results", type=Path)
     flag_capture_parser.set_defaults(func=cmd_flag_catalog_capture)
+
+    promote_preview_parser = subparsers.add_parser(
+        "promote-preview", help="Preview promotion of a ranked sweep candidate"
+    )
+    promote_preview_parser.add_argument("--ranking", required=True, type=Path)
+    promote_preview_parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    promote_preview_parser.add_argument("--out", required=True, type=Path)
+    promote_preview_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
+    promote_preview_parser.set_defaults(func=cmd_promote_preview)
+
+    promote_profile_parser = subparsers.add_parser(
+        "promote-profile", help="Generate a recommended profile from a ranked candidate"
+    )
+    promote_profile_parser.add_argument("--ranking", required=True, type=Path)
+    promote_profile_parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    promote_profile_parser.add_argument("--profile-out", required=True, type=Path)
+    promote_profile_parser.add_argument("--summary-out", required=True, type=Path)
+    promote_profile_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
+    promote_profile_parser.add_argument("--force", action="store_true")
+    promote_profile_parser.set_defaults(func=cmd_promote_profile)
 
     return parser
 
@@ -344,4 +372,24 @@ def cmd_flag_catalog_capture(args: argparse.Namespace) -> int:
         executor = SshExecutor(target.ssh_destination)
     capture_flag_catalog(target, profile, args.policy, executor, args.out)
     print(str(args.out))
+    return 0
+
+
+def cmd_promote_preview(args: argparse.Namespace) -> int:
+    preview = build_promotion_preview(args.ranking, args.objective, args.profile_id)
+    write_json(args.out, preview)
+    print(str(args.out))
+    return 0
+
+
+def cmd_promote_profile(args: argparse.Namespace) -> int:
+    result = write_promoted_profile(
+        ranking_path=args.ranking,
+        profile_out=args.profile_out,
+        summary_out=args.summary_out,
+        objective=args.objective,
+        profile_id=args.profile_id,
+        force=args.force,
+    )
+    print(result["profile_path"])
     return 0
