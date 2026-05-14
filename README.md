@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.20.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.21.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -47,6 +47,9 @@ The project is spec-driven with SpecKit and currently supports:
   mapping where concurrent interactive throughput flattens or destabilizes.
 - A conservative `optimize-workload` pipeline MVP that orchestrates one sweep
   through plan, preview, explicit run, and report stages without auto-promotion.
+- A local pipeline confirmation stage that turns the ranked winner into a
+  candidate profile, aggregates repeated A/B summaries, and only writes a
+  confirmed profile when `--allow-promotion` is explicitly provided.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -94,16 +97,22 @@ uv run vllm-optimizer optimize-workload --mode plan --sweep config/sweeps/qwen-c
 uv run vllm-optimizer optimize-workload --mode preview --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --allow-risky-session-flags
 uv run vllm-optimizer optimize-workload --mode run --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --config config/local.gx10.json --continue-on-failure --allow-risky-session-flags
 uv run vllm-optimizer optimize-workload --mode report --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --allow-risky-session-flags
+uv run vllm-optimizer optimize-workload --mode confirm --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --current-profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --candidate-profile-out artifacts/optimizer-runs/qwen-c8/candidate-profile.json --confirmed-profile-out artifacts/optimizer-runs/qwen-c8/confirmed-profile.json --confirmation-repetitions 5 --original-label current-concurrent --recommended-label c8-saturation --allow-risky-session-flags
 ```
 
 Pipeline boundaries:
 
-```text
 The MVP records deterministic artifact paths and runs one existing sweep at a
 time. It can generate plans, previews, live sweep outputs, rankings, and local
 reports. It never promotes profiles automatically; promotion remains an
 explicit confirmation-gated command.
-```
+
+`confirm` mode expects repeated benchmark summaries under
+`<out>/confirmation/current-rN/summary.json` and
+`<out>/confirmation/candidate-rN/summary.json`. It writes a candidate profile
+and A/B confirmation report locally. Even when the report says
+`switch-to-recommended`, the pipeline does not write the confirmed profile
+unless `--allow-promotion` is included.
 
 Smoke serve:
 

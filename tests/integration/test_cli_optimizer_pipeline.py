@@ -38,3 +38,19 @@ def test_optimize_workload_cli_run_requires_config(tmp_path: Path) -> None:
     )
 
     assert exit_code == 2
+
+
+def test_optimize_workload_cli_confirm_requires_inputs(tmp_path: Path) -> None:
+    exit_code = main(
+        [
+            "optimize-workload",
+            "--mode",
+            "confirm",
+            "--sweep",
+            "config/sweeps/qwen-small-sweep.json",
+            "--out",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 2

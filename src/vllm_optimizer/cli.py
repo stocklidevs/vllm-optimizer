@@ -207,10 +207,19 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_parser = subparsers.add_parser(
         "optimize-workload", help="Run a staged optimization pipeline for one sweep"
     )
-    optimize_parser.add_argument("--mode", required=True, choices=["plan", "preview", "run", "report"])
+    optimize_parser.add_argument("--mode", required=True, choices=["plan", "preview", "run", "report", "confirm"])
     optimize_parser.add_argument("--sweep", required=True, type=Path)
     optimize_parser.add_argument("--out", required=True, type=Path)
     optimize_parser.add_argument("--config", type=Path)
+    optimize_parser.add_argument("--current-profile", type=Path)
+    optimize_parser.add_argument("--prompts", type=Path)
+    optimize_parser.add_argument("--candidate-profile-out", type=Path)
+    optimize_parser.add_argument("--confirmed-profile-out", type=Path)
+    optimize_parser.add_argument("--promotion-summary-out", type=Path)
+    optimize_parser.add_argument("--confirmation-repetitions", type=int, default=3)
+    optimize_parser.add_argument("--original-label", default="current")
+    optimize_parser.add_argument("--recommended-label", default="candidate")
+    optimize_parser.add_argument("--allow-promotion", action="store_true")
     optimize_parser.add_argument("--timeout-seconds", type=int, default=1200)
     optimize_parser.add_argument("--continue-on-failure", action="store_true")
     optimize_parser.add_argument("--allow-risky-session-flags", action="store_true")
@@ -477,6 +486,15 @@ def cmd_optimize_workload(args: argparse.Namespace) -> int:
             timeout_seconds=args.timeout_seconds,
             continue_on_failure=args.continue_on_failure,
             allow_risky_session_flags=args.allow_risky_session_flags,
+            current_profile_path=args.current_profile,
+            prompts_path=args.prompts,
+            candidate_profile_out=args.candidate_profile_out,
+            confirmed_profile_out=args.confirmed_profile_out,
+            promotion_summary_out=args.promotion_summary_out,
+            confirmation_repetitions=args.confirmation_repetitions,
+            original_label=args.original_label,
+            recommended_label=args.recommended_label,
+            allow_promotion=args.allow_promotion,
         )
     )
     print(summary["artifacts"]["pipeline_summary"])
