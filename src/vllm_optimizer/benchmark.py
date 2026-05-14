@@ -9,6 +9,7 @@ from .artifacts import read_json, write_json
 from .discovery import DiscoveryTarget
 from .redaction import REDACTION, redact_data
 from .serve_profiles import ServeProfile
+from .session_tuning import SessionTuningProfile, build_session_tuning_preview
 from .smoke import build_smoke_serve_plan, parse_remote_smoke_output, run_preflight, sh_quote
 from .ssh import SshExecutor
 
@@ -82,8 +83,12 @@ def load_prompt_set(path: Path) -> PromptSet:
     return PromptSet(prompt_set_id=prompt_set_id, cases=tuple(parsed_cases), concurrency=concurrency)
 
 
-def build_benchmark_plan(profile: ServeProfile, prompt_set: PromptSet) -> dict[str, Any]:
-    return {
+def build_benchmark_plan(
+    profile: ServeProfile,
+    prompt_set: PromptSet,
+    session_tuning: SessionTuningProfile | None = None,
+) -> dict[str, Any]:
+    plan = {
         "profile_id": profile.profile_id,
         "prompt_set_id": prompt_set.prompt_set_id,
         "mode": "dry-run",
@@ -100,6 +105,15 @@ def build_benchmark_plan(profile: ServeProfile, prompt_set: PromptSet) -> dict[s
         ],
         "metrics": ["duration_ms", "prompt_tokens", "completion_tokens", "total_tokens", "tokens_per_second"],
     }
+    if session_tuning is not None:
+        preview = build_session_tuning_preview(session_tuning)
+        plan["session_tuning"] = {
+            "profile_id": preview["profile_id"],
+            "classification": preview["classification"],
+            "actions": preview["actions"],
+            "prelude": preview["prelude"],
+        }
+    return plan
 
 
 def summarize_metrics(metrics: list[dict[str, Any]]) -> dict[str, Any]:
@@ -179,8 +193,9 @@ def run_baseline_benchmark(
     prompt_set: PromptSet,
     out_dir: Path,
     timeout_seconds: int,
+    session_tuning: SessionTuningProfile | None = None,
 ) -> dict[str, Any]:
-    plan = build_benchmark_plan(profile, prompt_set)
+    plan = build_benchmark_plan(profile, prompt_set, session_tuning)
     preflight = run_preflight(target, profile)
     if not preflight["safe"]:
         return save_benchmark_artifacts(
@@ -194,7 +209,7 @@ def run_baseline_benchmark(
             {},
         )
 
-    script = build_remote_benchmark_script(profile, prompt_set, timeout_seconds)
+    script = build_remote_benchmark_script(profile, prompt_set, timeout_seconds, session_tuning)
     result = SshExecutor(target.ssh_destination).run(
         "benchmark-run", script, timeout_seconds + 60
     )
@@ -215,12 +230,16 @@ def run_baseline_benchmark(
 
 
 def build_remote_benchmark_script(
-    profile: ServeProfile, prompt_set: PromptSet, timeout_seconds: int
+    profile: ServeProfile,
+    prompt_set: PromptSet,
+    timeout_seconds: int,
+    session_tuning: SessionTuningProfile | None = None,
 ) -> str:
     from .serve_profiles import render_vllm_serve_command, shell_join
 
     serve_command = shell_join(render_vllm_serve_command(profile))
     path_export = build_vllm_bin_path_export(profile.vllm_executable)
+    tuning_prelude = build_session_tuning_preview(session_tuning)["prelude"] if session_tuning else ""
     cases_json = json_dump(
         [
             {
@@ -237,6 +256,7 @@ set -u
 LOG=$(mktemp /tmp/vllm-benchmark-{profile.profile_id}.XXXXXX.log)
 PID=""
 {path_export}
+{tuning_prelude}
 cleanup() {{
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
     kill "$PID" 2>/dev/null || true

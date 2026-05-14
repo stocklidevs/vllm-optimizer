@@ -1,0 +1,12 @@
+{
+  "profile_id": "qwen-runtime-env-v1",
+  "description": "Session-scoped runtime environment tuning for Qwen benchmark shells.",
+  "classification": "session-mutating",
+  "environment": {
+    "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
+    "CUDA_MODULE_LOADING": "LAZY"
+  },
+  "ulimits": {
+    "nofile": 500000
+  }
+}

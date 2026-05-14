@@ -30,6 +30,11 @@ from .ranking import rank_results
 from .report import ReportError, ReportInputs, build_comparison_report
 from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
+from .session_tuning import (
+    SessionTuningError,
+    load_session_tuning_profile,
+    write_session_tuning_preview,
+)
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
 from .system_tuning import SystemTuningError, run_system_tuning_discovery
@@ -68,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         BenchmarkError,
         ExperimentValidationError,
         ServeProfileError,
+        SessionTuningError,
         SmokeServeError,
         SweepError,
         ReportError,
@@ -140,6 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     benchmark_plan_parser.add_argument("--profile", required=True, type=Path)
     benchmark_plan_parser.add_argument("--prompts", required=True, type=Path)
+    benchmark_plan_parser.add_argument("--session-tuning", type=Path)
+    benchmark_plan_parser.add_argument("--allow-session-tuning", action="store_true")
     benchmark_plan_parser.add_argument("--out", required=True, type=Path)
     benchmark_plan_parser.set_defaults(func=cmd_benchmark_plan)
 
@@ -149,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_run_parser.add_argument("--config", required=True, type=Path)
     benchmark_run_parser.add_argument("--profile", required=True, type=Path)
     benchmark_run_parser.add_argument("--prompts", required=True, type=Path)
+    benchmark_run_parser.add_argument("--session-tuning", type=Path)
+    benchmark_run_parser.add_argument("--allow-session-tuning", action="store_true")
     benchmark_run_parser.add_argument("--out", required=True, type=Path)
     benchmark_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
     benchmark_run_parser.set_defaults(func=cmd_benchmark_run)
@@ -254,6 +264,14 @@ def build_parser() -> argparse.ArgumentParser:
     flag_capture_parser.add_argument("--executor", required=True, choices=["mock", "ssh"])
     flag_capture_parser.add_argument("--mock-results", type=Path)
     flag_capture_parser.set_defaults(func=cmd_flag_catalog_capture)
+
+    session_tuning_parser = subparsers.add_parser(
+        "session-tuning-preview", help="Preview approved session-scoped benchmark tuning"
+    )
+    session_tuning_parser.add_argument("--profile", required=True, type=Path)
+    session_tuning_parser.add_argument("--catalog", type=Path)
+    session_tuning_parser.add_argument("--out", required=True, type=Path)
+    session_tuning_parser.set_defaults(func=cmd_session_tuning_preview)
 
     system_tuning_parser = subparsers.add_parser(
         "system-tuning-discover", help="Capture read-only Linux/NVIDIA/runtime tuning state"
@@ -391,7 +409,8 @@ def cmd_smoke_serve(args: argparse.Namespace) -> int:
 def cmd_benchmark_plan(args: argparse.Namespace) -> int:
     profile = load_serve_profile(args.profile)
     prompts = load_prompt_set(args.prompts)
-    write_json(args.out, build_benchmark_plan(profile, prompts))
+    session_tuning = load_allowed_session_tuning(args.session_tuning, args.allow_session_tuning)
+    write_json(args.out, build_benchmark_plan(profile, prompts, session_tuning))
     print(str(args.out))
     return 0
 
@@ -400,8 +419,9 @@ def cmd_benchmark_run(args: argparse.Namespace) -> int:
     target = load_target(args.config)
     profile = load_serve_profile(args.profile)
     prompts = load_prompt_set(args.prompts)
+    session_tuning = load_allowed_session_tuning(args.session_tuning, args.allow_session_tuning)
     result = run_baseline_benchmark(
-        target, profile, prompts, args.out, args.timeout_seconds
+        target, profile, prompts, args.out, args.timeout_seconds, session_tuning
     )
     print(str(args.out))
     summary = result["summary"]
@@ -561,6 +581,12 @@ def cmd_flag_catalog_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_session_tuning_preview(args: argparse.Namespace) -> int:
+    write_session_tuning_preview(args.profile, args.catalog, args.out)
+    print(str(args.out))
+    return 0
+
+
 def cmd_system_tuning_discover(args: argparse.Namespace) -> int:
     target = load_target(args.config)
     if args.executor == "mock":
@@ -572,6 +598,14 @@ def cmd_system_tuning_discover(args: argparse.Namespace) -> int:
     run_system_tuning_discovery(target, executor, args.out)
     print(str(args.out))
     return 0
+
+
+def load_allowed_session_tuning(path: Path | None, allowed: bool):
+    if path is None:
+        return None
+    if not allowed:
+        raise SessionTuningError("session tuning requires --allow-session-tuning")
+    return load_session_tuning_profile(path)
 
 
 def cmd_promote_preview(args: argparse.Namespace) -> int:

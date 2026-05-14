@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.23.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.24.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -56,6 +56,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Read-only Linux/NVIDIA/runtime system tuning discovery that captures current
   GX10 tuning state and classifies future knobs before any session or
   persistent tuning is attempted.
+- Guarded session-only benchmark tuning profiles for shell-scoped environment
+  variables and `ulimit` changes, with deterministic previews and explicit
+  live-run opt-in.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -95,12 +98,21 @@ Read-only discovery:
 ```powershell
 uv run vllm-optimizer discover --config config/local.gx10.json --executor ssh --out artifacts/discovery/gx10-live
 uv run vllm-optimizer system-tuning-discover --config config/local.gx10.json --executor ssh --out artifacts/system-tuning/gx10-live
+uv run vllm-optimizer session-tuning-preview --profile config/session-tuning/qwen-runtime-env.json --catalog artifacts/system-tuning/gx10-live/catalog.json --out artifacts/session-tuning/qwen-runtime-env/preview.json
 ```
 
 System tuning discovery is observational only. It records raw probe output,
 parsed tuning entries, redaction metadata, and future action classifications
 such as `read-only`, `session-mutating`, and `persistent-mutating`; it does not
 change Linux, NVIDIA, GPU, CPU, memory, kernel, or runtime settings.
+
+Session tuning profiles are limited to shell-scoped benchmark changes such as
+`export` statements and `ulimit -n`. Benchmark plans and live runs require
+`--allow-session-tuning` when a session tuning profile is supplied:
+
+```powershell
+uv run vllm-optimizer benchmark-plan --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --session-tuning config/session-tuning/qwen-runtime-env.json --allow-session-tuning --out artifacts/session-tuning/qwen-runtime-env/benchmark-plan.json
+```
 
 Optimization pipeline MVP:
 
