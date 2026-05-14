@@ -1,0 +1,19 @@
+{
+  "sweep_id": "qwen-high-impact-interactive",
+  "profile": "config/profiles/qwen3-coder-next-awq-recommended.json",
+  "prompts": "config/prompts/qwen-coding-interactive.json",
+  "seed": 16,
+  "repetitions": 2,
+  "objectives": ["throughput", "latency", "balanced"],
+  "allow_risky_session_flags": true,
+  "candidates": [
+    {"block_size": 16, "gpu_memory_utilization": 0.9, "max_model_len": 32768, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "performance_mode": "interactivity"},
+    {"block_size": 16, "gpu_memory_utilization": 0.9, "max_model_len": 32768, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "performance_mode": "throughput"},
+    {"block_size": 16, "gpu_memory_utilization": 0.9, "max_model_len": 32768, "max_num_batched_tokens": 2048, "max_num_seqs": 8, "performance_mode": "interactivity"},
+    {"block_size": 16, "gpu_memory_utilization": 0.9, "max_model_len": 32768, "max_num_batched_tokens": 8192, "max_num_seqs": 32, "performance_mode": "throughput"},
+    {"block_size": 32, "gpu_memory_utilization": 0.9, "max_model_len": 32768, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "performance_mode": "interactivity"},
+    {"block_size": 16, "gpu_memory_utilization": 0.92, "max_model_len": 32768, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "performance_mode": "interactivity"},
+    {"block_size": 16, "gpu_memory_utilization": 0.9, "kv_cache_dtype": "fp8", "max_model_len": 32768, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "performance_mode": "interactivity"},
+    {"block_size": 16, "gpu_memory_utilization": 0.9, "kv_cache_dtype": "fp8_e5m2", "max_model_len": 32768, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "performance_mode": "interactivity"}
+  ]
+}

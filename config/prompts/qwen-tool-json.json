@@ -1,0 +1,38 @@
+{
+  "prompt_set_id": "qwen-tool-json-v1",
+  "cases": [
+    {
+      "case_id": "json-diagnostic",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return only JSON with keys status, likely_cause, next_actions. The issue is: vLLM readiness polling timed out after a model launch."
+        }
+      ],
+      "max_tokens": 180,
+      "temperature": 0
+    },
+    {
+      "case_id": "tool-plan",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return a JSON array of exactly four tool-style actions to benchmark a remote vLLM server. Each item must include action, purpose, risk, and expected_artifact."
+        }
+      ],
+      "max_tokens": 260,
+      "temperature": 0
+    },
+    {
+      "case_id": "schema-fill",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return only JSON matching this schema: {\"profile\":\"string\",\"objective\":\"string\",\"constraints\":[\"string\"],\"decision\":\"string\"}. Use it to summarize a latency-focused vLLM tuning run."
+        }
+      ],
+      "max_tokens": 220,
+      "temperature": 0
+    }
+  ]
+}

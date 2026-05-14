@@ -1,0 +1,38 @@
+{
+  "prompt_set_id": "qwen-coding-long-v1",
+  "cases": [
+    {
+      "case_id": "design-parser",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Design a small deterministic parser for a line-based task file. The format has comments starting with #, task lines shaped as [priority] title, and optional indented notes. Return Python code with data classes, parse errors, and two examples."
+        }
+      ],
+      "max_tokens": 700,
+      "temperature": 0
+    },
+    {
+      "case_id": "review-module",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Review this pseudo module for reliability risks and propose a safer implementation plan:\n\n- read config JSON\n- launch a subprocess\n- poll localhost until ready\n- run three HTTP requests\n- write metrics to disk\n- kill the process\n\nFocus on timeout handling, cleanup, deterministic artifacts, and error reporting."
+        }
+      ],
+      "max_tokens": 650,
+      "temperature": 0
+    },
+    {
+      "case_id": "implement-cache",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Implement a small in-memory LRU cache in Python with get, set, delete, clear, len, and optional max_items. Include careful edge-case handling and a short usage example."
+        }
+      ],
+      "max_tokens": 700,
+      "temperature": 0
+    }
+  ]
+}

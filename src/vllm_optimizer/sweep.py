@@ -34,6 +34,7 @@ class SweepDefinition:
     profile_path: Path
     prompts_path: Path
     parameters: dict[str, tuple[Any, ...]]
+    candidates: tuple[dict[str, Any], ...]
     objectives: tuple[str, ...]
     seed: int
     max_trials: int | None
@@ -86,9 +87,12 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
             continue
         objectives.append(objective)
 
+    candidate_overrides = _load_candidate_overrides(data.get("candidates"), errors)
     parameters_raw = data.get("parameters")
-    if not isinstance(parameters_raw, dict) or not parameters_raw:
-        errors.append("parameters must be a non-empty object")
+    if parameters_raw is None:
+        parameters_raw = {}
+    if not isinstance(parameters_raw, dict):
+        errors.append("parameters must be an object when provided")
         parameters_raw = {}
     parameters: dict[str, tuple[Any, ...]] = {}
     for name in sorted(parameters_raw):
@@ -112,8 +116,8 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
 
     if not objectives:
         errors.append("at least one supported objective is required")
-    if not parameters:
-        errors.append("at least one safe parameter is required")
+    if not parameters and not candidate_overrides:
+        errors.append("at least one safe parameter or explicit candidate is required")
     if errors:
         raise SweepError("; ".join(errors))
 
@@ -122,6 +126,7 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
         profile_path=profile,
         prompts_path=prompts,
         parameters=parameters,
+        candidates=tuple(candidate_overrides),
         objectives=tuple(objectives),
         seed=seed,
         max_trials=max_trials,
@@ -136,11 +141,18 @@ def build_sweep_plan(
 ) -> dict[str, Any]:
     profile = load_serve_profile(definition.profile_path)
     prompts = load_prompt_set(definition.prompts_path)
-    parameter_names = sorted(definition.parameters)
-    combinations = list(product(*(definition.parameters[name] for name in parameter_names)))
+    explicit_candidates = list(definition.candidates)
+    parameter_names = sorted({name for candidate in explicit_candidates for name in candidate} or definition.parameters)
+    if explicit_candidates:
+        candidate_overrides = explicit_candidates
+    else:
+        candidate_overrides = [
+            dict(zip(parameter_names, values, strict=True))
+            for values in product(*(definition.parameters[name] for name in parameter_names))
+        ]
     if definition.max_trials is not None:
-        combinations = combinations[: definition.max_trials]
-    if not combinations:
+        candidate_overrides = candidate_overrides[: definition.max_trials]
+    if not candidate_overrides:
         raise SweepError("sweep produced no trials")
     allow_risky = definition.allow_risky_session_flags or allow_risky_session_flags
     risk_tiers = {name: parameter_risk_tier(name) for name in parameter_names}
@@ -148,8 +160,7 @@ def build_sweep_plan(
 
     trials = []
     candidates = []
-    for order, values in enumerate(combinations):
-        overrides = dict(zip(parameter_names, values, strict=True))
+    for order, overrides in enumerate(candidate_overrides):
         candidate_id = build_candidate_id(definition.sweep_id, order, overrides)
         candidates.append(
             {
@@ -190,6 +201,7 @@ def build_sweep_plan(
         "prompts_path": str(definition.prompts_path),
         "prompt_set_id": prompts.prompt_set_id,
         "baseline_summary_path": str(definition.baseline_summary_path) if definition.baseline_summary_path else None,
+        "candidate_source": "explicit" if explicit_candidates else "cartesian",
         "safe_parameters": sorted(SAFE_PARAMETERS),
         "risk_tiers": risk_tiers,
         "allow_risky_session_flags": allow_risky,
@@ -619,6 +631,33 @@ def _required_path(data: dict[str, Any], field: str, errors: list[str]) -> Path:
         errors.append(f"{field} is required")
         return Path(".")
     return Path(value)
+
+
+def _load_candidate_overrides(value: Any, errors: list[str]) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not value:
+        errors.append("candidates must be a non-empty array when provided")
+        return []
+    candidates: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict) or not item:
+            errors.append(f"candidates[{index}] must be a non-empty object")
+            continue
+        candidate: dict[str, Any] = {}
+        for name in sorted(item):
+            if name not in SAFE_PARAMETERS:
+                if name in BLOCKED_PARAMETERS:
+                    errors.append(f"candidate parameter {name!r} is blocked for persistent/system safety")
+                else:
+                    errors.append(f"candidate parameter {name!r} is not allowed for session-level sweeps")
+                continue
+            parsed = _validate_parameter_value(name, item[name], errors)
+            if parsed is not None:
+                candidate[name] = parsed
+        if candidate:
+            candidates.append(candidate)
+    return candidates
 
 
 def _validate_parameter_value(name: str, value: Any, errors: list[str]) -> Any:

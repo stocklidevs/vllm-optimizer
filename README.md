@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.12.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.13.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -35,6 +35,8 @@ The project is spec-driven with SpecKit and currently supports:
 - Risk-tiered risky-session vLLM sweeps with explicit preview/run opt-in.
 - Guarded risky-winner promotion that requires repeated A/B confirmation before
   the default recommended profile is updated.
+- Workload-aware prompt sets and explicit high-impact sweep candidates for
+  interactive coding, long coding, and tool/JSON workloads.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -215,6 +217,18 @@ Failures: 0/9 requests for each profile
 Confirmed default flag addition: block_size=16
 ```
 
+Workload-aware high-impact sweeps:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-high-impact-interactive.json --out artifacts/sweeps/qwen-high-impact-interactive/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-high-impact-interactive/plan.json --out artifacts/sweeps/qwen-high-impact-interactive/preview.json
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-high-impact-long.json --out artifacts/sweeps/qwen-high-impact-long/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-high-impact-long/plan.json --out artifacts/sweeps/qwen-high-impact-long/preview.json
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-high-impact-tool-json.json --out artifacts/sweeps/qwen-high-impact-tool-json/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-high-impact-tool-json/plan.json --out artifacts/sweeps/qwen-high-impact-tool-json/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-high-impact-interactive/plan.json --out artifacts/sweeps/qwen-high-impact-interactive/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -250,3 +264,4 @@ Current feature specs:
 - `specs/013-ab-benchmark-confirmation/spec.md`
 - `specs/014-risky-session-knobs/spec.md`
 - `specs/015-risky-winner-confirmation/spec.md`
+- `specs/016-workload-aware-sweeps/spec.md`

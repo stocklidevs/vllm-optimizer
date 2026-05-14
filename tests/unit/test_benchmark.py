@@ -20,6 +20,24 @@ def test_load_prompt_set_fixture() -> None:
     assert len(prompts.cases) == 3
 
 
+def test_load_workload_prompt_sets() -> None:
+    prompt_paths = [
+        Path("config/prompts/qwen-coding-interactive.json"),
+        Path("config/prompts/qwen-coding-long.json"),
+        Path("config/prompts/qwen-tool-json.json"),
+    ]
+
+    loaded = [load_prompt_set(path) for path in prompt_paths]
+
+    assert [prompt.prompt_set_id for prompt in loaded] == [
+        "qwen-coding-interactive-v1",
+        "qwen-coding-long-v1",
+        "qwen-tool-json-v1",
+    ]
+    assert all(len(prompt.cases) == 3 for prompt in loaded)
+    assert loaded[1].cases[0].max_tokens > loaded[0].cases[0].max_tokens
+
+
 def test_load_prompt_set_rejects_empty_cases(tmp_path: Path) -> None:
     path = tmp_path / "bad.json"
     path.write_text('{"prompt_set_id":"bad","cases":[]}', encoding="utf-8")

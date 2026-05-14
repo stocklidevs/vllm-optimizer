@@ -279,3 +279,57 @@ def test_sweep_definition_rejects_blocked_parameter(tmp_path: Path) -> None:
 
     with pytest.raises(SweepError, match="blocked"):
         load_sweep_definition(path)
+
+
+def test_explicit_candidate_sweep_plan_shape() -> None:
+    definition = load_sweep_definition(Path("config/sweeps/qwen-high-impact-interactive.json"))
+
+    plan = build_sweep_plan(definition)
+    preview = build_sweep_preview(plan)
+
+    assert plan["candidate_source"] == "explicit"
+    assert plan["candidate_count"] == 8
+    assert plan["trial_count"] == 16
+    assert plan["prompt_set_id"] == "qwen-coding-interactive-v1"
+    assert plan["has_risky_session_flags"] is True
+    assert plan["allow_risky_session_flags"] is True
+    assert preview["blocked"] is False
+    assert any(candidate["overrides"].get("kv_cache_dtype") == "fp8" for candidate in plan["candidates"])
+
+
+def test_explicit_candidate_sweep_rejects_bad_candidate(tmp_path: Path) -> None:
+    path = tmp_path / "bad-candidates.json"
+    path.write_text(
+        """{
+  "sweep_id": "bad",
+  "profile": "config/profiles/qwen3-coder-next-awq-recommended.json",
+  "prompts": "config/prompts/qwen-coding-interactive.json",
+  "objectives": ["throughput"],
+  "candidates": [{"download_dir": "/tmp/cache"}]
+}""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SweepError, match="blocked"):
+        load_sweep_definition(path)
+
+
+def test_high_impact_workload_sweeps_are_distinct() -> None:
+    paths = [
+        Path("config/sweeps/qwen-high-impact-interactive.json"),
+        Path("config/sweeps/qwen-high-impact-long.json"),
+        Path("config/sweeps/qwen-high-impact-tool-json.json"),
+    ]
+
+    plans = [build_sweep_plan(load_sweep_definition(path)) for path in paths]
+
+    assert [plan["prompt_set_id"] for plan in plans] == [
+        "qwen-coding-interactive-v1",
+        "qwen-coding-long-v1",
+        "qwen-tool-json-v1",
+    ]
+    assert {plan["sweep_id"] for plan in plans} == {
+        "qwen-high-impact-interactive",
+        "qwen-high-impact-long",
+        "qwen-high-impact-tool-json",
+    }
