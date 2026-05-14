@@ -12,56 +12,11 @@
   },
   "performance_mode": "interactivity",
   "port": 8001,
-  "profile_id": "qwen3-coder-next-awq-concurrent-recommended",
+  "profile_id": "qwen3-coder-next-awq-concurrent-c8-candidate",
   "promotion": {
     "baseline_delta": {},
     "candidate_id": "qwen-concurrency-saturation-c8-c001-df6cb59c",
-    "confirmation": {
-      "decision": {
-        "reason": "recommended profile is materially better on latency and throughput",
-        "status": "switch-to-recommended"
-      },
-      "deltas": {
-        "failure_rate": {
-          "absolute": 0.0,
-          "recommended_higher": false
-        },
-        "mean_latency_ms": {
-          "absolute": -122.66666666666697,
-          "original_better": false,
-          "percent": -1.8127543028284923,
-          "recommended_better": true
-        },
-        "mean_tokens_per_second": {
-          "absolute": 1.6422080077683603,
-          "original_better": false,
-          "percent": 1.709903617157689,
-          "recommended_better": true
-        }
-      },
-      "noise_percent": 1.0,
-      "original": {
-        "failure_rate": 0.0,
-        "label": "current-concurrent",
-        "latency_spread_ms": 84.61273873097117,
-        "mean_latency_ms": 6766.866666666667,
-        "mean_tokens_per_second": 96.04096928563398,
-        "repetition_count": 5,
-        "tokens_per_second_spread": 1.0631494274228477
-      },
-      "prompt_set_id": "qwen-coding-interactive-concurrency-8-v1",
-      "recommended": {
-        "failure_rate": 0.0,
-        "label": "c8-saturation",
-        "latency_spread_ms": 136.5847884811645,
-        "mean_latency_ms": 6644.2,
-        "mean_tokens_per_second": 97.68317729340234,
-        "repetition_count": 5,
-        "tokens_per_second_spread": 1.8209010065628761
-      },
-      "report_path": "artifacts/reports/qwen-c8-concurrency-confirmation.json"
-    },
-    "generated_at": "2026-05-14T14:44:32Z",
+    "generated_at": "2026-05-14T14:21:28Z",
     "metrics": {
       "aggregate_tokens_per_second": 98.4146048818013,
       "failure_count": 0,

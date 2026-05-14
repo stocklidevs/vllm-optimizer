@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.18.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.19.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -284,6 +284,21 @@ c8: 98.415 tokens/sec, 6611.500 ms, failures 0/2
 Next action: repeated confirmation for concurrency=8 before promotion.
 ```
 
+Latest c8 concurrency confirmation:
+
+```text
+Decision: switch-to-recommended
+Prompt set: qwen-coding-interactive-concurrency-8-v1
+
+Previous concurrent profile: 6766.867 ms, 96.041 tokens/sec
+Confirmed c8 profile: 6644.200 ms, 97.683 tokens/sec
+Delta: -122.667 ms (-1.813%), +1.642 tokens/sec (+1.710%)
+Failures: 0/5 repetitions per side
+
+Confirmed concurrent profile: gpu_memory_utilization=0.90, block_size=16,
+max_num_batched_tokens=4096, max_num_seqs=16, performance_mode=interactivity
+```
+
 Workload leaderboard:
 
 ```powershell
@@ -359,3 +374,4 @@ Current feature specs:
 - `specs/019-fp8-ninja-rerun/spec.md`
 - `specs/020-concurrency-saturation/spec.md`
 - `specs/021-live-concurrency-saturation/spec.md`
+- `specs/022-confirm-c8-saturation/spec.md`
