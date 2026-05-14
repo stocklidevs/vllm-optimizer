@@ -4,6 +4,7 @@ import pytest
 
 from vllm_optimizer.benchmark import (
     BenchmarkError,
+    build_vllm_bin_path_export,
     build_benchmark_plan,
     load_prompt_set,
     metric_from_response,
@@ -64,6 +65,17 @@ def test_build_benchmark_plan_is_dry_run() -> None:
     assert plan["will_execute"] is False
     assert len(plan["request_sequence"]) == 3
     assert plan["concurrency"] == 1
+
+
+def test_build_vllm_bin_path_export_adds_venv_bin_to_path() -> None:
+    export = build_vllm_bin_path_export("$HOME/qwen3next-venv/bin/vllm")
+
+    assert 'dirname "$HOME/qwen3next-venv/bin/vllm"' in export
+    assert 'export PATH="$VLLM_BIN_DIR:$PATH"' in export
+
+
+def test_build_vllm_bin_path_export_ignores_pathless_executable() -> None:
+    assert build_vllm_bin_path_export("vllm") == ""
 
 
 def test_summarize_metrics() -> None:

@@ -220,6 +220,7 @@ def build_remote_benchmark_script(
     from .serve_profiles import render_vllm_serve_command, shell_join
 
     serve_command = shell_join(render_vllm_serve_command(profile))
+    path_export = build_vllm_bin_path_export(profile.vllm_executable)
     cases_json = json_dump(
         [
             {
@@ -235,6 +236,7 @@ def build_remote_benchmark_script(
 set -u
 LOG=$(mktemp /tmp/vllm-benchmark-{profile.profile_id}.XXXXXX.log)
 PID=""
+{path_export}
 cleanup() {{
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
     kill "$PID" 2>/dev/null || true
@@ -300,6 +302,13 @@ echo __VLLM_BENCHMARK_LOG_START__
 cat "$LOG" 2>/dev/null || true
 test "$READY" -eq 1
 """
+
+
+def build_vllm_bin_path_export(vllm_executable: str) -> str:
+    if "/" not in vllm_executable:
+        return ""
+    executable = vllm_executable.replace('"', '\\"')
+    return f'VLLM_BIN_DIR=$(dirname "{executable}")\nexport PATH="$VLLM_BIN_DIR:$PATH"'
 
 
 def parse_remote_benchmark_output(stdout: str) -> dict[str, Any]:

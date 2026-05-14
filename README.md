@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.15.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.16.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -41,6 +41,8 @@ The project is spec-driven with SpecKit and currently supports:
   and a confirmed concurrent interactive coding profile.
 - Workload leaderboard reports that summarize live workload winners, promoted
   profiles, failed risky candidates, and next actions.
+- FP8 KV cache rerun sweeps that expose the vLLM venv binary directory on
+  remote `PATH` so helpers such as `ninja` are available to child processes.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -257,7 +259,7 @@ Failures: 0/9 requests per side
 Workload leaderboard:
 
 ```powershell
-uv run vllm-optimizer workload-report --workload interactive=artifacts/sweeps/qwen-high-impact-interactive/live/ranking.json long=artifacts/sweeps/qwen-high-impact-long/live/ranking.json tool-json=artifacts/sweeps/qwen-high-impact-tool-json/live/ranking.json concurrent-interactive=artifacts/sweeps/qwen-high-impact-interactive-concurrent/live/ranking.json --promoted-profile concurrent-interactive=config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --out artifacts/reports/qwen-workload-leaderboard.json --markdown-out artifacts/reports/qwen-workload-leaderboard.md
+uv run vllm-optimizer workload-report --workload interactive=artifacts/sweeps/qwen-high-impact-interactive/live/ranking.json long=artifacts/sweeps/qwen-high-impact-long/live/ranking.json tool-json=artifacts/sweeps/qwen-high-impact-tool-json/live/ranking.json concurrent-interactive=artifacts/sweeps/qwen-high-impact-interactive-concurrent/live/ranking.json fp8-interactive=artifacts/sweeps/qwen-fp8-rerun-interactive/live/ranking.json fp8-long=artifacts/sweeps/qwen-fp8-rerun-long/live/ranking.json fp8-tool-json=artifacts/sweeps/qwen-fp8-rerun-tool-json/live/ranking.json --promoted-profile concurrent-interactive=config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --out artifacts/reports/qwen-workload-leaderboard.json --markdown-out artifacts/reports/qwen-workload-leaderboard.md
 ```
 
 Latest workload leaderboard says:
@@ -267,7 +269,25 @@ Promoted profile: qwen3-coder-next-awq-concurrent-recommended
 Sequential interactive winner: block_size=32, watch only
 Long coding winner: block_size=32 plus 8192 batched tokens, watch only
 Tool/JSON winner: smaller batch/seq envelope, watch only
-Next setup action: install or expose ninja before rerunning FP8 KV cache probes
+Historical high-impact FP8 failures still show the old missing-ninja blocker
+FP8 rerun labels show plain fp8 completed on all workloads
+```
+
+FP8 KV cache rerun:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-fp8-rerun-interactive.json --out artifacts/sweeps/qwen-fp8-rerun-interactive/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-fp8-rerun-interactive/plan.json --out artifacts/sweeps/qwen-fp8-rerun-interactive/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-fp8-rerun-interactive/plan.json --out artifacts/sweeps/qwen-fp8-rerun-interactive/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
+```
+
+Latest GX10 FP8 rerun result:
+
+```text
+plain fp8 interactive: 6080.833 ms, 39.770 tokens/sec, 0/2 failures
+plain fp8 long: 20561.000 ms, 36.008 tokens/sec, 0/2 failures
+plain fp8 tool-json: 5616.167 ms, 40.297 tokens/sec, 0/2 failures
+fp8_e5m2: rejected by vLLM for this FP8 checkpoint
 ```
 
 ## Safety
@@ -308,3 +328,4 @@ Current feature specs:
 - `specs/016-workload-aware-sweeps/spec.md`
 - `specs/017-benchmark-concurrency/spec.md`
 - `specs/018-workload-leaderboard/spec.md`
+- `specs/019-fp8-ninja-rerun/spec.md`

@@ -342,3 +342,18 @@ def test_concurrent_workload_sweep_plan_shape() -> None:
     assert plan["candidate_count"] == 4
     assert plan["trial_count"] == 8
     assert plan["trials"][0]["benchmark_plan"]["concurrency"] == 3
+
+
+def test_fp8_rerun_sweeps_are_risky_session_only() -> None:
+    paths = [
+        Path("config/sweeps/qwen-fp8-rerun-interactive.json"),
+        Path("config/sweeps/qwen-fp8-rerun-long.json"),
+        Path("config/sweeps/qwen-fp8-rerun-tool-json.json"),
+    ]
+
+    plans = [build_sweep_plan(load_sweep_definition(path)) for path in paths]
+
+    assert [plan["candidate_count"] for plan in plans] == [2, 1, 1]
+    assert all(plan["has_risky_session_flags"] for plan in plans)
+    assert all(plan["allow_risky_session_flags"] for plan in plans)
+    assert all("kv_cache_dtype" in plan["risk_tiers"] for plan in plans)
