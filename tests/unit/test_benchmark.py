@@ -18,6 +18,7 @@ def test_load_prompt_set_fixture() -> None:
 
     assert prompts.prompt_set_id == "qwen-baseline-v1"
     assert len(prompts.cases) == 3
+    assert prompts.concurrency == 1
 
 
 def test_load_workload_prompt_sets() -> None:
@@ -38,6 +39,14 @@ def test_load_workload_prompt_sets() -> None:
     assert loaded[1].cases[0].max_tokens > loaded[0].cases[0].max_tokens
 
 
+def test_load_concurrent_prompt_set() -> None:
+    prompts = load_prompt_set(Path("config/prompts/qwen-coding-interactive-concurrent.json"))
+
+    assert prompts.prompt_set_id == "qwen-coding-interactive-concurrent-v1"
+    assert prompts.concurrency == 3
+    assert len(prompts.cases) == 3
+
+
 def test_load_prompt_set_rejects_empty_cases(tmp_path: Path) -> None:
     path = tmp_path / "bad.json"
     path.write_text('{"prompt_set_id":"bad","cases":[]}', encoding="utf-8")
@@ -54,6 +63,7 @@ def test_build_benchmark_plan_is_dry_run() -> None:
 
     assert plan["will_execute"] is False
     assert len(plan["request_sequence"]) == 3
+    assert plan["concurrency"] == 1
 
 
 def test_summarize_metrics() -> None:
@@ -72,6 +82,18 @@ def test_summarize_metrics() -> None:
     assert summary["aggregate_tokens_per_second"] == 10
 
 
+def test_summarize_metrics_uses_batch_duration_when_present() -> None:
+    summary = summarize_metrics(
+        [
+            {"status": "success", "duration_ms": 1000, "batch_duration_ms": 2000, "total_tokens": 10},
+            {"status": "success", "duration_ms": 2000, "batch_duration_ms": 2000, "total_tokens": 20},
+        ]
+    )
+
+    assert summary["mean_latency_ms"] == 1500
+    assert summary["aggregate_tokens_per_second"] == 15
+
+
 def test_metric_from_response_extracts_usage() -> None:
     metric = metric_from_response(
         {
@@ -84,6 +106,20 @@ def test_metric_from_response_extracts_usage() -> None:
 
     assert metric["status"] == "success"
     assert metric["tokens_per_second"] == 6
+
+
+def test_metric_from_response_preserves_batch_duration() -> None:
+    metric = metric_from_response(
+        {
+            "case_id": "ok",
+            "duration_ms": 500,
+            "batch_duration_ms": 900,
+            "exit_code": 0,
+            "stdout": '{"usage":{"total_tokens":3}}\nHTTP_STATUS:200\n',
+        }
+    )
+
+    assert metric["batch_duration_ms"] == 900
 
 
 def test_parse_remote_benchmark_output() -> None:

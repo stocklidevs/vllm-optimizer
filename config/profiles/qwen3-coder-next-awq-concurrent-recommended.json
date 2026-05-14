@@ -1,0 +1,102 @@
+{
+  "enable_auto_tool_choice": true,
+  "gpu_memory_utilization": 0.92,
+  "host": "0.0.0.0",
+  "max_model_len": 32768,
+  "model": "cyankiwi/Qwen3-Coder-Next-AWQ-4bit",
+  "optional_flags": {
+    "block_size": 16,
+    "enable_chunked_prefill": true,
+    "max_num_batched_tokens": 4096,
+    "max_num_seqs": 16
+  },
+  "performance_mode": "interactivity",
+  "port": 8001,
+  "profile_id": "qwen3-coder-next-awq-concurrent-recommended",
+  "promotion": {
+    "baseline_delta": {},
+    "candidate_id": "qwen-high-impact-interactive-concurrent-c004-630adb3e",
+    "confirmation": {
+      "decision": {
+        "reason": "recommended profile is materially better on latency and throughput",
+        "status": "switch-to-recommended"
+      },
+      "deltas": {
+        "failure_rate": {
+          "absolute": 0.0,
+          "recommended_higher": false
+        },
+        "mean_latency_ms": {
+          "absolute": -195.33333333333394,
+          "original_better": false,
+          "percent": -2.8448903632980103,
+          "recommended_better": true
+        },
+        "mean_tokens_per_second": {
+          "absolute": 1.6758843403636803,
+          "original_better": false,
+          "percent": 1.7662506408345762,
+          "recommended_better": true
+        }
+      },
+      "noise_percent": 1.0,
+      "original": {
+        "failure_rate": 0.0,
+        "label": "current-concurrent-default",
+        "latency_spread_ms": 117.54316254775676,
+        "mean_latency_ms": 6866.111111111111,
+        "mean_tokens_per_second": 94.88372157486116,
+        "repetition_count": 3,
+        "tokens_per_second_spread": 1.4323038484342687
+      },
+      "prompt_set_id": "qwen-coding-interactive-concurrent-v1",
+      "recommended": {
+        "failure_rate": 0.0,
+        "label": "concurrent-winner",
+        "latency_spread_ms": 66.12688887357966,
+        "mean_latency_ms": 6670.777777777777,
+        "mean_tokens_per_second": 96.55960591522484,
+        "repetition_count": 3,
+        "tokens_per_second_spread": 0.1908240760598817
+      },
+      "report_path": "artifacts/reports/qwen-concurrency-confirmation.json"
+    },
+    "generated_at": "2026-05-14T06:10:33Z",
+    "metrics": {
+      "aggregate_tokens_per_second": 96.66687460785471,
+      "failure_count": 0,
+      "failure_rate": 0.0,
+      "latency_spread_ms": 10.166666666666515,
+      "mean_latency_ms": 6717.166666666666,
+      "overrides": {
+        "block_size": 16,
+        "gpu_memory_utilization": 0.92,
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "performance_mode": "interactivity"
+      },
+      "success_count": 2,
+      "tokens_per_second_spread": 0.14177808275818649
+    },
+    "objective": "balanced",
+    "overrides": {
+      "block_size": 16,
+      "gpu_memory_utilization": 0.92,
+      "max_model_len": 32768,
+      "max_num_batched_tokens": 4096,
+      "max_num_seqs": 16,
+      "performance_mode": "interactivity"
+    },
+    "rank": 1,
+    "ranking_path": "artifacts/sweeps/qwen-high-impact-interactive-concurrent/live/ranking.json",
+    "source_trial_ids": [
+      "qwen-high-impact-interactive-concurrent-c004-r01-3327ca59",
+      "qwen-high-impact-interactive-concurrent-c004-r02-bd6e1dc7"
+    ],
+    "sweep_id": "qwen-high-impact-interactive-concurrent"
+  },
+  "served_model_name": "Qwen3-Coder-Next",
+  "tool_call_parser": "qwen3_coder",
+  "vllm_executable": "$HOME/qwen3next-venv/bin/vllm"
+}

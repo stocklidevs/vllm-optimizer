@@ -333,3 +333,12 @@ def test_high_impact_workload_sweeps_are_distinct() -> None:
         "qwen-high-impact-long",
         "qwen-high-impact-tool-json",
     }
+
+
+def test_concurrent_workload_sweep_plan_shape() -> None:
+    plan = build_sweep_plan(load_sweep_definition(Path("config/sweeps/qwen-high-impact-interactive-concurrent.json")))
+
+    assert plan["prompt_set_id"] == "qwen-coding-interactive-concurrent-v1"
+    assert plan["candidate_count"] == 4
+    assert plan["trial_count"] == 8
+    assert plan["trials"][0]["benchmark_plan"]["concurrency"] == 3

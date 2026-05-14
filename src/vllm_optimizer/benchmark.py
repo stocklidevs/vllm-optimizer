@@ -29,18 +29,23 @@ class PromptCase:
 class PromptSet:
     prompt_set_id: str
     cases: tuple[PromptCase, ...]
+    concurrency: int
 
 
 def load_prompt_set(path: Path) -> PromptSet:
     data = read_json(path)
     prompt_set_id = data.get("prompt_set_id")
     cases = data.get("cases")
+    concurrency = data.get("concurrency", 1)
     errors: list[str] = []
     if not isinstance(prompt_set_id, str) or not prompt_set_id:
         errors.append("prompt_set_id is required")
     if not isinstance(cases, list) or not cases:
         errors.append("cases must be a non-empty array")
         cases = []
+    if not isinstance(concurrency, int) or isinstance(concurrency, bool) or concurrency < 1:
+        errors.append("concurrency must be a positive integer")
+        concurrency = 1
 
     parsed_cases: list[PromptCase] = []
     for index, item in enumerate(cases):
@@ -74,7 +79,7 @@ def load_prompt_set(path: Path) -> PromptSet:
 
     if errors:
         raise BenchmarkError("; ".join(errors))
-    return PromptSet(prompt_set_id=prompt_set_id, cases=tuple(parsed_cases))
+    return PromptSet(prompt_set_id=prompt_set_id, cases=tuple(parsed_cases), concurrency=concurrency)
 
 
 def build_benchmark_plan(profile: ServeProfile, prompt_set: PromptSet) -> dict[str, Any]:
@@ -84,6 +89,7 @@ def build_benchmark_plan(profile: ServeProfile, prompt_set: PromptSet) -> dict[s
         "mode": "dry-run",
         "will_execute": False,
         "serve_plan": build_smoke_serve_plan(profile),
+        "concurrency": prompt_set.concurrency,
         "request_sequence": [
             {
                 "case_id": case.case_id,
@@ -101,7 +107,13 @@ def summarize_metrics(metrics: list[dict[str, Any]]) -> dict[str, Any]:
     failures = [item for item in metrics if item.get("status") != "success"]
     durations = [float(item["duration_ms"]) for item in success if isinstance(item.get("duration_ms"), int | float)]
     total_tokens = sum(int(item.get("total_tokens", 0) or 0) for item in success)
-    total_seconds = sum(float(item.get("duration_ms", 0) or 0) for item in success) / 1000
+    batch_durations = [
+        float(item["batch_duration_ms"])
+        for item in success
+        if isinstance(item.get("batch_duration_ms"), int | float)
+    ]
+    total_duration_ms = max(batch_durations) if batch_durations else sum(durations)
+    total_seconds = total_duration_ms / 1000
     return {
         "success_count": len(success),
         "failure_count": len(failures),
@@ -252,9 +264,10 @@ echo __VLLM_BENCHMARK_RESPONSES_START__
 if [ "$READY" -eq 1 ]; then
   CASES={sh_quote(cases_json)}
   printf '%s' "$CASES" | python3 -c '
-import json, subprocess, time
+import concurrent.futures, json, subprocess, time
 cases = json.load(__import__("sys").stdin)
-for case in cases:
+concurrency = {prompt_set.concurrency}
+def run_case(case):
     body = {{
         "model": "{profile.served_model_name}",
         "messages": case["messages"],
@@ -268,7 +281,15 @@ for case in cases:
         capture_output=True,
     )
     duration_ms = int((time.perf_counter() - started) * 1000)
-    print(json.dumps({{"case_id": case["case_id"], "duration_ms": duration_ms, "stdout": proc.stdout, "stderr": proc.stderr, "exit_code": proc.returncode}}))
+    return {{"case_id": case["case_id"], "duration_ms": duration_ms, "stdout": proc.stdout, "stderr": proc.stderr, "exit_code": proc.returncode}}
+with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
+    batch_started = time.perf_counter()
+    futures = [pool.submit(run_case, case) for case in cases]
+    results = [future.result() for future in futures]
+    batch_duration_ms = int((time.perf_counter() - batch_started) * 1000)
+    for result in results:
+        result["batch_duration_ms"] = batch_duration_ms
+        print(json.dumps(result))
 '
 fi
 cleanup
@@ -323,6 +344,7 @@ def metric_from_response(row: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "http_status": http_status,
         "duration_ms": duration_ms,
+        "batch_duration_ms": row.get("batch_duration_ms"),
         "prompt_tokens": usage.get("prompt_tokens"),
         "completion_tokens": usage.get("completion_tokens"),
         "total_tokens": total_tokens,
@@ -342,6 +364,7 @@ def prompt_set_to_dict(prompt_set: PromptSet) -> dict[str, Any]:
             }
             for case in prompt_set.cases
         ],
+        "concurrency": prompt_set.concurrency,
     }
 
 

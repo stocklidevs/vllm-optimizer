@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.13.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.14.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -37,6 +37,8 @@ The project is spec-driven with SpecKit and currently supports:
   the default recommended profile is updated.
 - Workload-aware prompt sets and explicit high-impact sweep candidates for
   interactive coding, long coding, and tool/JSON workloads.
+- Benchmark-side request concurrency with batch-duration throughput accounting
+  and a confirmed concurrent interactive coding profile.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -229,6 +231,27 @@ uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-high-impact-too
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-high-impact-interactive/plan.json --out artifacts/sweeps/qwen-high-impact-interactive/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
 ```
 
+Concurrent interactive sweep:
+
+```powershell
+uv run vllm-optimizer benchmark-plan --profile config/profiles/qwen3-coder-next-awq-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrent.json --out artifacts/benchmarks/qwen-concurrency/plan.json
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-high-impact-interactive-concurrent.json --out artifacts/sweeps/qwen-high-impact-interactive-concurrent/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-high-impact-interactive-concurrent/plan.json --out artifacts/sweeps/qwen-high-impact-interactive-concurrent/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-high-impact-interactive-concurrent/plan.json --out artifacts/sweeps/qwen-high-impact-interactive-concurrent/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
+```
+
+Latest GX10 concurrent interactive confirmation:
+
+```text
+Best concurrent profile: gpu_memory_utilization=0.92, block_size=16,
+max_num_batched_tokens=4096, max_num_seqs=16, performance_mode=interactivity
+
+Current concurrent default: 6866.111 ms, 94.884 tokens/sec
+Concurrent winner: 6670.778 ms, 96.560 tokens/sec
+Delta: -195.333 ms (-2.845%), +1.676 tokens/sec (+1.766%)
+Failures: 0/9 requests per side
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -265,3 +288,4 @@ Current feature specs:
 - `specs/014-risky-session-knobs/spec.md`
 - `specs/015-risky-winner-confirmation/spec.md`
 - `specs/016-workload-aware-sweeps/spec.md`
+- `specs/017-benchmark-concurrency/spec.md`
