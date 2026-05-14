@@ -66,6 +66,23 @@ def test_sweep_definition_rejects_out_of_bounds_value(tmp_path: Path) -> None:
         load_sweep_definition(path)
 
 
+def test_sweep_definition_rejects_bool_for_integer_parameter(tmp_path: Path) -> None:
+    path = tmp_path / "bad-int.json"
+    path.write_text(
+        """{
+  "sweep_id": "bad",
+  "profile": "config/profiles/qwen3-coder-next-awq.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "objectives": ["throughput"],
+  "parameters": {"max_num_seqs": [true]}
+}""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SweepError, match="invalid type"):
+        load_sweep_definition(path)
+
+
 def test_build_sweep_preview_lists_trials_without_execution() -> None:
     plan = build_sweep_plan(load_sweep_definition(Path("config/sweeps/qwen-small-sweep.json")))
 
@@ -200,3 +217,24 @@ def test_expanded_qwen_sweep_plan_shape() -> None:
         "interactivity",
         "throughput",
     }
+
+
+def test_scheduler_sweep_plan_shape_and_flags() -> None:
+    definition = load_sweep_definition(Path("config/sweeps/qwen-scheduler-safe.json"))
+
+    plan = build_sweep_plan(definition)
+    preview = build_sweep_preview(plan)
+
+    assert plan["candidate_count"] == 8
+    assert plan["trial_count"] == 24
+    assert plan["repetitions"] == 3
+    assert preview["blocked"] is False
+    assert preview["trials"][0]["order"] == 0
+    assert {"max_num_batched_tokens", "max_num_seqs", "enable_chunked_prefill", "enable_prefix_caching"} <= set(
+        plan["safe_parameters"]
+    )
+    first_profile = plan["trials"][0]["profile"]
+    assert first_profile["optional_flags"]["max_num_batched_tokens"] == 4096
+    assert first_profile["optional_flags"]["max_num_seqs"] == 16
+    assert "--max-num-batched-tokens 4096" in plan["trials"][0]["serve_plan"]["command_line"]
+    assert "--max-num-seqs 16" in plan["trials"][0]["serve_plan"]["command_line"]

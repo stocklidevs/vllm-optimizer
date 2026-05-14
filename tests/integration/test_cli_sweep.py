@@ -111,3 +111,29 @@ def test_expanded_sweep_cli_plan_and_preview(tmp_path: Path) -> None:
     assert plan["candidate_count"] == 6
     assert plan["trial_count"] == 18
     assert preview["blocked"] is False
+
+
+def test_scheduler_sweep_cli_plan_and_preview(tmp_path: Path) -> None:
+    plan_path = tmp_path / "scheduler-plan.json"
+    preview_path = tmp_path / "scheduler-preview.json"
+
+    assert (
+        main(
+            [
+                "sweep-plan",
+                "--sweep",
+                "config/sweeps/qwen-scheduler-safe.json",
+                "--out",
+                str(plan_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["sweep-preview", "--plan", str(plan_path), "--out", str(preview_path)]) == 0
+
+    plan = read_json(plan_path)
+    preview = read_json(preview_path)
+    assert plan["candidate_count"] == 8
+    assert plan["trial_count"] == 24
+    assert preview["blocked"] is False
+    assert "--max-num-batched-tokens" in preview["trials"][0]["command_line"]

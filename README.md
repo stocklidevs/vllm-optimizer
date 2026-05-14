@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.6.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.7.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -26,6 +26,8 @@ The project is spec-driven with SpecKit and currently supports:
   and performance-mode candidates around the current winner.
 - Read-only vLLM flag discovery and safe performance knob cataloging from the
   installed GX10 vLLM help output.
+- Scheduler and prefill knob sweep support for approved vLLM serve flags such
+  as batched tokens, sequence count, chunked prefill, and prefix caching.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -103,6 +105,26 @@ uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-expanded-safe/p
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-expanded-safe/plan.json --out artifacts/sweeps/qwen-expanded-safe/live --timeout-seconds 1200 --continue-on-failure
 ```
 
+Scheduler knob sweep:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-scheduler-safe.json --out artifacts/sweeps/qwen-scheduler-safe/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-scheduler-safe/plan.json --out artifacts/sweeps/qwen-scheduler-safe/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-scheduler-safe/plan.json --out artifacts/sweeps/qwen-scheduler-safe/live --timeout-seconds 1200 --continue-on-failure
+```
+
+Latest GX10 scheduler sweep result:
+
+```text
+Best balanced candidate: gpu_memory_utilization=0.90, max_model_len=32768,
+max_num_batched_tokens=4096, max_num_seqs=16, enable_chunked_prefill=true,
+enable_prefix_caching=false, performance_mode=interactivity
+
+Mean latency: 1004.0 ms
+Throughput: 48.16 tokens/sec
+Failures: 0/3 repetitions
+```
+
 Rank completed or fixture sweep results:
 
 ```powershell
@@ -146,3 +168,4 @@ Current feature specs:
 - `specs/007-run-comparison-report/spec.md`
 - `specs/008-expanded-qwen-sweep/spec.md`
 - `specs/009-vllm-flag-catalog/spec.md`
+- `specs/010-scheduler-knob-sweep/spec.md`

@@ -25,6 +25,15 @@ class ServeProfile:
     enable_auto_tool_choice: bool
     tool_call_parser: str
     performance_mode: str
+    optional_flags: dict[str, bool | int]
+
+
+OPTIONAL_FLAG_RULES: dict[str, dict[str, Any]] = {
+    "max_num_batched_tokens": {"cli": "max-num-batched-tokens", "type": int, "min": 1},
+    "max_num_seqs": {"cli": "max-num-seqs", "type": int, "min": 1},
+    "enable_chunked_prefill": {"cli": "enable-chunked-prefill", "type": bool},
+    "enable_prefix_caching": {"cli": "enable-prefix-caching", "type": bool},
+}
 
 
 def load_serve_profile(path: Path) -> ServeProfile:
@@ -55,6 +64,7 @@ def parse_serve_profile(data: dict[str, Any]) -> ServeProfile:
         errors.append("max_model_len must be positive")
     if gpu_memory_utilization <= 0 or gpu_memory_utilization > 1:
         errors.append("gpu_memory_utilization must be > 0 and <= 1")
+    optional_flags = parse_optional_flags(data.get("optional_flags", {}), errors)
     if errors:
         raise ServeProfileError("; ".join(errors))
     return ServeProfile(
@@ -69,6 +79,7 @@ def parse_serve_profile(data: dict[str, Any]) -> ServeProfile:
         enable_auto_tool_choice=enable_auto_tool_choice,
         tool_call_parser=tool_call_parser,
         performance_mode=performance_mode,
+        optional_flags=optional_flags,
     )
 
 
@@ -98,7 +109,48 @@ def render_vllm_serve_command(profile: ServeProfile) -> list[str]:
             profile.performance_mode,
         ]
     )
+    for name in sorted(profile.optional_flags):
+        value = profile.optional_flags[name]
+        rule = OPTIONAL_FLAG_RULES[name]
+        cli_flag = f"--{rule['cli']}"
+        if isinstance(value, bool):
+            if value:
+                command.append(cli_flag)
+        else:
+            command.extend([cli_flag, str(value)])
     return command
+
+
+def parse_optional_flags(data: Any, errors: list[str]) -> dict[str, bool | int]:
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        errors.append("optional_flags must be an object")
+        return {}
+    parsed: dict[str, bool | int] = {}
+    for name, value in sorted(data.items()):
+        if name not in OPTIONAL_FLAG_RULES:
+            errors.append(f"optional flag {name!r} is not approved")
+            continue
+        rule = OPTIONAL_FLAG_RULES[name]
+        expected = rule["type"]
+        if expected is bool:
+            if not isinstance(value, bool):
+                errors.append(f"optional_flags.{name} must be a boolean")
+                continue
+            parsed[name] = value
+        elif expected is int:
+            if not isinstance(value, int) or isinstance(value, bool):
+                errors.append(f"optional_flags.{name} must be an integer")
+                continue
+            minimum = rule.get("min")
+            if isinstance(minimum, int) and value < minimum:
+                errors.append(f"optional_flags.{name} must be >= {minimum}")
+                continue
+            parsed[name] = value
+        else:
+            errors.append(f"optional_flags.{name} has unsupported rule type")
+    return parsed
 
 
 def build_serve_plan(profile: ServeProfile) -> dict[str, Any]:

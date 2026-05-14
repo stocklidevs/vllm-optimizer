@@ -65,3 +65,56 @@ def test_parse_serve_profile_validates_memory_utilization() -> None:
                 "vllm_executable": "vllm",
             }
         )
+
+
+def test_optional_flags_render_when_approved() -> None:
+    profile = parse_serve_profile(
+        {
+            "profile_id": "scheduler",
+            "model": "m",
+            "served_model_name": "m",
+            "host": "0.0.0.0",
+            "port": 8001,
+            "max_model_len": 32768,
+            "gpu_memory_utilization": 0.9,
+            "enable_auto_tool_choice": True,
+            "tool_call_parser": "qwen3_coder",
+            "performance_mode": "interactivity",
+            "vllm_executable": "vllm",
+            "optional_flags": {
+                "max_num_batched_tokens": 8192,
+                "max_num_seqs": 32,
+                "enable_chunked_prefill": True,
+                "enable_prefix_caching": False,
+            },
+        }
+    )
+
+    command = render_vllm_serve_command(profile)
+
+    assert "--max-num-batched-tokens" in command
+    assert "8192" in command
+    assert "--max-num-seqs" in command
+    assert "32" in command
+    assert "--enable-chunked-prefill" in command
+    assert "--enable-prefix-caching" not in command
+
+
+def test_optional_flags_reject_unknown_flags() -> None:
+    with pytest.raises(ServeProfileError, match="not approved"):
+        parse_serve_profile(
+            {
+                "profile_id": "bad",
+                "model": "m",
+                "served_model_name": "m",
+                "host": "0.0.0.0",
+                "port": 8001,
+                "max_model_len": 32768,
+                "gpu_memory_utilization": 0.9,
+                "enable_auto_tool_choice": True,
+                "tool_call_parser": "qwen3_coder",
+                "performance_mode": "interactivity",
+                "vllm_executable": "vllm",
+                "optional_flags": {"kv_cache_dtype": "fp8"},
+            }
+        )

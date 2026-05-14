@@ -1,0 +1,40 @@
+{
+  "sweep_id": "qwen-scheduler-safe",
+  "profile": "config/profiles/qwen3-coder-next-awq.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "baseline_summary": "artifacts/benchmarks/qwen-baseline/summary.json",
+  "seed": 13,
+  "repetitions": 3,
+  "max_trials": 8,
+  "objectives": [
+    "throughput",
+    "latency",
+    "balanced"
+  ],
+  "parameters": {
+    "enable_chunked_prefill": [
+      false,
+      true
+    ],
+    "enable_prefix_caching": [
+      false,
+      true
+    ],
+    "gpu_memory_utilization": [
+      0.9
+    ],
+    "max_model_len": [
+      32768
+    ],
+    "max_num_batched_tokens": [
+      4096,
+      8192
+    ],
+    "max_num_seqs": [
+      16
+    ],
+    "performance_mode": [
+      "interactivity"
+    ]
+  }
+}

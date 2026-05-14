@@ -10,7 +10,7 @@ from typing import Any
 from .artifacts import read_json, read_jsonl, write_json, write_jsonl
 from .benchmark import PromptSet, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
 from .discovery import DiscoveryTarget
-from .serve_profiles import ServeProfile, build_serve_plan, load_serve_profile
+from .serve_profiles import OPTIONAL_FLAG_RULES, ServeProfile, build_serve_plan, load_serve_profile
 
 
 class SweepError(ValueError):
@@ -21,6 +21,10 @@ SAFE_PARAMETERS: dict[str, dict[str, Any]] = {
     "max_model_len": {"type": int, "min": 1024, "max": 65536},
     "gpu_memory_utilization": {"type": float, "min": 0.5, "max": 0.95},
     "performance_mode": {"type": str, "allowed": {"interactivity", "throughput"}},
+    "max_num_batched_tokens": {"type": int, "min": 1},
+    "max_num_seqs": {"type": int, "min": 1},
+    "enable_chunked_prefill": {"type": bool},
+    "enable_prefix_caching": {"type": bool},
 }
 
 OBJECTIVES = {"throughput", "latency", "balanced"}
@@ -212,7 +216,7 @@ def build_sweep_preview(plan: dict[str, Any]) -> dict[str, Any]:
                 "trial_id": trial_id,
                 "candidate_id": trial.get("candidate_id"),
                 "repetition_index": trial.get("repetition_index", 0),
-                "order": trial.get("order"),
+                "order": trial.get("candidate_order", trial.get("order")),
                 "changed_parameters": overrides,
                 "classification": classification,
                 "will_execute": False,
@@ -348,10 +352,19 @@ def load_sweep_results(path: Path) -> list[dict[str, Any]]:
 def apply_profile_overrides(
     profile: ServeProfile, overrides: dict[str, Any], order: int, repetition_index: int = 0
 ) -> ServeProfile:
-    values = {name: _coerce_profile_value(name, value) for name, value in overrides.items()}
+    values = {
+        name: _coerce_profile_value(name, value)
+        for name, value in overrides.items()
+        if name not in OPTIONAL_FLAG_RULES
+    }
+    optional_flags = dict(profile.optional_flags)
+    for name, value in overrides.items():
+        if name in OPTIONAL_FLAG_RULES:
+            optional_flags[name] = _coerce_profile_value(name, value)
     return replace(
         profile,
         profile_id=f"{profile.profile_id}-sweep-{order + 1:03d}-r{repetition_index + 1:02d}",
+        optional_flags=optional_flags,
         **values,
     )
 
@@ -373,7 +386,7 @@ def serve_profile_to_dict(profile: ServeProfile) -> dict[str, Any]:
 
 
 def parse_profile_from_plan(data: dict[str, Any]) -> ServeProfile:
-    return ServeProfile(**data)
+    return ServeProfile(**{**data, "optional_flags": data.get("optional_flags", {})})
 
 
 def normalize_trial_result(row: dict[str, Any]) -> dict[str, Any]:
@@ -583,7 +596,17 @@ def _required_path(data: dict[str, Any], field: str, errors: list[str]) -> Path:
 def _validate_parameter_value(name: str, value: Any, errors: list[str]) -> Any:
     rule = SAFE_PARAMETERS[name]
     expected = rule["type"]
-    if expected is float and isinstance(value, int | float):
+    if expected is bool:
+        if not isinstance(value, bool):
+            errors.append(f"parameters.{name} contains value with invalid type")
+            return None
+        parsed = value
+    elif expected is int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            errors.append(f"parameters.{name} contains value with invalid type")
+            return None
+        parsed = value
+    elif expected is float and isinstance(value, int | float) and not isinstance(value, bool):
         parsed = float(value)
     elif isinstance(value, expected):
         parsed = value
