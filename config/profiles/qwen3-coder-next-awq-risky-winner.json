@@ -13,7 +13,7 @@
   },
   "performance_mode": "interactivity",
   "port": 8001,
-  "profile_id": "qwen3-coder-next-awq-recommended",
+  "profile_id": "qwen3-coder-next-awq-risky-winner",
   "promotion": {
     "baseline_delta": {
       "aggregate_tokens_per_second": {
@@ -26,52 +26,7 @@
       }
     },
     "candidate_id": "qwen-risky-session-small-c001-920c77cd",
-    "confirmation": {
-      "decision": {
-        "reason": "recommended profile is materially better on latency and throughput",
-        "status": "switch-to-recommended"
-      },
-      "deltas": {
-        "failure_rate": {
-          "absolute": 0.0,
-          "recommended_higher": false
-        },
-        "mean_latency_ms": {
-          "absolute": -15.777777777777715,
-          "original_better": false,
-          "percent": -1.5645658880564062,
-          "recommended_better": true
-        },
-        "mean_tokens_per_second": {
-          "absolute": 0.7695874265800384,
-          "original_better": false,
-          "percent": 1.6050527199605673,
-          "recommended_better": true
-        }
-      },
-      "noise_percent": 1.0,
-      "original": {
-        "failure_rate": 0.0,
-        "label": "current-recommended",
-        "latency_spread_ms": 20.045011078465457,
-        "mean_latency_ms": 1008.4444444444445,
-        "mean_tokens_per_second": 47.94779741558555,
-        "repetition_count": 3,
-        "tokens_per_second_spread": 0.9656697337758249
-      },
-      "prompt_set_id": "qwen-baseline-v1",
-      "recommended": {
-        "failure_rate": 0.0,
-        "label": "risky-winner",
-        "latency_spread_ms": 23.543497962203862,
-        "mean_latency_ms": 992.6666666666667,
-        "mean_tokens_per_second": 48.717384842165586,
-        "repetition_count": 3,
-        "tokens_per_second_spread": 1.137947985472008
-      },
-      "report_path": "artifacts/reports/qwen-risky-winner-confirmation.json"
-    },
-    "generated_at": "2026-05-14T03:30:42Z",
+    "generated_at": "2026-05-14T03:14:47Z",
     "metrics": {
       "aggregate_tokens_per_second": 49.72565157750343,
       "failure_count": 0,

@@ -22,6 +22,7 @@ from .promotion import (
     DEFAULT_PROFILE_ID,
     PromotionError,
     build_promotion_preview,
+    write_confirmed_promoted_profile,
     write_promoted_profile,
 )
 from .ranking import rank_results
@@ -217,6 +218,20 @@ def build_parser() -> argparse.ArgumentParser:
     promote_profile_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
     promote_profile_parser.add_argument("--force", action="store_true")
     promote_profile_parser.set_defaults(func=cmd_promote_profile)
+
+    promote_confirmed_parser = subparsers.add_parser(
+        "promote-confirmed-profile",
+        help="Generate a promoted profile only when an A/B report approves it",
+    )
+    promote_confirmed_parser.add_argument("--confirmation-report", required=True, type=Path)
+    promote_confirmed_parser.add_argument("--ranking", required=True, type=Path)
+    promote_confirmed_parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    promote_confirmed_parser.add_argument("--profile-out", required=True, type=Path)
+    promote_confirmed_parser.add_argument("--summary-out", required=True, type=Path)
+    promote_confirmed_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
+    promote_confirmed_parser.add_argument("--expected-recommended-label")
+    promote_confirmed_parser.add_argument("--force", action="store_true")
+    promote_confirmed_parser.set_defaults(func=cmd_promote_confirmed_profile)
 
     recommended_report_parser = subparsers.add_parser(
         "recommended-report", help="Report whether the promoted profile should remain the default"
@@ -421,6 +436,21 @@ def cmd_promote_profile(args: argparse.Namespace) -> int:
         summary_out=args.summary_out,
         objective=args.objective,
         profile_id=args.profile_id,
+        force=args.force,
+    )
+    print(result["profile_path"])
+    return 0
+
+
+def cmd_promote_confirmed_profile(args: argparse.Namespace) -> int:
+    result = write_confirmed_promoted_profile(
+        confirmation_report_path=args.confirmation_report,
+        ranking_path=args.ranking,
+        profile_out=args.profile_out,
+        summary_out=args.summary_out,
+        objective=args.objective,
+        profile_id=args.profile_id,
+        expected_recommended_label=args.expected_recommended_label,
         force=args.force,
     )
     print(result["profile_path"])

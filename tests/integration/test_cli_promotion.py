@@ -72,6 +72,57 @@ def test_promote_profile_cli_refuses_existing_output(tmp_path: Path) -> None:
     assert not summary_out.exists()
 
 
+def test_promote_confirmed_profile_cli_writes_only_after_ab_switch(tmp_path: Path) -> None:
+    ranking_path = _write_ranking_fixture(tmp_path)
+    confirmation_path = _write_confirmation_report(tmp_path, "switch-to-recommended")
+    profile_out = tmp_path / "recommended.json"
+    summary_out = tmp_path / "recommended.md"
+
+    exit_code = main(
+        [
+            "promote-confirmed-profile",
+            "--confirmation-report",
+            str(confirmation_path),
+            "--ranking",
+            str(ranking_path),
+            "--profile-out",
+            str(profile_out),
+            "--summary-out",
+            str(summary_out),
+            "--expected-recommended-label",
+            "risky-winner",
+        ]
+    )
+
+    assert exit_code == 0
+    profile = read_json(profile_out)
+    assert profile["promotion"]["confirmation"]["decision"]["status"] == "switch-to-recommended"
+    assert profile["promotion"]["confirmation"]["recommended"]["label"] == "risky-winner"
+
+
+def test_promote_confirmed_profile_cli_rejects_inconclusive_ab_report(tmp_path: Path) -> None:
+    ranking_path = _write_ranking_fixture(tmp_path)
+    confirmation_path = _write_confirmation_report(tmp_path, "inconclusive")
+    profile_out = tmp_path / "recommended.json"
+
+    exit_code = main(
+        [
+            "promote-confirmed-profile",
+            "--confirmation-report",
+            str(confirmation_path),
+            "--ranking",
+            str(ranking_path),
+            "--profile-out",
+            str(profile_out),
+            "--summary-out",
+            str(tmp_path / "recommended.md"),
+        ]
+    )
+
+    assert exit_code == 2
+    assert not profile_out.exists()
+
+
 def test_promote_preview_cli_rejects_missing_objective(tmp_path: Path) -> None:
     ranking_path = _write_ranking_fixture(tmp_path)
     out = tmp_path / "preview.json"
@@ -165,3 +216,45 @@ def _write_ranking_fixture(tmp_path: Path) -> Path:
         },
     )
     return ranking_path
+
+
+def _write_confirmation_report(tmp_path: Path, status: str) -> Path:
+    path = tmp_path / "ab-report.json"
+    write_json(
+        path,
+        {
+            "prompt_set_id": "qwen-baseline-v1",
+            "noise_percent": 1.0,
+            "decision": {"status": status, "reason": "fixture decision"},
+            "aggregates": {
+                "original": {
+                    "label": "current-recommended",
+                    "repetition_count": 3,
+                    "failure_rate": 0.0,
+                    "mean_latency_ms": 1000.0,
+                    "latency_spread_ms": 3.0,
+                    "mean_tokens_per_second": 48.0,
+                    "tokens_per_second_spread": 0.1,
+                },
+                "recommended": {
+                    "label": "risky-winner",
+                    "repetition_count": 3,
+                    "failure_rate": 0.0,
+                    "mean_latency_ms": 950.0,
+                    "latency_spread_ms": 2.0,
+                    "mean_tokens_per_second": 50.0,
+                    "tokens_per_second_spread": 0.2,
+                },
+            },
+            "deltas": {
+                "mean_latency_ms": {"absolute": -50.0, "percent": -5.0},
+                "mean_tokens_per_second": {"absolute": 2.0, "percent": 4.1667},
+                "failure_rate": {"absolute": 0.0},
+            },
+            "inputs": {
+                "original_label": "current-recommended",
+                "recommended_label": "risky-winner",
+            },
+        },
+    )
+    return path

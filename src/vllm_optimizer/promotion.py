@@ -94,6 +94,62 @@ def write_promoted_profile(
     }
 
 
+def write_confirmed_promoted_profile(
+    confirmation_report_path: Path,
+    ranking_path: Path,
+    profile_out: Path,
+    summary_out: Path,
+    objective: str = DEFAULT_OBJECTIVE,
+    profile_id: str = DEFAULT_PROFILE_ID,
+    expected_recommended_label: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    report = read_json(confirmation_report_path)
+    decision = report.get("decision")
+    if not isinstance(decision, dict):
+        raise PromotionError("confirmation report has no decision")
+    status = decision.get("status")
+    if status != "switch-to-recommended":
+        reason = decision.get("reason", "no reason provided")
+        raise PromotionError(f"confirmation did not approve promotion: {status} ({reason})")
+    inputs = report.get("inputs", {})
+    if expected_recommended_label is not None:
+        actual = inputs.get("recommended_label") if isinstance(inputs, dict) else None
+        if actual != expected_recommended_label:
+            raise PromotionError(
+                "confirmation recommended label mismatch: "
+                f"expected {expected_recommended_label!r}, got {actual!r}"
+            )
+
+    existing = [path for path in (profile_out, summary_out) if path.exists()]
+    if existing and not force:
+        names = ", ".join(str(path) for path in existing)
+        raise PromotionError(f"output path already exists: {names}")
+
+    preview = build_promotion_preview(ranking_path, objective, profile_id)
+    profile = {
+        **preview["proposed_profile"],
+        "promotion": {
+            **preview["proposed_profile"]["promotion"],
+            "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "confirmation": compact_confirmation_report(report, confirmation_report_path),
+        },
+    }
+    parse_serve_profile(profile)
+    summary = render_promotion_summary(preview, profile_out)
+    summary += render_confirmation_summary(report, confirmation_report_path)
+
+    write_json(profile_out, profile)
+    summary_out.parent.mkdir(parents=True, exist_ok=True)
+    summary_out.write_text(summary, encoding="utf-8")
+    return {
+        "profile_path": str(profile_out),
+        "summary_path": str(summary_out),
+        "preview": preview,
+        "confirmation": profile["promotion"]["confirmation"],
+    }
+
+
 def select_ranked_candidate(ranking: dict[str, Any], objective: str) -> dict[str, Any]:
     objectives = ranking.get("objectives")
     if not isinstance(objectives, dict) or objective not in objectives:
@@ -279,6 +335,59 @@ def render_promotion_summary(preview: dict[str, Any], profile_out: Path) -> str:
     for key, value in sorted(preview.get("overrides", {}).items()):
         lines.append(f"- {key}: {value}")
     lines.append("")
+    return "\n".join(lines)
+
+
+def compact_confirmation_report(report: dict[str, Any], confirmation_report_path: Path) -> dict[str, Any]:
+    original = report.get("aggregates", {}).get("original", {})
+    recommended = report.get("aggregates", {}).get("recommended", {})
+    return {
+        "report_path": display_path(confirmation_report_path),
+        "decision": report.get("decision", {}),
+        "prompt_set_id": report.get("prompt_set_id"),
+        "noise_percent": report.get("noise_percent"),
+        "original": compact_confirmation_aggregate(original),
+        "recommended": compact_confirmation_aggregate(recommended),
+        "deltas": report.get("deltas", {}),
+    }
+
+
+def compact_confirmation_aggregate(aggregate: Any) -> dict[str, Any]:
+    if not isinstance(aggregate, dict):
+        return {}
+    return {
+        "label": aggregate.get("label"),
+        "repetition_count": aggregate.get("repetition_count"),
+        "failure_rate": aggregate.get("failure_rate"),
+        "mean_latency_ms": aggregate.get("mean_latency_ms"),
+        "latency_spread_ms": aggregate.get("latency_spread_ms"),
+        "mean_tokens_per_second": aggregate.get("mean_tokens_per_second"),
+        "tokens_per_second_spread": aggregate.get("tokens_per_second_spread"),
+    }
+
+
+def render_confirmation_summary(report: dict[str, Any], confirmation_report_path: Path) -> str:
+    confirmation = compact_confirmation_report(report, confirmation_report_path)
+    decision = confirmation.get("decision", {})
+    original = confirmation.get("original", {})
+    recommended = confirmation.get("recommended", {})
+    deltas = confirmation.get("deltas", {})
+    latency = deltas.get("mean_latency_ms", {}) if isinstance(deltas, dict) else {}
+    throughput = deltas.get("mean_tokens_per_second", {}) if isinstance(deltas, dict) else {}
+    lines = [
+        "",
+        "## A/B Confirmation",
+        "",
+        f"- Confirmation report: `{confirmation['report_path']}`",
+        f"- Decision: `{decision.get('status')}`",
+        f"- Reason: {decision.get('reason')}",
+        f"- Prompt set: `{confirmation.get('prompt_set_id')}`",
+        f"- Original: `{original.get('label')}` ({original.get('repetition_count')} repetitions)",
+        f"- Recommended: `{recommended.get('label')}` ({recommended.get('repetition_count')} repetitions)",
+        f"- Mean latency delta: `{latency.get('absolute')}` ms",
+        f"- Mean throughput delta: `{throughput.get('absolute')}` tokens/sec",
+        "",
+    ]
     return "\n".join(lines)
 
 

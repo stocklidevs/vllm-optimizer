@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.11.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.12.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -33,6 +33,8 @@ The project is spec-driven with SpecKit and currently supports:
 - Recommended-profile benchmark validation with a default decision report.
 - Repeated A/B confirmation reports for original vs recommended profiles.
 - Risk-tiered risky-session vLLM sweeps with explicit preview/run opt-in.
+- Guarded risky-winner promotion that requires repeated A/B confirmation before
+  the default recommended profile is updated.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -185,6 +187,34 @@ uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-risky-session-s
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-risky-session-small/plan.json --out artifacts/sweeps/qwen-risky-session-small/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
 ```
 
+Risky winner confirmation and guarded promotion:
+
+```powershell
+uv run vllm-optimizer promote-profile --ranking artifacts/sweeps/qwen-risky-session-small/live/ranking.json --objective balanced --profile-out config/profiles/qwen3-coder-next-awq-risky-winner.json --summary-out artifacts/promotions/qwen3-coder-next-awq-risky-winner.md --profile-id qwen3-coder-next-awq-risky-winner
+uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-recommended.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-risky-ab/current-r1 --timeout-seconds 1200
+uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-recommended.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-risky-ab/current-r2 --timeout-seconds 1200
+uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-recommended.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-risky-ab/current-r3 --timeout-seconds 1200
+uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-risky-winner.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-risky-ab/risky-r1 --timeout-seconds 1200
+uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-risky-winner.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-risky-ab/risky-r2 --timeout-seconds 1200
+uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-risky-winner.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-risky-ab/risky-r3 --timeout-seconds 1200
+uv run vllm-optimizer ab-report --original-label current-recommended --recommended-label risky-winner --original-summaries artifacts/benchmarks/qwen-risky-ab/current-r1/summary.json artifacts/benchmarks/qwen-risky-ab/current-r2/summary.json artifacts/benchmarks/qwen-risky-ab/current-r3/summary.json --recommended-summaries artifacts/benchmarks/qwen-risky-ab/risky-r1/summary.json artifacts/benchmarks/qwen-risky-ab/risky-r2/summary.json artifacts/benchmarks/qwen-risky-ab/risky-r3/summary.json --prompt-set-id qwen-baseline-v1 --out artifacts/reports/qwen-risky-winner-confirmation.json --markdown-out artifacts/reports/qwen-risky-winner-confirmation.md
+uv run vllm-optimizer promote-confirmed-profile --confirmation-report artifacts/reports/qwen-risky-winner-confirmation.json --ranking artifacts/sweeps/qwen-risky-session-small/live/ranking.json --objective balanced --profile-out config/profiles/qwen3-coder-next-awq-recommended.json --summary-out artifacts/promotions/qwen3-coder-next-awq-recommended-risky-confirmed.md --profile-id qwen3-coder-next-awq-recommended --expected-recommended-label risky-winner --force
+```
+
+Latest GX10 risky winner confirmation:
+
+```text
+Decision: switch-to-recommended
+Current recommended mean latency: 1008.444 ms
+Risky winner mean latency: 992.667 ms
+Latency delta: -15.778 ms (-1.565%)
+Current recommended throughput: 47.948 tokens/sec
+Risky winner throughput: 48.717 tokens/sec
+Throughput delta: +0.770 tokens/sec (+1.605%)
+Failures: 0/9 requests for each profile
+Confirmed default flag addition: block_size=16
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -194,6 +224,8 @@ uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts
   checks plus cleanup verification.
 - Sweep live execution is sequential and session-mutating only.
 - Promotion commands are local-only and do not contact the GX10.
+- Confirmed promotion refuses to update the default profile unless the repeated
+  A/B report approves switching to the candidate.
 - Risky-session sweeps are blocked by default and require explicit preview/run
   opt-in; persistent/system flags remain blocked.
 - Generated artifacts under `artifacts/` are ignored by git.
@@ -217,3 +249,4 @@ Current feature specs:
 - `specs/012-recommended-profile-benchmark/spec.md`
 - `specs/013-ab-benchmark-confirmation/spec.md`
 - `specs/014-risky-session-knobs/spec.md`
+- `specs/015-risky-winner-confirmation/spec.md`

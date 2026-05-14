@@ -7,6 +7,7 @@ from vllm_optimizer.promotion import (
     PromotionError,
     build_promotion_preview,
     render_promotion_summary,
+    write_confirmed_promoted_profile,
     write_promoted_profile,
 )
 from vllm_optimizer.serve_profiles import parse_serve_profile
@@ -82,6 +83,57 @@ def test_write_promoted_profile_refuses_overwrite(tmp_path: Path) -> None:
         )
 
     assert not summary_out.exists()
+
+
+def test_write_confirmed_promoted_profile_writes_confirmation_provenance(tmp_path: Path) -> None:
+    ranking_path = _write_ranking_fixture(tmp_path)
+    confirmation_path = _write_confirmation_report(tmp_path, "switch-to-recommended")
+    profile_out = tmp_path / "recommended.json"
+    summary_out = tmp_path / "recommended.md"
+
+    result = write_confirmed_promoted_profile(
+        confirmation_path,
+        ranking_path,
+        profile_out,
+        summary_out,
+        expected_recommended_label="risky-winner",
+    )
+
+    profile = read_json(profile_out)
+    confirmation = profile["promotion"]["confirmation"]
+    assert result["profile_path"] == str(profile_out)
+    assert confirmation["report_path"] == confirmation_path.as_posix()
+    assert confirmation["decision"]["status"] == "switch-to-recommended"
+    assert confirmation["recommended"]["label"] == "risky-winner"
+    assert "A/B Confirmation" in summary_out.read_text(encoding="utf-8")
+    parse_serve_profile(profile)
+
+
+def test_write_confirmed_promoted_profile_rejects_non_switch_decision(tmp_path: Path) -> None:
+    ranking_path = _write_ranking_fixture(tmp_path)
+    confirmation_path = _write_confirmation_report(tmp_path, "inconclusive")
+
+    with pytest.raises(PromotionError, match="did not approve"):
+        write_confirmed_promoted_profile(
+            confirmation_path,
+            ranking_path,
+            tmp_path / "recommended.json",
+            tmp_path / "recommended.md",
+        )
+
+
+def test_write_confirmed_promoted_profile_rejects_label_mismatch(tmp_path: Path) -> None:
+    ranking_path = _write_ranking_fixture(tmp_path)
+    confirmation_path = _write_confirmation_report(tmp_path, "switch-to-recommended")
+
+    with pytest.raises(PromotionError, match="label mismatch"):
+        write_confirmed_promoted_profile(
+            confirmation_path,
+            ranking_path,
+            tmp_path / "recommended.json",
+            tmp_path / "recommended.md",
+            expected_recommended_label="other-profile",
+        )
 
 
 def test_promotion_rejects_missing_objective(tmp_path: Path) -> None:
@@ -254,3 +306,45 @@ def _write_ranking_fixture(tmp_path: Path) -> Path:
         },
     )
     return ranking_path
+
+
+def _write_confirmation_report(tmp_path: Path, status: str) -> Path:
+    path = tmp_path / "ab-report.json"
+    write_json(
+        path,
+        {
+            "prompt_set_id": "qwen-baseline-v1",
+            "noise_percent": 1.0,
+            "decision": {"status": status, "reason": "fixture decision"},
+            "aggregates": {
+                "original": {
+                    "label": "current-recommended",
+                    "repetition_count": 3,
+                    "failure_rate": 0.0,
+                    "mean_latency_ms": 1000.0,
+                    "latency_spread_ms": 3.0,
+                    "mean_tokens_per_second": 48.0,
+                    "tokens_per_second_spread": 0.1,
+                },
+                "recommended": {
+                    "label": "risky-winner",
+                    "repetition_count": 3,
+                    "failure_rate": 0.0,
+                    "mean_latency_ms": 950.0,
+                    "latency_spread_ms": 2.0,
+                    "mean_tokens_per_second": 50.0,
+                    "tokens_per_second_spread": 0.2,
+                },
+            },
+            "deltas": {
+                "mean_latency_ms": {"absolute": -50.0, "percent": -5.0},
+                "mean_tokens_per_second": {"absolute": 2.0, "percent": 4.1667},
+                "failure_rate": {"absolute": 0.0},
+            },
+            "inputs": {
+                "original_label": "current-recommended",
+                "recommended_label": "risky-winner",
+            },
+        },
+    )
+    return path

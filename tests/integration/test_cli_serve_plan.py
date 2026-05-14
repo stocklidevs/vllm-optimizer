@@ -25,3 +25,23 @@ def test_cli_serve_plan_writes_dry_run_command(tmp_path: Path) -> None:
         "serve",
         "cyankiwi/Qwen3-Coder-Next-AWQ-4bit",
     ]
+
+
+def test_cli_serve_plan_renders_confirmed_recommended_block_size(tmp_path: Path) -> None:
+    out = tmp_path / "serve-plan.json"
+
+    code = main(
+        [
+            "serve-plan",
+            "--profile",
+            "config/profiles/qwen3-coder-next-awq-recommended.json",
+            "--out",
+            str(out),
+        ]
+    )
+
+    assert code == 0
+    plan = read_json(out)
+    assert "--block-size" in plan["command"]
+    block_size_index = plan["command"].index("--block-size")
+    assert plan["command"][block_size_index + 1] == "16"
