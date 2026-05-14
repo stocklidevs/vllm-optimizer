@@ -8,6 +8,7 @@ from . import __version__
 from .artifacts import read_json, read_jsonl, write_json
 from .benchmark import BenchmarkError, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
 from .discovery import DiscoveryError, load_target, run_discovery
+from .default_report import DefaultReportError, DefaultReportInputs, build_default_decision_report
 from .experiments import ExperimentValidationError, load_experiment
 from .flag_catalog import (
     FlagCatalogError,
@@ -56,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         ReportError,
         FlagCatalogError,
         PromotionError,
+        DefaultReportError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -211,6 +213,17 @@ def build_parser() -> argparse.ArgumentParser:
     promote_profile_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
     promote_profile_parser.add_argument("--force", action="store_true")
     promote_profile_parser.set_defaults(func=cmd_promote_profile)
+
+    recommended_report_parser = subparsers.add_parser(
+        "recommended-report", help="Report whether the promoted profile should remain the default"
+    )
+    recommended_report_parser.add_argument("--baseline", required=True, type=Path)
+    recommended_report_parser.add_argument("--recommended", required=True, type=Path)
+    recommended_report_parser.add_argument("--profile", required=True, type=Path)
+    recommended_report_parser.add_argument("--source-ranking", type=Path)
+    recommended_report_parser.add_argument("--out", required=True, type=Path)
+    recommended_report_parser.add_argument("--markdown-out", type=Path)
+    recommended_report_parser.set_defaults(func=cmd_recommended_report)
 
     return parser
 
@@ -392,4 +405,21 @@ def cmd_promote_profile(args: argparse.Namespace) -> int:
         force=args.force,
     )
     print(result["profile_path"])
+    return 0
+
+
+def cmd_recommended_report(args: argparse.Namespace) -> int:
+    report = build_default_decision_report(
+        DefaultReportInputs(
+            baseline=args.baseline,
+            recommended=args.recommended,
+            profile=args.profile,
+            source_ranking=args.source_ranking,
+        )
+    )
+    write_json(args.out, report)
+    if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
     return 0
