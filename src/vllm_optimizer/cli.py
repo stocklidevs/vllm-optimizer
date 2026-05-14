@@ -139,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sweep_plan_parser.add_argument("--sweep", required=True, type=Path)
     sweep_plan_parser.add_argument("--out", required=True, type=Path)
+    sweep_plan_parser.add_argument("--allow-risky-session-flags", action="store_true")
     sweep_plan_parser.set_defaults(func=cmd_sweep_plan)
 
     sweep_preview_parser = subparsers.add_parser(
@@ -164,6 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
     sweep_run_parser.add_argument("--out", required=True, type=Path)
     sweep_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
     sweep_run_parser.add_argument("--continue-on-failure", action="store_true")
+    sweep_run_parser.add_argument("--allow-risky-session-flags", action="store_true")
     sweep_run_parser.set_defaults(func=cmd_sweep_run)
 
     report_parser = subparsers.add_parser(
@@ -328,7 +330,7 @@ def cmd_benchmark_run(args: argparse.Namespace) -> int:
 
 def cmd_sweep_plan(args: argparse.Namespace) -> int:
     definition = load_sweep_definition(args.sweep)
-    plan = build_sweep_plan(definition)
+    plan = build_sweep_plan(definition, allow_risky_session_flags=args.allow_risky_session_flags)
     write_json(args.out, plan)
     print(str(args.out))
     return 0
@@ -352,8 +354,10 @@ def cmd_sweep_rank(args: argparse.Namespace) -> int:
 
 
 def cmd_sweep_run(args: argparse.Namespace) -> int:
-    target = load_target(args.config)
     plan = read_json(args.plan)
+    if plan.get("has_risky_session_flags") and not args.allow_risky_session_flags:
+        raise SweepError("risky-session sweep requires --allow-risky-session-flags")
+    target = load_target(args.config)
     prompts = load_prompt_set(Path(plan["prompts_path"]))
     result = run_sweep(
         target,

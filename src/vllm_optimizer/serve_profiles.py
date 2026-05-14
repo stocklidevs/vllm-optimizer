@@ -25,14 +25,17 @@ class ServeProfile:
     enable_auto_tool_choice: bool
     tool_call_parser: str
     performance_mode: str
-    optional_flags: dict[str, bool | int]
+    optional_flags: dict[str, bool | int | float | str]
 
 
 OPTIONAL_FLAG_RULES: dict[str, dict[str, Any]] = {
-    "max_num_batched_tokens": {"cli": "max-num-batched-tokens", "type": int, "min": 1},
-    "max_num_seqs": {"cli": "max-num-seqs", "type": int, "min": 1},
-    "enable_chunked_prefill": {"cli": "enable-chunked-prefill", "type": bool},
-    "enable_prefix_caching": {"cli": "enable-prefix-caching", "type": bool},
+    "max_num_batched_tokens": {"cli": "max-num-batched-tokens", "type": int, "min": 1, "risk_tier": "safe-session"},
+    "max_num_seqs": {"cli": "max-num-seqs", "type": int, "min": 1, "risk_tier": "safe-session"},
+    "enable_chunked_prefill": {"cli": "enable-chunked-prefill", "type": bool, "risk_tier": "safe-session"},
+    "enable_prefix_caching": {"cli": "enable-prefix-caching", "type": bool, "risk_tier": "safe-session"},
+    "block_size": {"cli": "block-size", "type": int, "allowed": {8, 16, 32}, "risk_tier": "risky-session"},
+    "kv_cache_dtype": {"cli": "kv-cache-dtype", "type": str, "allowed": {"auto", "fp8", "fp8_e5m2"}, "risk_tier": "risky-session"},
+    "enforce_eager": {"cli": "enforce-eager", "type": bool, "risk_tier": "risky-session"},
 }
 
 
@@ -121,13 +124,13 @@ def render_vllm_serve_command(profile: ServeProfile) -> list[str]:
     return command
 
 
-def parse_optional_flags(data: Any, errors: list[str]) -> dict[str, bool | int]:
+def parse_optional_flags(data: Any, errors: list[str]) -> dict[str, bool | int | float | str]:
     if data is None:
         return {}
     if not isinstance(data, dict):
         errors.append("optional_flags must be an object")
         return {}
-    parsed: dict[str, bool | int] = {}
+    parsed: dict[str, bool | int | float | str] = {}
     for name, value in sorted(data.items()):
         if name not in OPTIONAL_FLAG_RULES:
             errors.append(f"optional flag {name!r} is not approved")
@@ -146,6 +149,24 @@ def parse_optional_flags(data: Any, errors: list[str]) -> dict[str, bool | int]:
             minimum = rule.get("min")
             if isinstance(minimum, int) and value < minimum:
                 errors.append(f"optional_flags.{name} must be >= {minimum}")
+                continue
+            allowed = rule.get("allowed")
+            if isinstance(allowed, set) and value not in allowed:
+                errors.append(f"optional_flags.{name} must be one of {sorted(allowed)}")
+                continue
+            parsed[name] = value
+        elif expected is float:
+            if not isinstance(value, int | float) or isinstance(value, bool):
+                errors.append(f"optional_flags.{name} must be a number")
+                continue
+            parsed[name] = float(value)
+        elif expected is str:
+            if not isinstance(value, str) or not value:
+                errors.append(f"optional_flags.{name} must be a string")
+                continue
+            allowed = rule.get("allowed")
+            if isinstance(allowed, set) and value not in allowed:
+                errors.append(f"optional_flags.{name} must be one of {sorted(allowed)}")
                 continue
             parsed[name] = value
         else:

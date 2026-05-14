@@ -18,14 +18,12 @@ class SweepError(ValueError):
 
 
 SAFE_PARAMETERS: dict[str, dict[str, Any]] = {
-    "max_model_len": {"type": int, "min": 1024, "max": 65536},
-    "gpu_memory_utilization": {"type": float, "min": 0.5, "max": 0.95},
-    "performance_mode": {"type": str, "allowed": {"interactivity", "throughput"}},
-    "max_num_batched_tokens": {"type": int, "min": 1},
-    "max_num_seqs": {"type": int, "min": 1},
-    "enable_chunked_prefill": {"type": bool},
-    "enable_prefix_caching": {"type": bool},
+    "max_model_len": {"type": int, "min": 1024, "max": 65536, "risk_tier": "safe-session"},
+    "gpu_memory_utilization": {"type": float, "min": 0.5, "max": 0.95, "risk_tier": "safe-session"},
+    "performance_mode": {"type": str, "allowed": {"interactivity", "throughput"}, "risk_tier": "safe-session"},
+    **{name: rule for name, rule in OPTIONAL_FLAG_RULES.items()},
 }
+BLOCKED_PARAMETERS = {"download_dir", "model_loader_extra_config", "tokenizer_mode"}
 
 OBJECTIVES = {"throughput", "latency", "balanced"}
 
@@ -41,6 +39,7 @@ class SweepDefinition:
     max_trials: int | None
     baseline_summary_path: Path | None
     repetitions: int
+    allow_risky_session_flags: bool
 
 
 def load_sweep_definition(path: Path) -> SweepDefinition:
@@ -71,6 +70,10 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
     if not isinstance(repetitions, int) or repetitions < 1:
         errors.append("repetitions must be a positive integer")
         repetitions = 1
+    allow_risky_session_flags = data.get("allow_risky_session_flags", False)
+    if not isinstance(allow_risky_session_flags, bool):
+        errors.append("allow_risky_session_flags must be a boolean")
+        allow_risky_session_flags = False
 
     objectives_raw = data.get("objectives", ["throughput", "latency", "balanced"])
     if not isinstance(objectives_raw, list) or not objectives_raw:
@@ -91,7 +94,10 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
     for name in sorted(parameters_raw):
         values = parameters_raw[name]
         if name not in SAFE_PARAMETERS:
-            errors.append(f"parameter {name!r} is not allowed for session-level sweeps")
+            if name in BLOCKED_PARAMETERS:
+                errors.append(f"parameter {name!r} is blocked for persistent/system safety")
+            else:
+                errors.append(f"parameter {name!r} is not allowed for session-level sweeps")
             continue
         if not isinstance(values, list) or not values:
             errors.append(f"parameters.{name} must be a non-empty array")
@@ -121,10 +127,13 @@ def load_sweep_definition(path: Path) -> SweepDefinition:
         max_trials=max_trials,
         baseline_summary_path=baseline_summary_path,
         repetitions=repetitions,
+        allow_risky_session_flags=allow_risky_session_flags,
     )
 
 
-def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifacts/sweeps") -> dict[str, Any]:
+def build_sweep_plan(
+    definition: SweepDefinition, artifact_root: str = "artifacts/sweeps", allow_risky_session_flags: bool = False
+) -> dict[str, Any]:
     profile = load_serve_profile(definition.profile_path)
     prompts = load_prompt_set(definition.prompts_path)
     parameter_names = sorted(definition.parameters)
@@ -133,6 +142,9 @@ def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifact
         combinations = combinations[: definition.max_trials]
     if not combinations:
         raise SweepError("sweep produced no trials")
+    allow_risky = definition.allow_risky_session_flags or allow_risky_session_flags
+    risk_tiers = {name: parameter_risk_tier(name) for name in parameter_names}
+    has_risky = any(tier == "risky-session" for tier in risk_tiers.values())
 
     trials = []
     candidates = []
@@ -151,6 +163,7 @@ def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifact
             trial_profile = apply_profile_overrides(profile, overrides, order, repetition_index)
             trial_id = build_trial_id(definition.sweep_id, order, repetition_index, overrides)
             artifact_dir = f"{artifact_root}/{definition.sweep_id}/{trial_id}"
+            classification = "risky-session" if any(parameter_risk_tier(name) == "risky-session" for name in overrides) else "session-mutating"
             trials.append(
                 {
                     "trial_id": trial_id,
@@ -159,7 +172,8 @@ def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifact
                     "repetition_index": repetition_index,
                     "profile": serve_profile_to_dict(trial_profile),
                     "overrides": overrides,
-                    "classification": "session-mutating",
+                    "classification": classification,
+                    "risk_tiers": {name: parameter_risk_tier(name) for name in overrides},
                     "artifact_dir": artifact_dir,
                     "serve_plan": build_serve_plan(trial_profile),
                     "benchmark_plan": build_benchmark_plan(trial_profile, prompts),
@@ -177,6 +191,9 @@ def build_sweep_plan(definition: SweepDefinition, artifact_root: str = "artifact
         "prompt_set_id": prompts.prompt_set_id,
         "baseline_summary_path": str(definition.baseline_summary_path) if definition.baseline_summary_path else None,
         "safe_parameters": sorted(SAFE_PARAMETERS),
+        "risk_tiers": risk_tiers,
+        "allow_risky_session_flags": allow_risky,
+        "has_risky_session_flags": has_risky,
         "repetitions": definition.repetitions,
         "candidate_count": len(candidates),
         "trial_count": len(trials),
@@ -196,10 +213,12 @@ def build_sweep_preview(plan: dict[str, Any]) -> dict[str, Any]:
         trial_id = str(trial.get("trial_id", "unknown"))
         overrides = trial.get("overrides", {})
         classification = trial.get("classification")
-        if classification != "session-mutating":
+        if classification not in {"session-mutating", "risky-session"}:
             blocked_reasons.append(
                 {"trial_id": trial_id, "reason": f"unsupported classification {classification!r}"}
             )
+        if classification == "risky-session" and not plan.get("allow_risky_session_flags"):
+            blocked_reasons.append({"trial_id": trial_id, "reason": "risky-session flags require explicit allowance"})
         if not isinstance(overrides, dict):
             blocked_reasons.append({"trial_id": trial_id, "reason": "overrides must be an object"})
             overrides = {}
@@ -219,6 +238,7 @@ def build_sweep_preview(plan: dict[str, Any]) -> dict[str, Any]:
                 "order": trial.get("candidate_order", trial.get("order")),
                 "changed_parameters": overrides,
                 "classification": classification,
+                "risk_tiers": trial.get("risk_tiers", {}),
                 "will_execute": False,
                 "artifact_dir": trial.get("artifact_dir"),
                 "command_line": trial.get("serve_plan", {}).get("command_line"),
@@ -234,6 +254,7 @@ def build_sweep_preview(plan: dict[str, Any]) -> dict[str, Any]:
         "trial_count": len(preview_trials),
         "blocked": bool(blocked_reasons),
         "blocked_reasons": blocked_reasons,
+        "allow_risky_session_flags": bool(plan.get("allow_risky_session_flags")),
         "trials": preview_trials,
     }
 
@@ -298,6 +319,8 @@ def run_sweep(
     results = []
     failures = 0
     for trial in plan.get("trials", []):
+        if trial.get("classification") == "risky-session" and not plan.get("allow_risky_session_flags"):
+            raise SweepError("risky-session sweep plan requires explicit allowance before execution")
         trial_id = trial["trial_id"]
         profile = parse_profile_from_plan(trial["profile"])
         trial_out = out_dir / trial_id
@@ -387,6 +410,11 @@ def serve_profile_to_dict(profile: ServeProfile) -> dict[str, Any]:
 
 def parse_profile_from_plan(data: dict[str, Any]) -> ServeProfile:
     return ServeProfile(**{**data, "optional_flags": data.get("optional_flags", {})})
+
+
+def parameter_risk_tier(name: str) -> str:
+    rule = SAFE_PARAMETERS.get(name, {})
+    return str(rule.get("risk_tier", "safe-session"))
 
 
 def normalize_trial_result(row: dict[str, Any]) -> dict[str, Any]:

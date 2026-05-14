@@ -238,3 +238,44 @@ def test_scheduler_sweep_plan_shape_and_flags() -> None:
     assert first_profile["optional_flags"]["max_num_seqs"] == 16
     assert "--max-num-batched-tokens 4096" in plan["trials"][0]["serve_plan"]["command_line"]
     assert "--max-num-seqs 16" in plan["trials"][0]["serve_plan"]["command_line"]
+
+
+def test_risky_session_sweep_preview_blocks_without_allowance() -> None:
+    definition = load_sweep_definition(Path("config/sweeps/qwen-risky-session-small.json"))
+
+    plan = build_sweep_plan(definition)
+    preview = build_sweep_preview(plan)
+
+    assert plan["candidate_count"] == 4
+    assert plan["has_risky_session_flags"] is True
+    assert plan["risk_tiers"]["block_size"] == "risky-session"
+    assert preview["blocked"] is True
+    assert "risky-session" in preview["blocked_reasons"][0]["reason"]
+
+
+def test_risky_session_sweep_preview_allows_with_explicit_allowance() -> None:
+    definition = load_sweep_definition(Path("config/sweeps/qwen-risky-session-small.json"))
+
+    plan = build_sweep_plan(definition, allow_risky_session_flags=True)
+    preview = build_sweep_preview(plan)
+
+    assert plan["allow_risky_session_flags"] is True
+    assert preview["blocked"] is False
+    assert "--block-size" in preview["trials"][0]["command_line"]
+
+
+def test_sweep_definition_rejects_blocked_parameter(tmp_path: Path) -> None:
+    path = tmp_path / "blocked.json"
+    path.write_text(
+        """{
+  "sweep_id": "bad",
+  "profile": "config/profiles/qwen3-coder-next-awq-recommended.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "objectives": ["throughput"],
+  "parameters": {"download_dir": ["/tmp/cache"]}
+}""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SweepError, match="blocked"):
+        load_sweep_definition(path)

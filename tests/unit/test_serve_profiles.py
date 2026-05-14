@@ -115,6 +115,57 @@ def test_optional_flags_reject_unknown_flags() -> None:
                 "tool_call_parser": "qwen3_coder",
                 "performance_mode": "interactivity",
                 "vllm_executable": "vllm",
-                "optional_flags": {"kv_cache_dtype": "fp8"},
+                "optional_flags": {"download_dir": "/tmp/cache"},
+            }
+        )
+
+
+def test_risky_session_flags_render_when_approved() -> None:
+    profile = parse_serve_profile(
+        {
+            "profile_id": "risky",
+            "model": "m",
+            "served_model_name": "m",
+            "host": "0.0.0.0",
+            "port": 8001,
+            "max_model_len": 32768,
+            "gpu_memory_utilization": 0.9,
+            "enable_auto_tool_choice": True,
+            "tool_call_parser": "qwen3_coder",
+            "performance_mode": "interactivity",
+            "vllm_executable": "vllm",
+            "optional_flags": {
+                "block_size": 32,
+                "enforce_eager": True,
+                "kv_cache_dtype": "auto",
+            },
+        }
+    )
+
+    command = render_vllm_serve_command(profile)
+
+    assert "--block-size" in command
+    assert "32" in command
+    assert "--enforce-eager" in command
+    assert "--kv-cache-dtype" in command
+    assert "auto" in command
+
+
+def test_risky_session_flags_validate_allowed_values() -> None:
+    with pytest.raises(ServeProfileError, match="block_size"):
+        parse_serve_profile(
+            {
+                "profile_id": "bad",
+                "model": "m",
+                "served_model_name": "m",
+                "host": "0.0.0.0",
+                "port": 8001,
+                "max_model_len": 32768,
+                "gpu_memory_utilization": 0.9,
+                "enable_auto_tool_choice": True,
+                "tool_call_parser": "qwen3_coder",
+                "performance_mode": "interactivity",
+                "vllm_executable": "vllm",
+                "optional_flags": {"block_size": 7},
             }
         )

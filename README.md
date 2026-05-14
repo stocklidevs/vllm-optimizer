@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.10.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.11.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -32,6 +32,7 @@ The project is spec-driven with SpecKit and currently supports:
   profiles with provenance.
 - Recommended-profile benchmark validation with a default decision report.
 - Repeated A/B confirmation reports for original vs recommended profiles.
+- Risk-tiered risky-session vLLM sweeps with explicit preview/run opt-in.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -176,6 +177,14 @@ uv run vllm-optimizer benchmark-run --config config/local.gx10.json --profile co
 uv run vllm-optimizer ab-report --original-label original --recommended-label recommended --original-summaries artifacts/benchmarks/qwen-ab/original-r1/summary.json artifacts/benchmarks/qwen-ab/original-r2/summary.json artifacts/benchmarks/qwen-ab/original-r3/summary.json --recommended-summaries artifacts/benchmarks/qwen-ab/recommended-r1/summary.json artifacts/benchmarks/qwen-ab/recommended-r2/summary.json artifacts/benchmarks/qwen-ab/recommended-r3/summary.json --prompt-set-id qwen-baseline-v1 --out artifacts/reports/qwen-ab-confirmation.json --markdown-out artifacts/reports/qwen-ab-confirmation.md
 ```
 
+Risky-session knob sweep:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-risky-session-small.json --out artifacts/sweeps/qwen-risky-session-small/plan.json --allow-risky-session-flags
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-risky-session-small/plan.json --out artifacts/sweeps/qwen-risky-session-small/preview.json
+uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-risky-session-small/plan.json --out artifacts/sweeps/qwen-risky-session-small/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
+```
+
 ## Safety
 
 - Local secrets belong in ignored files such as `config/local.gx10.json`.
@@ -185,6 +194,8 @@ uv run vllm-optimizer ab-report --original-label original --recommended-label re
   checks plus cleanup verification.
 - Sweep live execution is sequential and session-mutating only.
 - Promotion commands are local-only and do not contact the GX10.
+- Risky-session sweeps are blocked by default and require explicit preview/run
+  opt-in; persistent/system flags remain blocked.
 - Generated artifacts under `artifacts/` are ignored by git.
 
 ## SpecKit
@@ -205,3 +216,4 @@ Current feature specs:
 - `specs/011-promote-winner-profile/spec.md`
 - `specs/012-recommended-profile-benchmark/spec.md`
 - `specs/013-ab-benchmark-confirmation/spec.md`
+- `specs/014-risky-session-knobs/spec.md`

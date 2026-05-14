@@ -1,0 +1,19 @@
+{
+  "sweep_id": "qwen-risky-session-small",
+  "profile": "config/profiles/qwen3-coder-next-awq-recommended.json",
+  "prompts": "config/prompts/qwen-baseline.json",
+  "baseline_summary": "artifacts/benchmarks/qwen-ab/recommended-r1/summary.json",
+  "seed": 14,
+  "repetitions": 1,
+  "max_trials": 4,
+  "objectives": ["throughput", "latency", "balanced"],
+  "parameters": {
+    "block_size": [16, 32],
+    "enforce_eager": [false, true],
+    "gpu_memory_utilization": [0.9],
+    "max_model_len": [32768],
+    "max_num_batched_tokens": [4096],
+    "max_num_seqs": [16],
+    "performance_mode": ["interactivity"]
+  }
+}

@@ -137,3 +137,82 @@ def test_scheduler_sweep_cli_plan_and_preview(tmp_path: Path) -> None:
     assert plan["trial_count"] == 24
     assert preview["blocked"] is False
     assert "--max-num-batched-tokens" in preview["trials"][0]["command_line"]
+
+
+def test_risky_session_sweep_cli_preview_requires_allowance(tmp_path: Path) -> None:
+    plan_path = tmp_path / "risky-plan.json"
+    preview_path = tmp_path / "risky-preview.json"
+
+    assert (
+        main(
+            [
+                "sweep-plan",
+                "--sweep",
+                "config/sweeps/qwen-risky-session-small.json",
+                "--out",
+                str(plan_path),
+            ]
+        )
+        == 0
+    )
+
+    assert main(["sweep-preview", "--plan", str(plan_path), "--out", str(preview_path)]) == 2
+    preview = read_json(preview_path)
+    assert preview["blocked"] is True
+
+
+def test_risky_session_sweep_cli_preview_allows_explicit_allowance(tmp_path: Path) -> None:
+    plan_path = tmp_path / "risky-plan.json"
+    preview_path = tmp_path / "risky-preview.json"
+
+    assert (
+        main(
+            [
+                "sweep-plan",
+                "--sweep",
+                "config/sweeps/qwen-risky-session-small.json",
+                "--out",
+                str(plan_path),
+                "--allow-risky-session-flags",
+            ]
+        )
+        == 0
+    )
+
+    assert main(["sweep-preview", "--plan", str(plan_path), "--out", str(preview_path)]) == 0
+    plan = read_json(plan_path)
+    preview = read_json(preview_path)
+    assert plan["allow_risky_session_flags"] is True
+    assert preview["blocked"] is False
+    assert "--block-size" in preview["trials"][0]["command_line"]
+
+
+def test_risky_session_sweep_run_requires_live_allowance(tmp_path: Path) -> None:
+    plan_path = tmp_path / "risky-plan.json"
+    assert (
+        main(
+            [
+                "sweep-plan",
+                "--sweep",
+                "config/sweeps/qwen-risky-session-small.json",
+                "--out",
+                str(plan_path),
+                "--allow-risky-session-flags",
+            ]
+        )
+        == 0
+    )
+
+    exit_code = main(
+        [
+            "sweep-run",
+            "--config",
+            "tests/fixtures/discovery/local.gx10.mock.json",
+            "--plan",
+            str(plan_path),
+            "--out",
+            str(tmp_path / "live"),
+        ]
+    )
+
+    assert exit_code == 2
