@@ -1,0 +1,9 @@
+{
+  "profile_id": "qwen-cuda-lazy-v1",
+  "description": "Session-scoped CUDA lazy module loading only.",
+  "classification": "session-mutating",
+  "environment": {
+    "CUDA_MODULE_LOADING": "LAZY"
+  },
+  "ulimits": {}
+}

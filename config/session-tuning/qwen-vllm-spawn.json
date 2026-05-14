@@ -1,0 +1,9 @@
+{
+  "profile_id": "qwen-vllm-spawn-v1",
+  "description": "Session-scoped vLLM worker multiprocessing mode only.",
+  "classification": "session-mutating",
+  "environment": {
+    "VLLM_WORKER_MULTIPROC_METHOD": "spawn"
+  },
+  "ulimits": {}
+}

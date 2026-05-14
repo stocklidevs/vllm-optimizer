@@ -1,0 +1,13 @@
+{
+  "sweep_id": "qwen-runtime-env-session-sweep",
+  "profile": "config/profiles/qwen3-coder-next-awq-concurrent-recommended.json",
+  "prompts": "config/prompts/qwen-coding-interactive-concurrency-8.json",
+  "seed": 0,
+  "repetitions": 2,
+  "candidates": [
+    "config/session-tuning/qwen-no-env.json",
+    "config/session-tuning/qwen-cuda-lazy.json",
+    "config/session-tuning/qwen-vllm-spawn.json",
+    "config/session-tuning/qwen-runtime-env.json"
+  ]
+}

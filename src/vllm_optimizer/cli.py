@@ -40,6 +40,11 @@ from .session_tuning_confirmation import (
     SessionTuningConfirmationRequest,
     run_session_tuning_confirmation,
 )
+from .session_tuning_sweep import (
+    SessionTuningSweepError,
+    write_session_tuning_sweep_plan,
+    write_session_tuning_sweep_preview,
+)
 from .smoke import SmokeServeError, build_smoke_serve_plan, run_smoke_serve
 from .ssh import MockExecutor, SshExecutor
 from .system_tuning import SystemTuningError, run_system_tuning_discovery
@@ -80,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         ServeProfileError,
         SessionTuningError,
         SessionTuningConfirmationError,
+        SessionTuningSweepError,
         SmokeServeError,
         SweepError,
         ReportError,
@@ -294,6 +300,20 @@ def build_parser() -> argparse.ArgumentParser:
     session_confirm_parser.add_argument("--timeout-seconds", type=int, default=1200)
     session_confirm_parser.add_argument("--allow-session-tuning", action="store_true")
     session_confirm_parser.set_defaults(func=cmd_session_tuning_confirm)
+
+    session_sweep_plan_parser = subparsers.add_parser(
+        "session-tuning-sweep-plan", help="Generate a dry-run session tuning sweep plan"
+    )
+    session_sweep_plan_parser.add_argument("--sweep", required=True, type=Path)
+    session_sweep_plan_parser.add_argument("--out", required=True, type=Path)
+    session_sweep_plan_parser.set_defaults(func=cmd_session_tuning_sweep_plan)
+
+    session_sweep_preview_parser = subparsers.add_parser(
+        "session-tuning-sweep-preview", help="Preview a session tuning sweep plan"
+    )
+    session_sweep_preview_parser.add_argument("--plan", required=True, type=Path)
+    session_sweep_preview_parser.add_argument("--out", required=True, type=Path)
+    session_sweep_preview_parser.set_defaults(func=cmd_session_tuning_sweep_preview)
 
     system_tuning_parser = subparsers.add_parser(
         "system-tuning-discover", help="Capture read-only Linux/NVIDIA/runtime tuning state"
@@ -627,6 +647,18 @@ def cmd_session_tuning_confirm(args: argparse.Namespace) -> int:
         )
     )
     print(result["artifact_paths"]["summary"])
+    return 0
+
+
+def cmd_session_tuning_sweep_plan(args: argparse.Namespace) -> int:
+    write_session_tuning_sweep_plan(args.sweep, args.out)
+    print(str(args.out))
+    return 0
+
+
+def cmd_session_tuning_sweep_preview(args: argparse.Namespace) -> int:
+    write_session_tuning_sweep_preview(args.plan, args.out)
+    print(str(args.out))
     return 0
 
 

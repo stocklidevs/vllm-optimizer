@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.25.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.26.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -61,6 +61,8 @@ The project is spec-driven with SpecKit and currently supports:
   live-run opt-in.
 - Repeated A/B confirmation for session tuning profiles against the same serve
   profile without tuning.
+- Dry-run session tuning sweep plans and previews for comparing multiple
+  shell-scoped runtime tuning variants before live execution.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -120,6 +122,13 @@ Repeated session tuning confirmation:
 
 ```powershell
 uv run vllm-optimizer session-tuning-confirm --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --session-tuning config/session-tuning/qwen-runtime-env.json --allow-session-tuning --repetitions 5 --current-label current-c8 --tuned-label runtime-env --out artifacts/session-tuning/qwen-runtime-env-confirmation --timeout-seconds 1200
+```
+
+Session tuning sweep planning:
+
+```powershell
+uv run vllm-optimizer session-tuning-sweep-plan --sweep config/session-tuning-sweeps/qwen-runtime-env-sweep.json --out artifacts/session-tuning-sweeps/qwen-runtime-env/plan.json
+uv run vllm-optimizer session-tuning-sweep-preview --plan artifacts/session-tuning-sweeps/qwen-runtime-env/plan.json --out artifacts/session-tuning-sweeps/qwen-runtime-env/preview.json
 ```
 
 Optimization pipeline MVP:

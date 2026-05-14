@@ -1,0 +1,7 @@
+{
+  "profile_id": "qwen-no-env-v1",
+  "description": "Neutral session tuning baseline with no shell changes.",
+  "classification": "session-mutating",
+  "environment": {},
+  "ulimits": {}
+}
