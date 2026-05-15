@@ -83,6 +83,7 @@ from .workload_report import (
     build_workload_leaderboard_report,
 )
 from .web_report import WebReportError, write_web_report
+from .web_cockpit import WebCockpitError, write_web_cockpit
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -110,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         SaturationReportError,
         CanonicalReportError,
         WebReportError,
+        WebCockpitError,
         ExecutionStatusError,
         KnobCatalogError,
         PipelineControlError,
@@ -295,6 +297,16 @@ def build_parser() -> argparse.ArgumentParser:
     report_viewer_parser.add_argument("--report", required=True, type=Path)
     report_viewer_parser.add_argument("--out", required=True, type=Path)
     report_viewer_parser.set_defaults(func=cmd_report_viewer)
+
+    web_cockpit_parser = subparsers.add_parser(
+        "web-cockpit", help="Generate a standalone mission-control web cockpit from optimizer artifacts"
+    )
+    web_cockpit_parser.add_argument("--catalog", required=True, type=Path)
+    web_cockpit_parser.add_argument("--manifest", type=Path)
+    web_cockpit_parser.add_argument("--status", type=Path)
+    web_cockpit_parser.add_argument("--report", type=Path)
+    web_cockpit_parser.add_argument("--out", required=True, type=Path)
+    web_cockpit_parser.set_defaults(func=cmd_web_cockpit)
 
     execution_status_parser = subparsers.add_parser(
         "execution-status", help="Generate local execution progress status from run artifacts"
@@ -711,6 +723,18 @@ def cmd_canonical_report(args: argparse.Namespace) -> int:
 
 def cmd_report_viewer(args: argparse.Namespace) -> int:
     result = write_web_report(args.report, args.out)
+    print(result["html_path"])
+    return 0
+
+
+def cmd_web_cockpit(args: argparse.Namespace) -> int:
+    result = write_web_cockpit(
+        args.catalog,
+        args.out,
+        manifest_path=args.manifest,
+        status_path=args.status,
+        report_path=args.report,
+    )
     print(result["html_path"])
     return 0
 

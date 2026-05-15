@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.36.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.37.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -84,6 +84,9 @@ The project is spec-driven with SpecKit and currently supports:
   schema versions, producers, and dashboard consumers.
 - Local release readiness checks for package version consistency, active
   SpecKit metadata, release docs, artifact contracts, and essential files.
+- A standalone high-tech `web-cockpit` interface that combines knob groups,
+  pipeline stages, execution status, report summaries, safety gates, and
+  disabled future controller controls from deterministic artifacts.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -187,6 +190,7 @@ uv run vllm-optimizer knob-groups --config-root config --out artifacts/catalog/k
 uv run vllm-optimizer pipeline-control --catalog artifacts/catalog/knob-groups.json --group-id qwen-concurrency-saturation-c8 --out artifacts/catalog/qwen-c8-control.json --html-out artifacts/catalog/qwen-c8-control.html
 uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contracts.json --markdown-out artifacts/catalog/artifact-contracts.md
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
+uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --out artifacts/cockpit/index.html
 ```
 
 Pipeline boundaries:
@@ -231,6 +235,13 @@ can share the same contract assumptions.
 checks version metadata, the README version badge, active SpecKit files,
 artifact contract availability, release workflow docs, and essential project
 files before packaging or handoff.
+
+`web-cockpit` is the first combined web interface. It is static and read-only:
+knob groups, pipeline stages, safety gates, status, and report summaries are
+loaded from existing artifacts, while future controller actions are visible but
+disabled. This implementation intentionally uses no npm packages. If a future
+spec adds npm, dependency versions must be pinned, vulnerability-reviewed, and
+installed with `npm ci`.
 
 Smoke serve:
 

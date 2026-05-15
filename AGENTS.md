@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/039-release-documentation/plan.md
+specs/040-web-cockpit-interface/plan.md
 <!-- SPECKIT END -->

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.37.0 - 2026-05-15
+
+- Added the static `web-cockpit` mission-control interface for knob groups,
+  pipeline manifests, execution status, canonical report summaries, safety
+  gates, and disabled future controller controls.
+- Added a high-tech cockpit layout while keeping the implementation standalone,
+  local-only, and npm-free.
+- Added tests for cockpit rendering, empty optional artifact states, and CLI
+  generation.
+
 ## 0.36.0 - 2026-05-15
 
 - Added release setup documentation for local install, safe previews, GX10
