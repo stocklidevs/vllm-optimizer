@@ -22,6 +22,7 @@ from .flag_catalog import (
     capture_flag_catalog,
     generate_catalog_from_files,
 )
+from .knob_catalog import KnobCatalogError, write_knob_catalog
 from .optimizer_pipeline import OptimizerPipelineError, OptimizerPipelineRequest, run_optimizer_pipeline
 from .planner import build_trial_plan
 from .promotion import (
@@ -107,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         CanonicalReportError,
         WebReportError,
         ExecutionStatusError,
+        KnobCatalogError,
         SystemTuningError,
         AbConfirmationError,
         ValueError,
@@ -297,6 +299,14 @@ def build_parser() -> argparse.ArgumentParser:
     execution_status_parser.add_argument("--out", required=True, type=Path)
     execution_status_parser.add_argument("--html-out", type=Path)
     execution_status_parser.set_defaults(func=cmd_execution_status)
+
+    knob_groups_parser = subparsers.add_parser(
+        "knob-groups", help="Generate a selectable optimization knob group catalog"
+    )
+    knob_groups_parser.add_argument("--config-root", required=True, type=Path)
+    knob_groups_parser.add_argument("--out", required=True, type=Path)
+    knob_groups_parser.add_argument("--html-out", type=Path)
+    knob_groups_parser.set_defaults(func=cmd_knob_groups)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -680,6 +690,12 @@ def cmd_report_viewer(args: argparse.Namespace) -> int:
 def cmd_execution_status(args: argparse.Namespace) -> int:
     result = write_execution_status(args.run_dir, args.out, args.html_out)
     print(result["status_path"])
+    return 0
+
+
+def cmd_knob_groups(args: argparse.Namespace) -> int:
+    result = write_knob_catalog(args.config_root, args.out, args.html_out)
+    print(result["catalog_path"])
     return 0
 
 
