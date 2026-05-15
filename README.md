@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.33.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.34.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -80,6 +80,8 @@ The project is spec-driven with SpecKit and currently supports:
   web orchestration.
 - Curated impactful sweep bundles for KV/cache memory tradeoffs and
   prefix/chunked-prefill behavior on tool/JSON workloads.
+- Release-facing artifact contract catalogs that document stable JSON fields,
+  schema versions, producers, and dashboard consumers.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -178,6 +180,7 @@ uv run vllm-optimizer optimize-workload --mode full --sweep config/sweeps/qwen-c
 uv run vllm-optimizer execution-status --run-dir artifacts/optimizer-runs/qwen-c8-full --out artifacts/optimizer-runs/qwen-c8-full/execution-status.json --html-out artifacts/optimizer-runs/qwen-c8-full/execution-status.html
 uv run vllm-optimizer knob-groups --config-root config --out artifacts/catalog/knob-groups.json --html-out artifacts/catalog/knob-groups.html
 uv run vllm-optimizer pipeline-control --catalog artifacts/catalog/knob-groups.json --group-id qwen-concurrency-saturation-c8 --out artifacts/catalog/qwen-c8-control.json --html-out artifacts/catalog/qwen-c8-control.html
+uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contracts.json --markdown-out artifacts/catalog/artifact-contracts.md
 ```
 
 Pipeline boundaries:
@@ -212,6 +215,11 @@ command kind, and config path for each optimization group.
 UI-readable ordered control manifest with command hints, remote markers,
 artifact targets, and explicit gates such as `--allow-risky-session-flags`,
 `--allow-session-tuning`, and `--allow-promotion`.
+
+`artifact-contracts` is a release-polish command. It documents stable
+release-facing JSON artifacts such as canonical reports, execution status,
+knob group catalogs, and pipeline control manifests so CLI and web consumers
+can share the same contract assumptions.
 
 Smoke serve:
 

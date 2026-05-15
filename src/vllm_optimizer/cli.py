@@ -6,6 +6,7 @@ from pathlib import Path
 
 from . import __version__
 from .ab_confirmation import AbConfirmationError, AbConfirmationInputs, build_ab_confirmation_report
+from .artifact_contracts import write_artifact_contract_catalog
 from .artifacts import read_json, read_jsonl, write_json
 from .benchmark import BenchmarkError, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
 from .canonical_report import (
@@ -318,6 +319,13 @@ def build_parser() -> argparse.ArgumentParser:
     pipeline_control_parser.add_argument("--out", required=True, type=Path)
     pipeline_control_parser.add_argument("--html-out", type=Path)
     pipeline_control_parser.set_defaults(func=cmd_pipeline_control)
+
+    artifact_contracts_parser = subparsers.add_parser(
+        "artifact-contracts", help="Generate release-facing artifact contract documentation"
+    )
+    artifact_contracts_parser.add_argument("--out", required=True, type=Path)
+    artifact_contracts_parser.add_argument("--markdown-out", type=Path)
+    artifact_contracts_parser.set_defaults(func=cmd_artifact_contracts)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -713,6 +721,12 @@ def cmd_knob_groups(args: argparse.Namespace) -> int:
 def cmd_pipeline_control(args: argparse.Namespace) -> int:
     result = write_pipeline_control_manifest(args.catalog, args.group_id, args.out, args.html_out)
     print(result["manifest_path"])
+    return 0
+
+
+def cmd_artifact_contracts(args: argparse.Namespace) -> int:
+    result = write_artifact_contract_catalog(args.out, args.markdown_out)
+    print(result["catalog_path"])
     return 0
 
 
