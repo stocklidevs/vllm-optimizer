@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.31.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.32.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -75,6 +75,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Deterministic knob group catalog and static selector preview for future web
   UI selection of safe, risky, workload, concurrency, FP8, session tuning, and
   read-only discovery families.
+- Pipeline control manifests for selected knob groups, exposing ordered command
+  stages, artifact targets, remote-action markers, and safety gates for future
+  web orchestration.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -172,6 +175,7 @@ uv run vllm-optimizer optimize-workload --mode confirm --sweep config/sweeps/qwe
 uv run vllm-optimizer optimize-workload --mode full --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8-full --config config/local.gx10.json --current-profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --candidate-profile-out artifacts/optimizer-runs/qwen-c8-full/candidate-profile.json --confirmed-profile-out artifacts/optimizer-runs/qwen-c8-full/confirmed-profile.json --confirmation-repetitions 5 --original-label current-concurrent --recommended-label c8-saturation --continue-on-failure --allow-risky-session-flags
 uv run vllm-optimizer execution-status --run-dir artifacts/optimizer-runs/qwen-c8-full --out artifacts/optimizer-runs/qwen-c8-full/execution-status.json --html-out artifacts/optimizer-runs/qwen-c8-full/execution-status.html
 uv run vllm-optimizer knob-groups --config-root config --out artifacts/catalog/knob-groups.json --html-out artifacts/catalog/knob-groups.html
+uv run vllm-optimizer pipeline-control --catalog artifacts/catalog/knob-groups.json --group-id qwen-concurrency-saturation-c8 --out artifacts/catalog/qwen-c8-control.json --html-out artifacts/catalog/qwen-c8-control.html
 ```
 
 Pipeline boundaries:
@@ -201,6 +205,11 @@ state, trial counts, failures, and artifact availability.
 `knob-groups` is also local-only. It reads repository configuration files and
 generates a selectable catalog with family, safety tier, opt-in requirement,
 command kind, and config path for each optimization group.
+
+`pipeline-control` is local-only as well. It turns a selected knob group into a
+UI-readable ordered control manifest with command hints, remote markers,
+artifact targets, and explicit gates such as `--allow-risky-session-flags`,
+`--allow-session-tuning`, and `--allow-promotion`.
 
 Smoke serve:
 

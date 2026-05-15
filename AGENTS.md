@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/034-knob-group-catalog/plan.md
+specs/035-pipeline-control-manifest/plan.md
 <!-- SPECKIT END -->

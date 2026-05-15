@@ -25,6 +25,7 @@ from .flag_catalog import (
 from .knob_catalog import KnobCatalogError, write_knob_catalog
 from .optimizer_pipeline import OptimizerPipelineError, OptimizerPipelineRequest, run_optimizer_pipeline
 from .planner import build_trial_plan
+from .pipeline_control import PipelineControlError, write_pipeline_control_manifest
 from .promotion import (
     DEFAULT_OBJECTIVE,
     DEFAULT_PROFILE_ID,
@@ -109,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         WebReportError,
         ExecutionStatusError,
         KnobCatalogError,
+        PipelineControlError,
         SystemTuningError,
         AbConfirmationError,
         ValueError,
@@ -307,6 +309,15 @@ def build_parser() -> argparse.ArgumentParser:
     knob_groups_parser.add_argument("--out", required=True, type=Path)
     knob_groups_parser.add_argument("--html-out", type=Path)
     knob_groups_parser.set_defaults(func=cmd_knob_groups)
+
+    pipeline_control_parser = subparsers.add_parser(
+        "pipeline-control", help="Generate UI control manifest for a selected knob group"
+    )
+    pipeline_control_parser.add_argument("--catalog", required=True, type=Path)
+    pipeline_control_parser.add_argument("--group-id", required=True)
+    pipeline_control_parser.add_argument("--out", required=True, type=Path)
+    pipeline_control_parser.add_argument("--html-out", type=Path)
+    pipeline_control_parser.set_defaults(func=cmd_pipeline_control)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -696,6 +707,12 @@ def cmd_execution_status(args: argparse.Namespace) -> int:
 def cmd_knob_groups(args: argparse.Namespace) -> int:
     result = write_knob_catalog(args.config_root, args.out, args.html_out)
     print(result["catalog_path"])
+    return 0
+
+
+def cmd_pipeline_control(args: argparse.Namespace) -> int:
+    result = write_pipeline_control_manifest(args.catalog, args.group_id, args.out, args.html_out)
+    print(result["manifest_path"])
     return 0
 
 
