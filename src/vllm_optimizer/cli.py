@@ -16,6 +16,7 @@ from .canonical_report import (
 from .discovery import DiscoveryError, load_target, run_discovery
 from .default_report import DefaultReportError, DefaultReportInputs, build_default_decision_report
 from .experiments import ExperimentValidationError, load_experiment
+from .execution_status import ExecutionStatusError, write_execution_status
 from .flag_catalog import (
     FlagCatalogError,
     capture_flag_catalog,
@@ -105,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         SaturationReportError,
         CanonicalReportError,
         WebReportError,
+        ExecutionStatusError,
         SystemTuningError,
         AbConfirmationError,
         ValueError,
@@ -287,6 +289,14 @@ def build_parser() -> argparse.ArgumentParser:
     report_viewer_parser.add_argument("--report", required=True, type=Path)
     report_viewer_parser.add_argument("--out", required=True, type=Path)
     report_viewer_parser.set_defaults(func=cmd_report_viewer)
+
+    execution_status_parser = subparsers.add_parser(
+        "execution-status", help="Generate local execution progress status from run artifacts"
+    )
+    execution_status_parser.add_argument("--run-dir", required=True, type=Path)
+    execution_status_parser.add_argument("--out", required=True, type=Path)
+    execution_status_parser.add_argument("--html-out", type=Path)
+    execution_status_parser.set_defaults(func=cmd_execution_status)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -664,6 +674,12 @@ def cmd_canonical_report(args: argparse.Namespace) -> int:
 def cmd_report_viewer(args: argparse.Namespace) -> int:
     result = write_web_report(args.report, args.out)
     print(result["html_path"])
+    return 0
+
+
+def cmd_execution_status(args: argparse.Namespace) -> int:
+    result = write_execution_status(args.run_dir, args.out, args.html_out)
+    print(result["status_path"])
     return 0
 
 

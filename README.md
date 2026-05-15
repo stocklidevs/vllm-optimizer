@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.29.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.30.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -69,6 +69,9 @@ The project is spec-driven with SpecKit and currently supports:
   truth for future web dashboards without recomputing optimizer decisions.
 - Static web report viewer generation from canonical report JSON, producing
   standalone browser-openable dashboards with no server or network assets.
+- Local execution-status snapshots and static HTML progress dashboards for
+  pipeline/run directories, including stages, trial counts, failures, and
+  artifact availability.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -164,6 +167,7 @@ uv run vllm-optimizer optimize-workload --mode run --sweep config/sweeps/qwen-co
 uv run vllm-optimizer optimize-workload --mode report --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --allow-risky-session-flags
 uv run vllm-optimizer optimize-workload --mode confirm --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8 --current-profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --candidate-profile-out artifacts/optimizer-runs/qwen-c8/candidate-profile.json --confirmed-profile-out artifacts/optimizer-runs/qwen-c8/confirmed-profile.json --confirmation-repetitions 5 --original-label current-concurrent --recommended-label c8-saturation --allow-risky-session-flags
 uv run vllm-optimizer optimize-workload --mode full --sweep config/sweeps/qwen-concurrency-saturation-c8.json --out artifacts/optimizer-runs/qwen-c8-full --config config/local.gx10.json --current-profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --prompts config/prompts/qwen-coding-interactive-concurrency-8.json --candidate-profile-out artifacts/optimizer-runs/qwen-c8-full/candidate-profile.json --confirmed-profile-out artifacts/optimizer-runs/qwen-c8-full/confirmed-profile.json --confirmation-repetitions 5 --original-label current-concurrent --recommended-label c8-saturation --continue-on-failure --allow-risky-session-flags
+uv run vllm-optimizer execution-status --run-dir artifacts/optimizer-runs/qwen-c8-full --out artifacts/optimizer-runs/qwen-c8-full/execution-status.json --html-out artifacts/optimizer-runs/qwen-c8-full/execution-status.html
 ```
 
 Pipeline boundaries:
@@ -185,6 +189,10 @@ because it performs live GX10 vLLM sessions for both the sweep and repeated
 confirmation benchmarks. It still does not write the confirmed profile unless
 `--allow-promotion` is included and the A/B decision is
 `switch-to-recommended`.
+
+`execution-status` is local-only. It reads existing pipeline/run artifacts and
+produces a progress snapshot plus optional standalone HTML dashboard for stage
+state, trial counts, failures, and artifact availability.
 
 Smoke serve:
 
