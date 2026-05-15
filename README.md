@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.27.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.28.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -65,6 +65,8 @@ The project is spec-driven with SpecKit and currently supports:
   shell-scoped runtime tuning variants before live execution.
 - Live execution and ranking for session tuning sweeps, with explicit
   `--allow-session-tuning` gating and no promotion.
+- Canonical machine-readable and Markdown reports that serve as the source of
+  truth for future web dashboards without recomputing optimizer decisions.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -134,6 +136,17 @@ uv run vllm-optimizer session-tuning-sweep-preview --plan artifacts/session-tuni
 uv run vllm-optimizer session-tuning-sweep-run --config config/local.gx10.json --plan artifacts/session-tuning-sweeps/qwen-runtime-env/plan.json --out artifacts/session-tuning-sweeps/qwen-runtime-env/live --allow-session-tuning --continue-on-failure --timeout-seconds 1200
 uv run vllm-optimizer session-tuning-sweep-rank --plan artifacts/session-tuning-sweeps/qwen-runtime-env/plan.json --results artifacts/session-tuning-sweeps/qwen-runtime-env/live/results.jsonl --out artifacts/session-tuning-sweeps/qwen-runtime-env/live/ranking.json
 ```
+
+Canonical report artifacts:
+
+```powershell
+uv run vllm-optimizer canonical-report --family session-tuning-sweep --label qwen-runtime-env --ranking artifacts/session-tuning-sweeps/qwen-runtime-env/live/ranking.json --summary artifacts/session-tuning-sweeps/qwen-runtime-env/live/summary.json --out artifacts/reports/qwen-runtime-env/canonical-report.json --markdown-out artifacts/reports/qwen-runtime-env/report.md
+```
+
+Canonical reports are the source of truth for the future web interface. They
+contain recommendation status, objective winners, candidate metrics,
+chart-ready datasets, failure/exclusion state, and provenance links while
+remaining local-only and deterministic from existing artifacts.
 
 Optimization pipeline MVP:
 

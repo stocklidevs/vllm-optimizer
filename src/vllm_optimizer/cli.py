@@ -8,6 +8,11 @@ from . import __version__
 from .ab_confirmation import AbConfirmationError, AbConfirmationInputs, build_ab_confirmation_report
 from .artifacts import read_json, read_jsonl, write_json
 from .benchmark import BenchmarkError, build_benchmark_plan, load_prompt_set, run_baseline_benchmark
+from .canonical_report import (
+    CanonicalReportError,
+    CanonicalReportInputs,
+    build_canonical_report,
+)
 from .discovery import DiscoveryError, load_target, run_discovery
 from .default_report import DefaultReportError, DefaultReportInputs, build_default_decision_report
 from .experiments import ExperimentValidationError, load_experiment
@@ -97,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         DefaultReportError,
         WorkloadReportError,
         SaturationReportError,
+        CanonicalReportError,
         SystemTuningError,
         AbConfirmationError,
         ValueError,
@@ -258,6 +264,20 @@ def build_parser() -> argparse.ArgumentParser:
     saturation_report_parser.add_argument("--out", required=True, type=Path)
     saturation_report_parser.add_argument("--markdown-out", type=Path)
     saturation_report_parser.set_defaults(func=cmd_saturation_report)
+
+    canonical_report_parser = subparsers.add_parser(
+        "canonical-report", help="Generate a canonical web-ready report from existing artifacts"
+    )
+    canonical_report_parser.add_argument("--family", required=True, choices=["sweep", "session-tuning-sweep"])
+    canonical_report_parser.add_argument("--label", required=True)
+    canonical_report_parser.add_argument("--ranking", required=True, type=Path)
+    canonical_report_parser.add_argument("--plan", type=Path)
+    canonical_report_parser.add_argument("--results", type=Path)
+    canonical_report_parser.add_argument("--summary", type=Path)
+    canonical_report_parser.add_argument("--out", required=True, type=Path)
+    canonical_report_parser.add_argument("--markdown-out", type=Path)
+    canonical_report_parser.add_argument("--baseline-candidate-order", type=int, default=0)
+    canonical_report_parser.set_defaults(func=cmd_canonical_report)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -604,6 +624,26 @@ def cmd_saturation_report(args: argparse.Namespace) -> int:
             raise SaturationReportError(f"expected integer concurrency label, got {label!r}") from exc
         rankings.append(SaturationInput(concurrency=concurrency, ranking_path=ranking_path))
     report = build_saturation_report(SaturationReportInputs(rankings=tuple(rankings)))
+    write_json(args.out, report)
+    if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown_out.write_text(report["markdown"], encoding="utf-8")
+    print(str(args.out))
+    return 0
+
+
+def cmd_canonical_report(args: argparse.Namespace) -> int:
+    report = build_canonical_report(
+        CanonicalReportInputs(
+            family=args.family,
+            label=args.label,
+            ranking_path=args.ranking,
+            plan_path=args.plan,
+            results_path=args.results,
+            summary_path=args.summary,
+            baseline_candidate_order=args.baseline_candidate_order,
+        )
+    )
     write_json(args.out, report)
     if args.markdown_out is not None:
         args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
