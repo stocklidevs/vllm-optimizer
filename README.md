@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.32.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.33.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -78,6 +78,8 @@ The project is spec-driven with SpecKit and currently supports:
 - Pipeline control manifests for selected knob groups, exposing ordered command
   stages, artifact targets, remote-action markers, and safety gates for future
   web orchestration.
+- Curated impactful sweep bundles for KV/cache memory tradeoffs and
+  prefix/chunked-prefill behavior on tool/JSON workloads.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -371,6 +373,20 @@ uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-high-impact-interact
 uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-high-impact-interactive-concurrent/plan.json --out artifacts/sweeps/qwen-high-impact-interactive-concurrent/preview.json
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-high-impact-interactive-concurrent/plan.json --out artifacts/sweeps/qwen-high-impact-interactive-concurrent/live --timeout-seconds 1200 --continue-on-failure --allow-risky-session-flags
 ```
+
+Impactful sweep bundles:
+
+```powershell
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-kv-cache-memory-tradeoff.json --out artifacts/sweeps/qwen-kv-cache-memory-tradeoff/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-kv-cache-memory-tradeoff/plan.json --out artifacts/sweeps/qwen-kv-cache-memory-tradeoff/preview.json
+uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-prefix-prefill-tool-json.json --out artifacts/sweeps/qwen-prefix-prefill-tool-json/plan.json
+uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-prefix-prefill-tool-json/plan.json --out artifacts/sweeps/qwen-prefix-prefill-tool-json/preview.json
+```
+
+The KV/cache memory tradeoff bundle intentionally includes risky-session flags
+such as `block_size` and `kv_cache_dtype`, so previews and live runs stay gated
+until `--allow-risky-session-flags` is explicitly provided. The tool/JSON
+prefix-prefill bundle stays inside safe-session scheduler and prefill flags.
 
 Latest GX10 concurrent interactive confirmation:
 

@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/035-pipeline-control-manifest/plan.md
+specs/036-impactful-sweep-bundles/plan.md
 <!-- SPECKIT END -->
