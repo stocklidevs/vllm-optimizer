@@ -77,6 +77,7 @@ from .workload_report import (
     WorkloadReportInputs,
     build_workload_leaderboard_report,
 )
+from .web_report import WebReportError, write_web_report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -103,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         WorkloadReportError,
         SaturationReportError,
         CanonicalReportError,
+        WebReportError,
         SystemTuningError,
         AbConfirmationError,
         ValueError,
@@ -278,6 +280,13 @@ def build_parser() -> argparse.ArgumentParser:
     canonical_report_parser.add_argument("--markdown-out", type=Path)
     canonical_report_parser.add_argument("--baseline-candidate-order", type=int, default=0)
     canonical_report_parser.set_defaults(func=cmd_canonical_report)
+
+    report_viewer_parser = subparsers.add_parser(
+        "report-viewer", help="Generate a standalone HTML viewer from a canonical report"
+    )
+    report_viewer_parser.add_argument("--report", required=True, type=Path)
+    report_viewer_parser.add_argument("--out", required=True, type=Path)
+    report_viewer_parser.set_defaults(func=cmd_report_viewer)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -649,6 +658,12 @@ def cmd_canonical_report(args: argparse.Namespace) -> int:
         args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
         args.markdown_out.write_text(report["markdown"], encoding="utf-8")
     print(str(args.out))
+    return 0
+
+
+def cmd_report_viewer(args: argparse.Namespace) -> int:
+    result = write_web_report(args.report, args.out)
+    print(result["html_path"])
     return 0
 
 

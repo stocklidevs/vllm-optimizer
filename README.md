@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.28.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.29.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -67,6 +67,8 @@ The project is spec-driven with SpecKit and currently supports:
   `--allow-session-tuning` gating and no promotion.
 - Canonical machine-readable and Markdown reports that serve as the source of
   truth for future web dashboards without recomputing optimizer decisions.
+- Static web report viewer generation from canonical report JSON, producing
+  standalone browser-openable dashboards with no server or network assets.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -141,12 +143,17 @@ Canonical report artifacts:
 
 ```powershell
 uv run vllm-optimizer canonical-report --family session-tuning-sweep --label qwen-runtime-env --ranking artifacts/session-tuning-sweeps/qwen-runtime-env/live/ranking.json --summary artifacts/session-tuning-sweeps/qwen-runtime-env/live/summary.json --out artifacts/reports/qwen-runtime-env/canonical-report.json --markdown-out artifacts/reports/qwen-runtime-env/report.md
+uv run vllm-optimizer report-viewer --report artifacts/reports/qwen-runtime-env/canonical-report.json --out artifacts/reports/qwen-runtime-env/viewer.html
 ```
 
 Canonical reports are the source of truth for the future web interface. They
 contain recommendation status, objective winners, candidate metrics,
 chart-ready datasets, failure/exclusion state, and provenance links while
 remaining local-only and deterministic from existing artifacts.
+
+`report-viewer` turns a canonical report into a standalone HTML dashboard that
+can be opened directly in a browser. It does not start a server and does not
+load external assets.
 
 Optimization pipeline MVP:
 
