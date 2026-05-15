@@ -36,6 +36,7 @@ from .promotion import (
     write_promoted_profile,
 )
 from .ranking import rank_results
+from .release_check import write_release_check
 from .report import ReportError, ReportInputs, build_comparison_report
 from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
@@ -326,6 +327,14 @@ def build_parser() -> argparse.ArgumentParser:
     artifact_contracts_parser.add_argument("--out", required=True, type=Path)
     artifact_contracts_parser.add_argument("--markdown-out", type=Path)
     artifact_contracts_parser.set_defaults(func=cmd_artifact_contracts)
+
+    release_check_parser = subparsers.add_parser(
+        "release-check", help="Generate a local release readiness report"
+    )
+    release_check_parser.add_argument("--root", type=Path, default=Path("."))
+    release_check_parser.add_argument("--out", required=True, type=Path)
+    release_check_parser.add_argument("--markdown-out", type=Path)
+    release_check_parser.set_defaults(func=cmd_release_check)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -727,6 +736,12 @@ def cmd_pipeline_control(args: argparse.Namespace) -> int:
 def cmd_artifact_contracts(args: argparse.Namespace) -> int:
     result = write_artifact_contract_catalog(args.out, args.markdown_out)
     print(result["catalog_path"])
+    return 0
+
+
+def cmd_release_check(args: argparse.Namespace) -> int:
+    result = write_release_check(args.root, args.out, args.markdown_out)
+    print(result["report_path"])
     return 0
 
 

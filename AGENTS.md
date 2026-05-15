@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/037-artifact-contract-catalog/plan.md
+specs/038-release-readiness-check/plan.md
 <!-- SPECKIT END -->

@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.34.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.35.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -82,6 +82,8 @@ The project is spec-driven with SpecKit and currently supports:
   prefix/chunked-prefill behavior on tool/JSON workloads.
 - Release-facing artifact contract catalogs that document stable JSON fields,
   schema versions, producers, and dashboard consumers.
+- Local release readiness checks for package version consistency, active
+  SpecKit metadata, release docs, artifact contracts, and essential files.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -181,6 +183,7 @@ uv run vllm-optimizer execution-status --run-dir artifacts/optimizer-runs/qwen-c
 uv run vllm-optimizer knob-groups --config-root config --out artifacts/catalog/knob-groups.json --html-out artifacts/catalog/knob-groups.html
 uv run vllm-optimizer pipeline-control --catalog artifacts/catalog/knob-groups.json --group-id qwen-concurrency-saturation-c8 --out artifacts/catalog/qwen-c8-control.json --html-out artifacts/catalog/qwen-c8-control.html
 uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contracts.json --markdown-out artifacts/catalog/artifact-contracts.md
+uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 ```
 
 Pipeline boundaries:
@@ -220,6 +223,11 @@ artifact targets, and explicit gates such as `--allow-risky-session-flags`,
 release-facing JSON artifacts such as canonical reports, execution status,
 knob group catalogs, and pipeline control manifests so CLI and web consumers
 can share the same contract assumptions.
+
+`release-check` is local-only and read-only apart from its output files. It
+checks version metadata, the README version badge, active SpecKit files,
+artifact contract availability, release workflow docs, and essential project
+files before packaging or handoff.
 
 Smoke serve:
 
