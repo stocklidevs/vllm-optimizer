@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/038-release-readiness-check/plan.md
+specs/039-release-documentation/plan.md
 <!-- SPECKIT END -->

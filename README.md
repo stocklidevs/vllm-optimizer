@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.35.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.36.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -89,6 +89,9 @@ Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
 
 ## Quickstart
+
+See the [Setup Guide](docs/SETUP.md) for local installation, GX10 config
+expectations, safe first commands, and release checks.
 
 ```powershell
 uv sync

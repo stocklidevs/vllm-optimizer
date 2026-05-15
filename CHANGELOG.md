@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.36.0 - 2026-05-15
+
+- Added release setup documentation for local install, safe previews, GX10
+  config expectations, live sweep gates, promotion gates, and reporting.
+- Added documentation tests that keep the setup guide, README link, and current
+  changelog entry aligned with the package version.
+- Captured recent release-polish commands including `artifact-contracts` and
+  `release-check` in handoff documentation.
+
+## 0.35.0 - 2026-05-15
+
+- Added the `release-check` command for local repository readiness reports.
+- Added checks for package version consistency, README badge freshness, active
+  SpecKit files, artifact contract availability, release docs, and essential
+  project files.
+- Added JSON and Markdown release-check outputs for handoff and packaging.
+
+## 0.34.0 - 2026-05-15
+
+- Added the `artifact-contracts` command for release-facing artifact contract
+  catalogs.
+- Documented stable contract fields for canonical reports, execution status,
+  knob group catalogs, and pipeline control manifests.
+- Added JSON and Markdown contract references for future web UI consumers.
+
+## 0.33.0 - 2026-05-15
+
+- Added curated impactful sweep bundles for KV/cache memory tradeoffs and
+  prefix/chunked-prefill behavior on tool/JSON workloads.
+- Preserved risky-session gating for KV cache and block-size candidates.
+- Added focused CLI coverage for safe and risky impactful sweep planning.
+
 ## 0.6.0 - 2026-05-13
 
 - Added read-only vLLM flag discovery from the GX10 profile executable.
