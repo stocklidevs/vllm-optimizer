@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/046-promotion-workflow-ui/plan.md
+specs/047-active-cockpit-server-help-ux/plan.md
 <!-- SPECKIT END -->

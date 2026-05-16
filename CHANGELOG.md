@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.45.0 - 2026-05-16
+
+- Added `cockpit-server`, a dependency-free localhost controller that serves
+  the cockpit and runs Plan/Preview through local API endpoints.
+- Added active controller fetch hooks with command-copy fallback, while keeping
+  Run gated by explicit browser confirmation.
+- Added cockpit question-mark help and a How to Use tab explaining Plan,
+  Preview, Run, Report, Confirm, and Promote.
+
 ## 0.44.1 - 2026-05-16
 
 - Fixed `web-cockpit` controller buttons so they copy deterministic CLI

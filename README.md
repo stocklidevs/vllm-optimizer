@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.44.1-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.45.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -100,6 +100,8 @@ The project is spec-driven with SpecKit and currently supports:
   only after an explicit live execution gate.
 - A gated `web-cockpit` Promotion tab that shows recommendation state,
   confirmation-oriented command hints, and disabled promotion controls.
+- A dependency-free `cockpit-server` that serves the cockpit on localhost,
+  runs Plan/Preview through local API endpoints, and keeps Run gated.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -206,6 +208,7 @@ uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json -
 uv run vllm-optimizer run-browser --artifacts-root artifacts --out artifacts/catalog/run-index.json --html-out artifacts/catalog/run-index.html
 uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-prefix-prefill-tool-json.json --out-dir artifacts/controller/qwen-prefix-prefill-tool-json --result-out artifacts/controller/qwen-prefix-prefill-tool-json/controller-result.json
 uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-live --confirm-live-run
+uv run vllm-optimizer cockpit-server --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-active --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --run-index artifacts/catalog/run-index.json
 uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --out artifacts/cockpit/index.html
 ```
 
@@ -267,6 +270,12 @@ the same `config/` and `artifacts/` path envelope, requires
 `--confirm-live-run`, delegates execution to the deterministic optimizer
 pipeline in `run` mode, and never promotes profiles.
 
+`cockpit-server` turns the cockpit into a local active app. It serves the UI on
+localhost, lets Plan and Preview run through local API endpoints, and requires
+an explicit browser confirmation before Run can call the remote-capable
+controller. If the cockpit is opened without the server, controller buttons
+fall back to command-copy behavior.
+
 `web-cockpit` is the first combined web interface. It is static and read-only:
 knob groups, pipeline stages, safety gates, status, and report summaries are
 loaded from existing artifacts, while future controller actions are visible but
@@ -275,11 +284,12 @@ without a server. Report views include recommendation detail, throughput and
 latency bars, candidate failure summaries, rationale, and next actions. The
 Runs tab can browse a `run-browser` index. Controller buttons copy deterministic
 CLI commands or show them inline when clipboard access is unavailable, while
-browser-side execution remains gated. The Promotion tab displays candidate,
-objective, gate, and promotion command hints while keeping browser promotion
-disabled. This implementation intentionally uses no npm packages. If a future
-spec adds npm, dependency versions must be pinned, vulnerability-reviewed, and
-installed with `npm ci`.
+browser-side execution remains gated. A How to Use tab and question-mark
+tooltips explain Plan, Preview, Run, Report, Confirm, and Promote. The
+Promotion tab displays candidate, objective, gate, and promotion command hints
+while keeping browser promotion disabled. This implementation intentionally uses
+no npm packages. If a future spec adds npm, dependency versions must be pinned,
+vulnerability-reviewed, and installed with `npm ci`.
 
 Smoke serve:
 

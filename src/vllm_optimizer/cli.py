@@ -21,6 +21,7 @@ from .cockpit_controller import (
     run_cockpit_live,
     run_cockpit_preview,
 )
+from .cockpit_server import CockpitServerConfig, CockpitServerError, serve_cockpit
 from .discovery import DiscoveryError, load_target, run_discovery
 from .default_report import DefaultReportError, DefaultReportInputs, build_default_decision_report
 from .experiments import ExperimentValidationError, load_experiment
@@ -127,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         RunBrowserError,
         AbConfirmationError,
         CockpitControllerError,
+        CockpitServerError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -388,6 +390,24 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_run_parser.add_argument("--continue-on-failure", action="store_true")
     cockpit_run_parser.add_argument("--allow-risky-session-flags", action="store_true")
     cockpit_run_parser.set_defaults(func=cmd_cockpit_run)
+
+    cockpit_server_parser = subparsers.add_parser(
+        "cockpit-server", help="Serve the active local web cockpit controller"
+    )
+    cockpit_server_parser.add_argument("--host", default="127.0.0.1")
+    cockpit_server_parser.add_argument("--port", type=int, default=8787)
+    cockpit_server_parser.add_argument("--sweep", required=True, type=Path)
+    cockpit_server_parser.add_argument("--out-dir", required=True, type=Path)
+    cockpit_server_parser.add_argument("--config", type=Path)
+    cockpit_server_parser.add_argument("--catalog", type=Path)
+    cockpit_server_parser.add_argument("--manifest", type=Path)
+    cockpit_server_parser.add_argument("--status", type=Path)
+    cockpit_server_parser.add_argument("--report", type=Path)
+    cockpit_server_parser.add_argument("--run-index", type=Path)
+    cockpit_server_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    cockpit_server_parser.add_argument("--continue-on-failure", action="store_true")
+    cockpit_server_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    cockpit_server_parser.set_defaults(func=cmd_cockpit_server)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -846,6 +866,27 @@ def cmd_cockpit_run(args: argparse.Namespace) -> int:
     if args.result_out is not None:
         write_json(args.result_out, result)
     print(result["result_path"])
+    return 0
+
+
+def cmd_cockpit_server(args: argparse.Namespace) -> int:
+    serve_cockpit(
+        CockpitServerConfig(
+            sweep_path=args.sweep,
+            config_path=args.config,
+            out_dir=args.out_dir,
+            catalog_path=args.catalog,
+            manifest_path=args.manifest,
+            status_path=args.status,
+            report_path=args.report,
+            run_index_path=args.run_index,
+            allow_risky_session_flags=args.allow_risky_session_flags,
+            timeout_seconds=args.timeout_seconds,
+            continue_on_failure=args.continue_on_failure,
+        ),
+        args.host,
+        args.port,
+    )
     return 0
 
 

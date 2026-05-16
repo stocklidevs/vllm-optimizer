@@ -78,6 +78,7 @@ def render_web_cockpit(
             render_runs(run_index),
             render_reporting(report),
             render_promotion_workflow(report, manifest),
+            render_how_to_use(),
             render_sources(sources or {}),
             "</section>",
             render_right_rail(manifest, status),
@@ -147,6 +148,7 @@ def render_tabs() -> str:
       <button type="button" data-tab-target="runs">Runs</button>
       <button type="button" data-tab-target="reports">Reports</button>
       <button type="button" data-tab-target="promotion">Promotion</button>
+      <button type="button" data-tab-target="how-to-use">How to Use</button>
       <button type="button" data-tab-target="sources">Sources</button>
     </div>"""
 
@@ -341,6 +343,37 @@ def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str,
         <p>Profile promotion is visible for traceability, gated by explicit CLI flags, and never automatic from this static cockpit.</p>
       </div>
       {content}
+    </section>"""
+
+
+def render_how_to_use() -> str:
+    steps = [
+        ("Choose", "Pick a knob group that matches the workload or tuning family you want to explore."),
+        ("Plan", "Plan creates the deterministic run blueprint: candidates, trial IDs, artifacts, objectives, and safety metadata."),
+        ("Preview", "Preview validates the blueprint before execution and shows blocked trials or required gates."),
+        ("Run", "Run starts remote-capable execution only from the local cockpit server and only after explicit confirmation."),
+        ("Report", "Report ranks completed results and explains the recommendation from generated artifacts."),
+        ("Confirm", "Confirm repeats A/B checks so a candidate proves stable before promotion."),
+        ("Promote", "Promote writes a profile only after confirmation and an explicit promotion gate."),
+    ]
+    cards = "".join(
+        f"""
+        <article class="how-card">
+          <strong>{escape(label)}</strong>
+          <p>{escape(text)}</p>
+        </article>"""
+        for label, text in steps
+    )
+    return f"""
+    <section class="panel tab-panel" id="how-to-use" data-tab-panel="how-to-use">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Guide</p>
+          <h2>How to Use</h2>
+        </div>
+        <p>The cockpit follows the same deterministic pipeline as the CLI. The server can run safe local actions; remote actions stay gated.</p>
+      </div>
+      <div class="how-grid">{cards}</div>
     </section>"""
 
 
@@ -541,7 +574,7 @@ def render_report_summary(report: dict[str, Any] | None) -> str:
 def render_disabled_actions(manifest: dict[str, Any] | None) -> str:
     return f"""
     <div class="disabled-actions">
-      <div><strong>Controller commands</strong><p>Buttons copy the exact CLI command to run in a terminal. Browser-side execution stays gated.</p></div>
+      <div><strong>Controller actions</strong><p>Served by <code>cockpit-server</code>, these buttons call local API endpoints. Without the server, they copy commands.</p></div>
       <div>{render_controller_buttons(manifest)}</div>
     </div>"""
 
@@ -568,8 +601,17 @@ def render_controller_buttons(manifest: dict[str, Any] | None, *, compact: bool 
     if compact:
         ordered = ordered[:6]
     return "".join(
-        f'<button type="button" data-controller-action="{escape(name)}" data-controller-command="{escape(command)}">{escape(name.title())}</button>'
+        f'<button type="button" data-controller-action="{escape(name)}" data-controller-endpoint="/api/controller/{escape(name)}" data-controller-command="{escape(command)}">{escape(name.title())}{help_button(name)}</button>'
         for name, command in ordered
+    )
+
+
+def help_button(key: str) -> str:
+    label = key.replace("-", " ").title()
+    text = HELP_TEXT.get(key, f"Runs the {label} cockpit action.")
+    return (
+        f' <span class="help-dot" data-help-key="{escape(key)}" aria-label="What is {escape(label)}?" '
+        f'title="{escape(text)}">?</span>'
     )
 
 
@@ -643,6 +685,16 @@ def _fmt(value: Any) -> str:
 
 def _fmt_pct(value: Any) -> str:
     return f"{value:.3%}" if isinstance(value, int | float) else "n/a" if value is None else str(value)
+
+
+HELP_TEXT = {
+    "plan": "Plan creates the deterministic run blueprint without touching the GX10.",
+    "preview": "Preview validates the blueprint and shows blocked trials or required gates.",
+    "run": "Run starts remote-capable execution only through the local server and explicit confirmation.",
+    "report": "Report ranks completed artifacts and explains the recommendation.",
+    "confirm": "Confirm repeats A/B checks before any promotion decision.",
+    "promote": "Promote writes a profile only after confirmation and an explicit promotion gate.",
+}
 
 
 CSS = """
@@ -734,6 +786,10 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .safety-note { margin-top: 12px; }
 .actions button { width: 100%; margin: 4px 0; }
 .controller-feedback { min-height: 42px; margin: 10px 0 0; font-size: 13px; }
+.help-dot { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; border: 1px solid rgba(55,216,255,.32); color: var(--cyan); font-size: 12px; font-weight: 800; vertical-align: middle; }
+.how-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.how-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 14px; }
+.how-card strong { display: block; margin-bottom: 8px; color: var(--ink); }
 .report-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 16px; margin-bottom: 14px; }
 .recommendation-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 16px; }
 .report-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -854,8 +910,44 @@ async function copyControllerCommand(button) {
   }
 }
 
+async function runControllerAction(button) {
+  const endpoint = button.dataset.controllerEndpoint || '';
+  const action = button.dataset.controllerAction || 'action';
+  const feedback = document.getElementById('controller-feedback');
+  const activeServer = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  if (!activeServer || !endpoint) {
+    await copyControllerCommand(button);
+    return;
+  }
+  const payload = {};
+  if (action === 'run') {
+    const confirmed = window.confirm('Run can execute on the GX10. Continue with the confirmed live run gate?');
+    if (!confirmed) {
+      if (feedback) feedback.textContent = 'Run cancelled before remote execution.';
+      return;
+    }
+    payload.confirm_live_run = true;
+  }
+  if (feedback) feedback.textContent = 'Running ' + action + '...';
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok || result.status === 'error') {
+      throw new Error(result.error || 'Controller request failed');
+    }
+    const artifact = result.preview_path || result.result_path || (result.artifacts && (result.artifacts.pipeline_summary || result.artifacts.pipeline_plan)) || 'artifact written';
+    if (feedback) feedback.textContent = action + ' completed: ' + artifact;
+  } catch (error) {
+    if (feedback) feedback.textContent = action + ' failed: ' + error.message;
+  }
+}
+
 document.querySelectorAll('[data-controller-command]').forEach((button) => {
-  button.addEventListener('click', () => copyControllerCommand(button));
+  button.addEventListener('click', () => runControllerAction(button));
 });
 
 applyGroupFilters();

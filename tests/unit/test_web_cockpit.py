@@ -139,6 +139,28 @@ def test_web_cockpit_controller_buttons_copy_commands() -> None:
     assert not re.search(r'<button[^>]+data-controller-action="run"[^>]+disabled', html)
 
 
+def test_web_cockpit_renders_help_tooltips_and_how_to_use() -> None:
+    html = render_web_cockpit(catalog={"groups": []})
+
+    assert 'data-tab-target="how-to-use"' in html
+    assert 'data-help-key="plan"' in html
+    assert 'aria-label="What is Plan?"' in html
+    assert 'aria-label="What is Preview?"' in html
+    assert "How to Use" in html
+    assert "Plan creates the deterministic run blueprint" in html
+    assert "Preview validates the blueprint" in html
+
+
+def test_web_cockpit_controller_buttons_have_active_api_hooks() -> None:
+    html = render_web_cockpit(catalog={"groups": []})
+
+    assert 'data-controller-endpoint="/api/controller/plan"' in html
+    assert 'data-controller-endpoint="/api/controller/preview"' in html
+    assert 'data-controller-endpoint="/api/controller/run"' in html
+    assert "async function runControllerAction" in html
+    assert "fetch(endpoint" in html
+
+
 def test_web_cockpit_renders_report_visuals() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},
