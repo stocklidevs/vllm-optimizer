@@ -14,6 +14,11 @@ from .canonical_report import (
     CanonicalReportInputs,
     build_canonical_report,
 )
+from .cockpit_controller import (
+    CockpitControllerError,
+    CockpitPreviewRequest,
+    run_cockpit_preview,
+)
 from .discovery import DiscoveryError, load_target, run_discovery
 from .default_report import DefaultReportError, DefaultReportInputs, build_default_decision_report
 from .experiments import ExperimentValidationError, load_experiment
@@ -119,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         SystemTuningError,
         RunBrowserError,
         AbConfirmationError,
+        CockpitControllerError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -358,6 +364,15 @@ def build_parser() -> argparse.ArgumentParser:
     run_browser_parser.add_argument("--out", required=True, type=Path)
     run_browser_parser.add_argument("--html-out", type=Path)
     run_browser_parser.set_defaults(func=cmd_run_browser)
+
+    cockpit_preview_parser = subparsers.add_parser(
+        "cockpit-preview", help="Generate local cockpit plan and preview artifacts only"
+    )
+    cockpit_preview_parser.add_argument("--sweep", required=True, type=Path)
+    cockpit_preview_parser.add_argument("--out-dir", required=True, type=Path)
+    cockpit_preview_parser.add_argument("--result-out", type=Path)
+    cockpit_preview_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    cockpit_preview_parser.set_defaults(func=cmd_cockpit_preview)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -784,6 +799,20 @@ def cmd_release_check(args: argparse.Namespace) -> int:
 def cmd_run_browser(args: argparse.Namespace) -> int:
     result = write_run_index(args.artifacts_root, args.out, args.html_out)
     print(result["index_path"])
+    return 0
+
+
+def cmd_cockpit_preview(args: argparse.Namespace) -> int:
+    result = run_cockpit_preview(
+        CockpitPreviewRequest(
+            sweep_path=args.sweep,
+            out_dir=args.out_dir,
+            allow_risky_session_flags=args.allow_risky_session_flags,
+        )
+    )
+    if args.result_out is not None:
+        write_json(args.result_out, result)
+    print(result["preview_path"])
     return 0
 
 

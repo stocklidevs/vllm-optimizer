@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.42.0 - 2026-05-16
+
+- Added the `cockpit-preview` command to generate local sweep plan, preview,
+  and controller result artifacts for the web cockpit.
+- Preserved controller safety by requiring sweeps under `config/`, outputs
+  under `artifacts/`, retaining risky-session preview blocks, and avoiding live
+  GX10 execution or promotion.
+
 ## 0.41.0 - 2026-05-16
 
 - Added the `run-browser` command to index local optimizer artifact directories
