@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.43.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.44.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -98,6 +98,8 @@ The project is spec-driven with SpecKit and currently supports:
   and controller result artifacts while preserving path and risky-session gates.
 - Confirmed cockpit live-run control that invokes the deterministic pipeline
   only after an explicit live execution gate.
+- A gated `web-cockpit` Promotion tab that shows recommendation state,
+  confirmation-oriented command hints, and disabled promotion controls.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -271,9 +273,11 @@ loaded from existing artifacts, while future controller actions are visible but
 disabled. It includes local-only tab switching, knob family filters, and search
 without a server. Report views include recommendation detail, throughput and
 latency bars, candidate failure summaries, rationale, and next actions. The
-Runs tab can browse a `run-browser` index. This implementation intentionally
-uses no npm packages. If a future spec adds npm, dependency versions must be
-pinned, vulnerability-reviewed, and installed with `npm ci`.
+Runs tab can browse a `run-browser` index. The Promotion tab displays candidate,
+objective, gate, and promotion command hints while keeping browser promotion
+disabled. This implementation intentionally uses no npm packages. If a future
+spec adds npm, dependency versions must be pinned, vulnerability-reviewed, and
+installed with `npm ci`.
 
 Smoke serve:
 

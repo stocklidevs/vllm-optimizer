@@ -77,6 +77,7 @@ def render_web_cockpit(
             render_pipeline(manifest),
             render_runs(run_index),
             render_reporting(report),
+            render_promotion_workflow(report, manifest),
             render_sources(sources or {}),
             "</section>",
             render_right_rail(manifest, status),
@@ -145,6 +146,7 @@ def render_tabs() -> str:
       <button type="button" data-tab-target="pipeline">Pipeline</button>
       <button type="button" data-tab-target="runs">Runs</button>
       <button type="button" data-tab-target="reports">Reports</button>
+      <button type="button" data-tab-target="promotion">Promotion</button>
       <button type="button" data-tab-target="sources">Sources</button>
     </div>"""
 
@@ -283,6 +285,60 @@ def render_runs(run_index: dict[str, Any] | None) -> str:
           <h2>Run browser</h2>
         </div>
         <p>Local artifact directories indexed for quick cockpit navigation.</p>
+      </div>
+      {content}
+    </section>"""
+
+
+def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str, Any] | None) -> str:
+    if report is None:
+        content = '<p class="empty">No promotion workflow loaded.</p>'
+    else:
+        recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
+        promotion = manifest.get("promotion", {}) if isinstance((manifest or {}).get("promotion"), dict) else {}
+        gate = str(promotion.get("required_gate") or "--allow-promotion")
+        available = bool(promotion.get("available", False))
+        automatic = bool(promotion.get("automatic", False))
+        candidate_id = str(recommendation.get("candidate_id") or "no candidate")
+        objective = str(recommendation.get("objective") or "no objective")
+        status = str(recommendation.get("status") or "unknown")
+        content = f"""
+        <div class="promotion-grid">
+          <article class="promotion-card">
+            <p class="eyebrow">Recommendation</p>
+            <h3>{escape(status)}</h3>
+            <dl>
+              <div><dt>Candidate</dt><dd><code>{escape(candidate_id)}</code></dd></div>
+              <div><dt>Objective</dt><dd>{escape(objective)}</dd></div>
+              <div><dt>Available</dt><dd>{escape(str(available))}</dd></div>
+              <div><dt>Automatic</dt><dd>{escape(str(automatic))}</dd></div>
+            </dl>
+          </article>
+          <article class="promotion-card gate-card">
+            <p class="eyebrow">Required gate</p>
+            <h3><code>{escape(gate)}</code></h3>
+            <p>Promotion remains disabled in the static cockpit. Use the CLI gate after repeated confirmation approves the candidate.</p>
+            <button disabled>Promote disabled</button>
+          </article>
+        </div>
+        <div class="command-stack">
+          <article>
+            <strong>Preview profile promotion</strong>
+            <code>uv run vllm-optimizer promote-preview --ranking ARTIFACT_DIR/live/ranking.json --out ARTIFACT_DIR/promotion-preview.json</code>
+          </article>
+          <article>
+            <strong>Promote after confirmation</strong>
+            <code>uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT {escape(gate)}</code>
+          </article>
+        </div>"""
+    return f"""
+    <section class="panel tab-panel" id="promotion" data-tab-panel="promotion">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Promotion</p>
+          <h2>Promotion workflow</h2>
+        </div>
+        <p>Profile promotion is visible for traceability, gated by explicit CLI flags, and never automatic from this static cockpit.</p>
       </div>
       {content}
     </section>"""
@@ -675,6 +731,12 @@ button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px soli
 .failure-item.excluded { border-color: rgba(255,107,107,.28); background: rgba(255,107,107,.06); }
 .failure-item span { color: var(--amber); font-weight: 780; }
 .failure-item small { color: var(--muted); }
+.promotion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.promotion-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 16px; }
+.gate-card { border-color: rgba(240,198,91,.36); background: rgba(240,198,91,.06); }
+.command-stack { display: grid; gap: 10px; }
+.command-stack article { border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(15,29,47,.48); padding: 13px; display: grid; gap: 8px; }
+.command-stack code { display: block; overflow-wrap: anywhere; }
 .run-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .run-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 14px; }
 .run-paths { display: grid; gap: 5px; margin-top: 10px; overflow-wrap: anywhere; }
@@ -690,7 +752,7 @@ button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px soli
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid { grid-template-columns: 1fr; }
 }
 """
 

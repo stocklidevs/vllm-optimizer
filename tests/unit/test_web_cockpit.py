@@ -180,3 +180,39 @@ def test_web_cockpit_renders_run_browser_tab() -> None:
     assert "Run browser" in html
     assert "demo-live" in html
     assert "artifacts/sweeps/demo/live/ranking.json" in html
+
+
+def test_web_cockpit_renders_promotion_workflow() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "promotion": {
+                "automatic": False,
+                "available": True,
+                "required_gate": "--allow-promotion",
+            }
+        },
+        report={
+            "recommendation": {
+                "status": "requires-confirmation",
+                "objective": "balanced",
+                "candidate_id": "candidate-promote",
+            }
+        },
+    )
+
+    assert 'data-tab-target="promotion"' in html
+    assert "Promotion workflow" in html
+    assert "candidate-promote" in html
+    assert "requires-confirmation" in html
+    assert "--allow-promotion" in html
+    assert "promote-preview" in html
+    assert "promote-confirmed-profile" in html
+    assert "Promote disabled" in html
+
+
+def test_web_cockpit_renders_promotion_empty_state() -> None:
+    html = render_web_cockpit(catalog={"groups": []}, manifest=None, report=None)
+
+    assert 'data-tab-target="promotion"' in html
+    assert "No promotion workflow loaded" in html

@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/045-live-run-control/plan.md
+specs/046-promotion-workflow-ui/plan.md
 <!-- SPECKIT END -->

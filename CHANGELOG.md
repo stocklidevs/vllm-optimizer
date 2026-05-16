@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.44.0 - 2026-05-16
+
+- Added a gated Promotion tab to `web-cockpit` with recommendation state,
+  candidate/objective details, promotion gate metadata, and deterministic CLI
+  command hints.
+- Kept browser-side promotion disabled and artifact-driven.
+
 ## 0.43.0 - 2026-05-16
 
 - Added the `cockpit-run` command for confirmed live-run control through the
