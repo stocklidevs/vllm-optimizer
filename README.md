@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.40.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.41.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -91,6 +91,9 @@ The project is spec-driven with SpecKit and currently supports:
   search, visible group counts, and no-match empty states.
 - Rich `web-cockpit` report visuals for recommendation detail, candidate
   throughput and latency bars, failure summaries, rationale, and next actions.
+- Local run browser indexes for optimizer artifacts, with a cockpit Runs tab
+  for browsing summaries, rankings, canonical reports, execution status, and
+  result files.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -194,7 +197,8 @@ uv run vllm-optimizer knob-groups --config-root config --out artifacts/catalog/k
 uv run vllm-optimizer pipeline-control --catalog artifacts/catalog/knob-groups.json --group-id qwen-concurrency-saturation-c8 --out artifacts/catalog/qwen-c8-control.json --html-out artifacts/catalog/qwen-c8-control.html
 uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contracts.json --markdown-out artifacts/catalog/artifact-contracts.md
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
-uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --out artifacts/cockpit/index.html
+uv run vllm-optimizer run-browser --artifacts-root artifacts --out artifacts/catalog/run-index.json --html-out artifacts/catalog/run-index.html
+uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --out artifacts/cockpit/index.html
 ```
 
 Pipeline boundaries:
@@ -240,15 +244,20 @@ checks version metadata, the README version badge, active SpecKit files,
 artifact contract availability, release workflow docs, and essential project
 files before packaging or handoff.
 
+`run-browser` is local-only and read-only. It scans an artifact root for known
+outputs such as `summary.json`, `ranking.json`, `canonical-report.json`,
+`execution-status.json`, `pipeline-summary.json`, and `results.jsonl`, then
+writes a JSON/HTML index for the cockpit Runs tab.
+
 `web-cockpit` is the first combined web interface. It is static and read-only:
 knob groups, pipeline stages, safety gates, status, and report summaries are
 loaded from existing artifacts, while future controller actions are visible but
 disabled. It includes local-only tab switching, knob family filters, and search
 without a server. Report views include recommendation detail, throughput and
-latency bars, candidate failure summaries, rationale, and next actions. This
-implementation intentionally uses no npm packages. If a future spec adds npm,
-dependency versions must be pinned, vulnerability-reviewed, and installed with
-`npm ci`.
+latency bars, candidate failure summaries, rationale, and next actions. The
+Runs tab can browse a `run-browser` index. This implementation intentionally
+uses no npm packages. If a future spec adds npm, dependency versions must be
+pinned, vulnerability-reviewed, and installed with `npm ci`.
 
 Smoke serve:
 

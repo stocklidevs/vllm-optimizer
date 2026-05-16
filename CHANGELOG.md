@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.41.0 - 2026-05-16
+
+- Added the `run-browser` command to index local optimizer artifact directories
+  and generate JSON/HTML run browser outputs.
+- Added optional `--run-index` support to `web-cockpit` with a Runs tab for
+  summaries, rankings, canonical reports, execution status, and result files.
+
 ## 0.40.0 - 2026-05-16
 
 - Added richer `web-cockpit` report visuals for recommendation detail,

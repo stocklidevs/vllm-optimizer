@@ -38,6 +38,7 @@ from .promotion import (
 from .ranking import rank_results
 from .release_check import write_release_check
 from .report import ReportError, ReportInputs, build_comparison_report
+from .run_browser import RunBrowserError, write_run_index
 from .safety import build_dry_run_preview
 from .serve_profiles import ServeProfileError, build_serve_plan, load_serve_profile
 from .session_tuning import (
@@ -116,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         KnobCatalogError,
         PipelineControlError,
         SystemTuningError,
+        RunBrowserError,
         AbConfirmationError,
         ValueError,
     ) as exc:
@@ -305,6 +307,7 @@ def build_parser() -> argparse.ArgumentParser:
     web_cockpit_parser.add_argument("--manifest", type=Path)
     web_cockpit_parser.add_argument("--status", type=Path)
     web_cockpit_parser.add_argument("--report", type=Path)
+    web_cockpit_parser.add_argument("--run-index", type=Path)
     web_cockpit_parser.add_argument("--out", required=True, type=Path)
     web_cockpit_parser.set_defaults(func=cmd_web_cockpit)
 
@@ -347,6 +350,14 @@ def build_parser() -> argparse.ArgumentParser:
     release_check_parser.add_argument("--out", required=True, type=Path)
     release_check_parser.add_argument("--markdown-out", type=Path)
     release_check_parser.set_defaults(func=cmd_release_check)
+
+    run_browser_parser = subparsers.add_parser(
+        "run-browser", help="Generate a local index of optimizer run and report artifacts"
+    )
+    run_browser_parser.add_argument("--artifacts-root", required=True, type=Path)
+    run_browser_parser.add_argument("--out", required=True, type=Path)
+    run_browser_parser.add_argument("--html-out", type=Path)
+    run_browser_parser.set_defaults(func=cmd_run_browser)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -734,6 +745,7 @@ def cmd_web_cockpit(args: argparse.Namespace) -> int:
         manifest_path=args.manifest,
         status_path=args.status,
         report_path=args.report,
+        run_index_path=args.run_index,
     )
     print(result["html_path"])
     return 0
@@ -766,6 +778,12 @@ def cmd_artifact_contracts(args: argparse.Namespace) -> int:
 def cmd_release_check(args: argparse.Namespace) -> int:
     result = write_release_check(args.root, args.out, args.markdown_out)
     print(result["report_path"])
+    return 0
+
+
+def cmd_run_browser(args: argparse.Namespace) -> int:
+    result = write_run_index(args.artifacts_root, args.out, args.html_out)
+    print(result["index_path"])
     return 0
 
 

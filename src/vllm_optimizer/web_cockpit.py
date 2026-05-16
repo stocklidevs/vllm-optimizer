@@ -18,6 +18,7 @@ def write_web_cockpit(
     manifest_path: Path | None = None,
     status_path: Path | None = None,
     report_path: Path | None = None,
+    run_index_path: Path | None = None,
 ) -> dict[str, str]:
     if not catalog_path.exists():
         raise WebCockpitError(f"catalog path does not exist: {catalog_path}")
@@ -25,16 +26,19 @@ def write_web_cockpit(
     manifest = _read_optional(manifest_path, "manifest")
     status = _read_optional(status_path, "status")
     report = _read_optional(report_path, "report")
+    run_index = _read_optional(run_index_path, "run index")
     html = render_web_cockpit(
         catalog,
         manifest=manifest,
         status=status,
         report=report,
+        run_index=run_index,
         sources={
             "catalog": catalog_path.as_posix(),
             "manifest": manifest_path.as_posix() if manifest_path else None,
             "status": status_path.as_posix() if status_path else None,
             "report": report_path.as_posix() if report_path else None,
+            "run_index": run_index_path.as_posix() if run_index_path else None,
         },
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -48,6 +52,7 @@ def render_web_cockpit(
     manifest: dict[str, Any] | None = None,
     status: dict[str, Any] | None = None,
     report: dict[str, Any] | None = None,
+    run_index: dict[str, Any] | None = None,
     sources: dict[str, str | None] | None = None,
 ) -> str:
     groups = _list_of_dicts(catalog.get("groups"))
@@ -70,6 +75,7 @@ def render_web_cockpit(
             render_tabs(),
             render_overview(groups, manifest, status, report),
             render_pipeline(manifest),
+            render_runs(run_index),
             render_reporting(report),
             render_sources(sources or {}),
             "</section>",
@@ -137,6 +143,7 @@ def render_tabs() -> str:
       <button type="button" class="active" data-tab-target="overview">Overview</button>
       <button type="button" data-tab-target="knobs">Knobs</button>
       <button type="button" data-tab-target="pipeline">Pipeline</button>
+      <button type="button" data-tab-target="runs">Runs</button>
       <button type="button" data-tab-target="reports">Reports</button>
       <button type="button" data-tab-target="sources">Sources</button>
     </div>"""
@@ -244,6 +251,47 @@ def render_reporting(report: dict[str, Any] | None) -> str:
       </div>
       {content}
     </section>"""
+
+
+def render_runs(run_index: dict[str, Any] | None) -> str:
+    if run_index is None:
+        content = '<p class="empty">No run index loaded.</p>'
+    else:
+        runs = _list_of_dicts(run_index.get("runs"))
+        cards = []
+        for run in runs:
+            cards.append(
+                f"""
+                <article class="run-card">
+                  <div class="metric-row-head">
+                    <strong>{escape(str(run.get('run_id') or 'run'))}</strong>
+                    <span>{escape(str(run.get('modified_at') or 'n/a'))}</span>
+                  </div>
+                  <p><code>{escape(str(run.get('relative_dir') or 'n/a'))}</code></p>
+                  <p>{escape(', '.join(str(item) for item in run.get('artifact_types', [])) or 'no artifacts')}</p>
+                  <div class="run-paths">{render_run_paths(run.get('artifact_paths'))}</div>
+                </article>"""
+            )
+        content = f"""
+        <p><strong>{escape(str(run_index.get('run_count', len(runs))))}</strong> local run directories indexed.</p>
+        <div class="run-grid">{''.join(cards) or '<p class="empty">No runs found.</p>'}</div>"""
+    return f"""
+    <section class="panel tab-panel" id="runs" data-tab-panel="runs">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Runs</p>
+          <h2>Run browser</h2>
+        </div>
+        <p>Local artifact directories indexed for quick cockpit navigation.</p>
+      </div>
+      {content}
+    </section>"""
+
+
+def render_run_paths(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    return "".join(f"<div><code>{escape(str(key))}</code>: <code>{escape(str(path))}</code></div>" for key, path in sorted(value.items()))
 
 
 def render_recommendation_detail(report: dict[str, Any]) -> str:
@@ -627,6 +675,9 @@ button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px soli
 .failure-item.excluded { border-color: rgba(255,107,107,.28); background: rgba(255,107,107,.06); }
 .failure-item span { color: var(--amber); font-weight: 780; }
 .failure-item small { color: var(--muted); }
+.run-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.run-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 14px; }
+.run-paths { display: grid; gap: 5px; margin-top: 10px; overflow-wrap: anywhere; }
 @media (max-width: 1180px) {
   .cockpit { grid-template-columns: 220px minmax(0, 1fr); }
   .right-rail { grid-column: 1 / -1; position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); }

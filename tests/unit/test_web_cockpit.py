@@ -154,3 +154,29 @@ def test_web_cockpit_renders_report_visuals() -> None:
     assert "25.000%" in html
     assert "candidate has failed trials" in html
     assert "Run repeated A/B confirmation before promotion." in html
+
+
+def test_web_cockpit_renders_run_browser_tab() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        run_index={
+            "runs": [
+                {
+                    "run_id": "demo-live",
+                    "relative_dir": "sweeps/demo/live",
+                    "artifact_types": ["summary", "ranking"],
+                    "artifact_paths": {
+                        "summary": "artifacts/sweeps/demo/live/summary.json",
+                        "ranking": "artifacts/sweeps/demo/live/ranking.json",
+                    },
+                    "modified_at": "2026-05-16T00:00:00Z",
+                }
+            ],
+            "run_count": 1,
+        },
+    )
+
+    assert 'data-tab-target="runs"' in html
+    assert "Run browser" in html
+    assert "demo-live" in html
+    assert "artifacts/sweeps/demo/live/ranking.json" in html
