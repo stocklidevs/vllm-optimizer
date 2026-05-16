@@ -1,3 +1,5 @@
+import re
+
 from vllm_optimizer.web_cockpit import render_web_cockpit
 
 
@@ -106,7 +108,35 @@ def test_web_cockpit_includes_local_interaction_hooks() -> None:
     assert 'id="visible-group-count"' in html
     assert 'id="group-empty-state"' in html
     assert "function applyGroupFilters()" in html
-    assert "button disabled" in html
+    assert "data-controller-command" in html
+
+
+def test_web_cockpit_controller_buttons_copy_commands() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "stages": [
+                {
+                    "name": "preview",
+                    "command_hint": "uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-small-sweep.json",
+                },
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer cockpit-run --confirm-live-run",
+                    "remote": True,
+                    "required_gates": ["--confirm-live-run"],
+                },
+            ],
+            "promotion": {"automatic": False, "required_gate": "--allow-promotion"},
+        },
+    )
+
+    assert 'data-controller-action="preview"' in html
+    assert 'data-controller-action="run"' in html
+    assert 'data-controller-command="uv run vllm-optimizer cockpit-run --confirm-live-run"' in html
+    assert 'id="controller-feedback"' in html
+    assert "function copyControllerCommand" in html
+    assert not re.search(r'<button[^>]+data-controller-action="run"[^>]+disabled', html)
 
 
 def test_web_cockpit_renders_report_visuals() -> None:

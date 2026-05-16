@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.44.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.44.1-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -273,7 +273,9 @@ loaded from existing artifacts, while future controller actions are visible but
 disabled. It includes local-only tab switching, knob family filters, and search
 without a server. Report views include recommendation detail, throughput and
 latency bars, candidate failure summaries, rationale, and next actions. The
-Runs tab can browse a `run-browser` index. The Promotion tab displays candidate,
+Runs tab can browse a `run-browser` index. Controller buttons copy deterministic
+CLI commands or show them inline when clipboard access is unavailable, while
+browser-side execution remains gated. The Promotion tab displays candidate,
 objective, gate, and promotion command hints while keeping browser promotion
 disabled. This implementation intentionally uses no npm packages. If a future
 spec adds npm, dependency versions must be pinned, vulnerability-reviewed, and

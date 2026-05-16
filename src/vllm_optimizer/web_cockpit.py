@@ -167,9 +167,9 @@ def render_overview(
       <div class="section-heading">
         <div>
           <p class="eyebrow">Overview</p>
-          <h2>Read-only controller shell</h2>
+          <h2>Controller command shell</h2>
         </div>
-        <p>The cockpit is ready for controller mode, but this spec keeps all operations disabled and artifact-driven.</p>
+        <p>Controller buttons copy deterministic CLI commands; live execution still requires explicit terminal gates.</p>
       </div>
       <div class="status-grid">
         <div>{metric_tile("Safety tiers", len(risk_counts), "families")}{'<div class="chips">' + chips + '</div>' if chips else ''}</div>
@@ -476,12 +476,8 @@ def render_right_rail(manifest: dict[str, Any] | None, status: dict[str, Any] | 
       </section>
       <section class="rail-panel actions">
         <h2>Controller</h2>
-        <button disabled>Plan</button>
-        <button disabled>Preview</button>
-        <button disabled>Run</button>
-        <button disabled>Confirm</button>
-        <button disabled>Promote</button>
-        <p>Actions are disabled in this read-only cockpit spec.</p>
+        {render_controller_buttons(manifest, compact=True)}
+        <p id="controller-feedback" class="controller-feedback" aria-live="polite">Choose an action to copy its CLI command.</p>
       </section>
     </aside>"""
 
@@ -543,14 +539,38 @@ def render_report_summary(report: dict[str, Any] | None) -> str:
 
 
 def render_disabled_actions(manifest: dict[str, Any] | None) -> str:
-    stage_names = [str(stage.get("name") or "stage") for stage in _list_of_dicts((manifest or {}).get("stages"))]
-    labels = stage_names or ["plan", "preview", "run", "report", "confirm", "promote"]
-    buttons = "".join(f"<button disabled>{escape(label)}</button>" for label in labels)
     return f"""
     <div class="disabled-actions">
-      <div><strong>Future controller actions</strong><p>Visible for layout alignment; disabled until a controller spec enables execution.</p></div>
-      <div>{buttons}</div>
+      <div><strong>Controller commands</strong><p>Buttons copy the exact CLI command to run in a terminal. Browser-side execution stays gated.</p></div>
+      <div>{render_controller_buttons(manifest)}</div>
     </div>"""
+
+
+def render_controller_buttons(manifest: dict[str, Any] | None, *, compact: bool = False) -> str:
+    stages = _list_of_dicts((manifest or {}).get("stages"))
+    commands = {
+        str(stage.get("name") or "stage"): str(stage.get("command_hint") or "")
+        for stage in stages
+        if stage.get("command_hint")
+    }
+    if not commands:
+        commands = {
+            "plan": "uv run vllm-optimizer optimize-workload --mode plan --sweep SWEEP_JSON --out ARTIFACT_DIR",
+            "preview": "uv run vllm-optimizer cockpit-preview --sweep SWEEP_JSON --out-dir ARTIFACT_DIR",
+            "run": "uv run vllm-optimizer cockpit-run --sweep SWEEP_JSON --config config/local.gx10.json --out-dir ARTIFACT_DIR --confirm-live-run",
+            "report": "uv run vllm-optimizer optimize-workload --mode report --sweep SWEEP_JSON --out ARTIFACT_DIR",
+            "confirm": "uv run vllm-optimizer optimize-workload --mode confirm --sweep SWEEP_JSON --out ARTIFACT_DIR",
+            "promote": "uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT --force",
+        }
+    preferred = ["plan", "preview", "run", "report", "confirm", "promote"]
+    ordered = [(name, commands[name]) for name in preferred if name in commands]
+    ordered.extend((name, command) for name, command in sorted(commands.items()) if name not in preferred)
+    if compact:
+        ordered = ordered[:6]
+    return "".join(
+        f'<button type="button" data-controller-action="{escape(name)}" data-controller-command="{escape(command)}">{escape(name.title())}</button>'
+        for name, command in ordered
+    )
 
 
 def render_gate_list(value: Any) -> str:
@@ -709,9 +729,11 @@ table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th, td { padding: 11px 9px; border-bottom: 1px solid rgba(55,216,255,.13); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 .disabled-actions { display: flex; justify-content: space-between; gap: 14px; align-items: center; margin-top: 18px; padding: 14px; border: 1px dashed rgba(240,198,91,.45); border-radius: 8px; background: rgba(240,198,91,.06); }
-button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px solid rgba(141,164,187,.3); background: rgba(141,164,187,.12); color: var(--muted); margin: 3px; }
+button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px solid rgba(55,216,255,.22); background: rgba(55,216,255,.09); color: var(--ink); margin: 3px; cursor: pointer; }
+button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,187,.12); color: var(--muted); cursor: not-allowed; }
 .safety-note { margin-top: 12px; }
 .actions button { width: 100%; margin: 4px 0; }
+.controller-feedback { min-height: 42px; margin: 10px 0 0; font-size: 13px; }
 .report-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 16px; margin-bottom: 14px; }
 .recommendation-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 16px; }
 .report-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -811,6 +833,30 @@ if (search) {
     applyGroupFilters();
   });
 }
+
+async function copyControllerCommand(button) {
+  const command = button.dataset.controllerCommand || '';
+  const action = button.dataset.controllerAction || 'action';
+  const feedback = document.getElementById('controller-feedback');
+  if (!command) {
+    if (feedback) feedback.textContent = 'No command is available for ' + action + '.';
+    return;
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(command);
+      if (feedback) feedback.textContent = 'Copied ' + action + ' command to clipboard.';
+    } else {
+      throw new Error('Clipboard API unavailable');
+    }
+  } catch (_error) {
+    if (feedback) feedback.textContent = action + ' command: ' + command;
+  }
+}
+
+document.querySelectorAll('[data-controller-command]').forEach((button) => {
+  button.addEventListener('click', () => copyControllerCommand(button));
+});
 
 applyGroupFilters();
 """

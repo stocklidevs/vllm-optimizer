@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.44.1 - 2026-05-16
+
+- Fixed `web-cockpit` controller buttons so they copy deterministic CLI
+  commands or show the command inline when clipboard access is unavailable.
+- Kept browser-side execution and promotion gated while removing dead disabled
+  controller placeholders.
+
 ## 0.44.0 - 2026-05-16
 
 - Added a gated Promotion tab to `web-cockpit` with recommendation state,
