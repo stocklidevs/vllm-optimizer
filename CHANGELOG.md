@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.40.0 - 2026-05-16
+
+- Added richer `web-cockpit` report visuals for recommendation detail,
+  candidate throughput and latency bars, failure summaries, rationale, and next
+  actions.
+- Kept report rendering canonical-artifact driven and read-only.
+
 ## 0.39.0 - 2026-05-16
 
 - Added local-only `web-cockpit` interactions for tab switching, knob family

@@ -107,3 +107,50 @@ def test_web_cockpit_includes_local_interaction_hooks() -> None:
     assert 'id="group-empty-state"' in html
     assert "function applyGroupFilters()" in html
     assert "button disabled" in html
+
+
+def test_web_cockpit_renders_report_visuals() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        report={
+            "source": {"label": "visual-report"},
+            "recommendation": {
+                "status": "requires-confirmation",
+                "objective": "balanced",
+                "candidate_id": "candidate-fast",
+                "rationale": ["Throughput: 100.000 tokens/sec.", "Failure rate: 0.000%."],
+                "next_actions": ["Run repeated A/B confirmation before promotion."],
+            },
+            "candidates": {
+                "candidate-fast": {
+                    "recommendable": True,
+                    "is_baseline": False,
+                    "metrics": {
+                        "aggregate_tokens_per_second": 100.0,
+                        "mean_latency_ms": 900.0,
+                        "failure_rate": 0.0,
+                    },
+                },
+                "candidate-risky": {
+                    "recommendable": False,
+                    "exclusion_reason": "candidate has failed trials",
+                    "metrics": {
+                        "aggregate_tokens_per_second": 80.0,
+                        "mean_latency_ms": 1200.0,
+                        "failure_rate": 0.25,
+                    },
+                },
+            },
+        },
+    )
+
+    assert "Recommendation detail" in html
+    assert "Metric visualizer" in html
+    assert "Failure summary" in html
+    assert "candidate-fast" in html
+    assert "candidate-risky" in html
+    assert "data-report-bar=\"throughput\"" in html
+    assert "data-report-bar=\"latency\"" in html
+    assert "25.000%" in html
+    assert "candidate has failed trials" in html
+    assert "Run repeated A/B confirmation before promotion." in html

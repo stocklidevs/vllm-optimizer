@@ -229,24 +229,10 @@ def render_reporting(report: dict[str, Any] | None) -> str:
         content = '<p class="empty">No canonical report loaded.</p>'
     else:
         candidates = report.get("candidates", {})
-        rows = []
-        if isinstance(candidates, dict):
-            for candidate_id, candidate in candidates.items():
-                metrics = candidate.get("metrics", {}) if isinstance(candidate, dict) else {}
-                rows.append(
-                    f"""
-                    <tr>
-                      <td><code>{escape(str(candidate_id))}</code></td>
-                      <td>{escape(_fmt(metrics.get('aggregate_tokens_per_second')))}</td>
-                      <td>{escape(_fmt(metrics.get('mean_latency_ms')))}</td>
-                    </tr>"""
-                )
         content = f"""
-        {render_report_summary(report)}
-        <table>
-          <thead><tr><th>Candidate</th><th>Tok/s</th><th>Latency</th></tr></thead>
-          <tbody>{''.join(rows) or '<tr><td colspan="3">No candidates available.</td></tr>'}</tbody>
-        </table>"""
+        {render_recommendation_detail(report)}
+        {render_metric_visualizer(candidates if isinstance(candidates, dict) else {})}
+        {render_failure_summary(candidates if isinstance(candidates, dict) else {})}"""
     return f"""
     <section class="panel tab-panel" id="reports" data-tab-panel="reports">
       <div class="section-heading">
@@ -258,6 +244,109 @@ def render_reporting(report: dict[str, Any] | None) -> str:
       </div>
       {content}
     </section>"""
+
+
+def render_recommendation_detail(report: dict[str, Any]) -> str:
+    recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
+    rationale = _list_of_strings(recommendation.get("rationale"))
+    next_actions = _list_of_strings(recommendation.get("next_actions"))
+    rationale_items = "".join(f"<li>{escape(item)}</li>" for item in rationale) or "<li>No rationale recorded.</li>"
+    action_items = "".join(f"<li>{escape(item)}</li>" for item in next_actions) or "<li>No next actions recorded.</li>"
+    return f"""
+    <div class="report-card recommendation-card">
+      <div>
+        <p class="eyebrow">Recommendation detail</p>
+        <h3>{escape(str(recommendation.get('status') or 'unknown'))}</h3>
+        <p>Objective <code>{escape(str(recommendation.get('objective') or 'n/a'))}</code>, candidate <code>{escape(str(recommendation.get('candidate_id') or 'n/a'))}</code>.</p>
+      </div>
+      <div class="report-lists">
+        <div><h4>Rationale</h4><ul>{rationale_items}</ul></div>
+        <div><h4>Next actions</h4><ul>{action_items}</ul></div>
+      </div>
+    </div>"""
+
+
+def render_metric_visualizer(candidates: dict[str, Any]) -> str:
+    rows = _candidate_metric_rows(candidates)
+    if not rows:
+        return '<div class="report-card"><p class="empty">No candidate metrics available.</p></div>'
+    max_tps = max((row["throughput"] or 0 for row in rows), default=0) or 1
+    max_latency = max((row["latency"] or 0 for row in rows), default=0) or 1
+    visual_rows = []
+    table_rows = []
+    for row in rows:
+        throughput_width = _bar_width(row["throughput"], max_tps)
+        latency_width = _bar_width(row["latency"], max_latency)
+        role = "baseline" if row["baseline"] else "candidate"
+        if not row["recommendable"]:
+            role = "excluded"
+        visual_rows.append(
+            f"""
+            <article class="metric-row">
+              <div class="metric-row-head">
+                <strong><code>{escape(row['candidate_id'])}</code></strong>
+                <span>{escape(role)}</span>
+              </div>
+              <div class="report-bar-line">
+                <span>Throughput</span>
+                <div class="report-bar-track"><div class="report-bar throughput" data-report-bar="throughput" style="width:{throughput_width:.3f}%"></div></div>
+                <strong>{escape(_fmt(row['throughput']))}</strong>
+              </div>
+              <div class="report-bar-line">
+                <span>Latency</span>
+                <div class="report-bar-track"><div class="report-bar latency" data-report-bar="latency" style="width:{latency_width:.3f}%"></div></div>
+                <strong>{escape(_fmt(row['latency']))}</strong>
+              </div>
+            </article>"""
+        )
+        table_rows.append(
+            f"""
+            <tr>
+              <td><code>{escape(row['candidate_id'])}</code></td>
+              <td>{escape(role)}</td>
+              <td>{escape(_fmt(row['throughput']))}</td>
+              <td>{escape(_fmt(row['latency']))}</td>
+              <td>{escape(_fmt_pct(row['failure_rate']))}</td>
+            </tr>"""
+        )
+    return f"""
+    <div class="report-card">
+      <div class="section-heading">
+        <div><p class="eyebrow">Metric visualizer</p><h3>Candidate performance</h3></div>
+        <p>Bars preserve the canonical report's metrics without recomputing winners.</p>
+      </div>
+      <div class="metric-visuals">{''.join(visual_rows)}</div>
+      <table>
+        <thead><tr><th>Candidate</th><th>Role</th><th>Tok/s</th><th>Latency</th><th>Failure</th></tr></thead>
+        <tbody>{''.join(table_rows)}</tbody>
+      </table>
+    </div>"""
+
+
+def render_failure_summary(candidates: dict[str, Any]) -> str:
+    rows = _candidate_metric_rows(candidates)
+    if not rows:
+        return ""
+    items = []
+    for row in rows:
+        status = "recommendable" if row["recommendable"] else "excluded"
+        reason = row["exclusion_reason"] or "No exclusion reason recorded."
+        items.append(
+            f"""
+            <article class="failure-item {'excluded' if not row['recommendable'] else ''}">
+              <strong><code>{escape(row['candidate_id'])}</code></strong>
+              <span>{escape(_fmt_pct(row['failure_rate']))}</span>
+              <small>{escape(status)} - {escape(reason)}</small>
+            </article>"""
+        )
+    return f"""
+    <div class="report-card">
+      <div class="section-heading">
+        <div><p class="eyebrow">Failure summary</p><h3>Reliability and exclusions</h3></div>
+        <p>Failed or excluded candidates stay visible instead of disappearing from the report.</p>
+      </div>
+      <div class="failure-grid">{''.join(items)}</div>
+    </div>"""
 
 
 def render_right_rail(manifest: dict[str, Any] | None, status: dict[str, Any] | None) -> str:
@@ -388,8 +477,48 @@ def _list_of_dicts(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)]
 
 
+def _list_of_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def _candidate_metric_rows(candidates: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    for candidate_id, candidate in candidates.items():
+        if not isinstance(candidate, dict):
+            continue
+        metrics = candidate.get("metrics", {}) if isinstance(candidate.get("metrics"), dict) else {}
+        rows.append(
+            {
+                "candidate_id": str(candidate_id),
+                "throughput": _number(metrics.get("aggregate_tokens_per_second")),
+                "latency": _number(metrics.get("mean_latency_ms")),
+                "failure_rate": _number(metrics.get("failure_rate")),
+                "recommendable": bool(candidate.get("recommendable", True)),
+                "baseline": bool(candidate.get("is_baseline", False)),
+                "exclusion_reason": str(candidate.get("exclusion_reason") or ""),
+            }
+        )
+    return sorted(rows, key=lambda row: (not row["recommendable"], row["candidate_id"]))
+
+
+def _number(value: Any) -> float | None:
+    return float(value) if isinstance(value, int | float) else None
+
+
+def _bar_width(value: float | None, maximum: float) -> float:
+    if value is None or maximum <= 0:
+        return 0.0
+    return max(4.0, min(100.0, (value / maximum) * 100.0))
+
+
 def _fmt(value: Any) -> str:
     return f"{value:.3f}" if isinstance(value, int | float) else "n/a" if value is None else str(value)
+
+
+def _fmt_pct(value: Any) -> str:
+    return f"{value:.3%}" if isinstance(value, int | float) else "n/a" if value is None else str(value)
 
 
 CSS = """
@@ -479,6 +608,25 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px solid rgba(141,164,187,.3); background: rgba(141,164,187,.12); color: var(--muted); margin: 3px; }
 .safety-note { margin-top: 12px; }
 .actions button { width: 100%; margin: 4px 0; }
+.report-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 16px; margin-bottom: 14px; }
+.recommendation-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 16px; }
+.report-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.report-lists h4 { margin: 0 0 8px; }
+.metric-visuals { display: grid; gap: 12px; margin-bottom: 16px; }
+.metric-row { border: 1px solid rgba(55,216,255,.12); border-radius: 8px; padding: 12px; background: rgba(15,29,47,.58); }
+.metric-row-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.metric-row-head span { color: var(--muted); }
+.report-bar-line { display: grid; grid-template-columns: 92px minmax(0, 1fr) 78px; gap: 10px; align-items: center; margin-top: 8px; }
+.report-bar-line span { color: var(--muted); }
+.report-bar-track { height: 12px; border-radius: 999px; background: rgba(141,164,187,.16); overflow: hidden; }
+.report-bar { height: 100%; border-radius: 999px; }
+.report-bar.throughput { background: var(--green); }
+.report-bar.latency { background: var(--cyan); }
+.failure-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.failure-item { border: 1px solid rgba(73,242,161,.18); border-radius: 8px; padding: 12px; background: rgba(73,242,161,.05); display: grid; gap: 6px; }
+.failure-item.excluded { border-color: rgba(255,107,107,.28); background: rgba(255,107,107,.06); }
+.failure-item span { color: var(--amber); font-weight: 780; }
+.failure-item small { color: var(--muted); }
 @media (max-width: 1180px) {
   .cockpit { grid-template-columns: 220px minmax(0, 1fr); }
   .right-rail { grid-column: 1 / -1; position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -491,6 +639,7 @@ button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px soli
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
+  .recommendation-card, .report-lists, .report-bar-line { grid-template-columns: 1fr; }
 }
 """
 
