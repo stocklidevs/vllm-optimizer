@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.39.0 - 2026-05-16
+
+- Added local-only `web-cockpit` interactions for tab switching, knob family
+  filters, search, visible counts, and no-match empty states.
+- Kept cockpit controller actions disabled and avoided npm dependencies.
+
 ## 0.38.0 - 2026-05-16
 
 - Improved the `web-cockpit` mobile layout so the main Mission Control

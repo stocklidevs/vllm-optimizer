@@ -74,6 +74,7 @@ def render_web_cockpit(
             render_sources(sources or {}),
             "</section>",
             render_right_rail(manifest, status),
+            f"<script>{JS}</script>",
             "</main>",
             "</body>",
             "</html>",
@@ -83,7 +84,9 @@ def render_web_cockpit(
 
 
 def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
-    family_items = "".join(f'<a href="#knobs">{escape(family)}</a>' for family in families) or '<span class="empty">No families</span>'
+    family_items = "".join(
+        f'<button type="button" data-family-filter="{escape(family)}">{escape(family)}</button>' for family in families
+    ) or '<span class="empty">No families</span>'
     group_items = []
     for group in groups[:10]:
         group_items.append(
@@ -99,7 +102,10 @@ def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
         <span class="pulse"></span>
         <div><strong>vLLM</strong><small>Optimizer</small></div>
       </div>
-      <nav class="family-nav">{family_items}</nav>
+      <nav class="family-nav" aria-label="Knob family filters">
+        <button type="button" class="active" data-family-filter="all">All families</button>
+        {family_items}
+      </nav>
       <div class="rail-section">
         <h2>Knob Groups</h2>
         {''.join(group_items) or '<p class="empty">No knob groups loaded.</p>'}
@@ -128,10 +134,11 @@ def render_hero(groups: list[dict[str, Any]], status: dict[str, Any] | None, rep
 def render_tabs() -> str:
     return """
     <div class="tabs" aria-label="Cockpit sections">
-      <a href="#overview">Overview</a>
-      <a href="#knobs">Knobs</a>
-      <a href="#pipeline">Pipeline</a>
-      <a href="#reports">Reports</a>
+      <button type="button" class="active" data-tab-target="overview">Overview</button>
+      <button type="button" data-tab-target="knobs">Knobs</button>
+      <button type="button" data-tab-target="pipeline">Pipeline</button>
+      <button type="button" data-tab-target="reports">Reports</button>
+      <button type="button" data-tab-target="sources">Sources</button>
     </div>"""
 
 
@@ -147,7 +154,7 @@ def render_overview(
         risk_counts[tier] = risk_counts.get(tier, 0) + 1
     chips = "".join(f"<span>{escape(tier)}: {count}</span>" for tier, count in sorted(risk_counts.items()))
     return f"""
-    <section class="panel" id="overview">
+    <section class="panel tab-panel active" id="overview" data-tab-panel="overview">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Overview</p>
@@ -162,15 +169,20 @@ def render_overview(
       </div>
       {render_disabled_actions(manifest)}
     </section>
-    <section class="panel" id="knobs">
+    <section class="panel tab-panel" id="knobs" data-tab-panel="knobs">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Knobs</p>
           <h2>Optimization families</h2>
         </div>
-        <p>Groups are loaded from the deterministic knob catalog.</p>
+        <p><span id="visible-group-count">{len(groups)}</span> of {len(groups)} groups visible from the deterministic knob catalog.</p>
+      </div>
+      <div class="filter-bar">
+        <label for="knob-search">Search knob groups</label>
+        <input id="knob-search" type="search" placeholder="Search by name, family, safety, or config">
       </div>
       <div class="group-grid">{''.join(render_group_card(group) for group in groups) or '<p class="empty">No knob groups loaded.</p>'}</div>
+      <p class="empty hidden" id="group-empty-state">No knob groups match the current filter.</p>
     </section>"""
 
 
@@ -199,7 +211,7 @@ def render_pipeline(manifest: dict[str, Any] | None) -> str:
         promotion = manifest.get("promotion", {}) if isinstance(manifest.get("promotion"), dict) else {}
         safety = f"<p class=\"safety-note\">Promotion automatic: <strong>{escape(str(promotion.get('automatic', False)))}</strong>. Gate: <code>{escape(str(promotion.get('required_gate') or '--allow-promotion'))}</code>.</p>"
     return f"""
-    <section class="panel" id="pipeline">
+    <section class="panel tab-panel" id="pipeline" data-tab-panel="pipeline">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Pipeline</p>
@@ -236,7 +248,7 @@ def render_reporting(report: dict[str, Any] | None) -> str:
           <tbody>{''.join(rows) or '<tr><td colspan="3">No candidates available.</td></tr>'}</tbody>
         </table>"""
     return f"""
-    <section class="panel" id="reports">
+    <section class="panel tab-panel" id="reports" data-tab-panel="reports">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Reports</p>
@@ -288,7 +300,7 @@ def render_sources(sources: dict[str, str | None]) -> str:
     for key, value in sorted(sources.items()):
         rows.append(f"<tr><td>{escape(key)}</td><td><code>{escape(str(value or 'not loaded'))}</code></td></tr>")
     return f"""
-    <section class="panel">
+    <section class="panel tab-panel" id="sources" data-tab-panel="sources">
       <div class="section-heading"><div><p class="eyebrow">Traceability</p><h2>Source artifacts</h2></div></div>
       <table><tbody>{''.join(rows)}</tbody></table>
     </section>"""
@@ -296,8 +308,12 @@ def render_sources(sources: dict[str, str | None]) -> str:
 
 def render_group_card(group: dict[str, Any]) -> str:
     gate = "requires opt-in" if group.get("requires_opt_in") else "no extra opt-in"
+    search_text = " ".join(
+        str(group.get(key) or "")
+        for key in ("label", "id", "family", "safety_tier", "description", "command_kind", "config_path")
+    ).lower()
     return f"""
-    <article class="group-card {escape(str(group.get('safety_tier') or 'unknown'))}">
+    <article class="group-card {escape(str(group.get('safety_tier') or 'unknown'))}" data-family="{escape(str(group.get('family') or 'unknown'))}" data-search="{escape(search_text)}">
       <div class="card-topline"><span>{escape(str(group.get('family') or 'unknown'))}</span><strong>{escape(str(group.get('safety_tier') or 'unknown'))}</strong></div>
       <h3>{escape(str(group.get('label') or group.get('id') or 'Unnamed group'))}</h3>
       <p>{escape(str(group.get('description') or 'No description.'))}</p>
@@ -416,7 +432,8 @@ body {
 .pulse { width: 12px; height: 12px; border-radius: 50%; background: var(--green); box-shadow: 0 0 18px var(--green); }
 .family-nav, .rail-section, .rail-panel { padding: 14px; }
 .family-nav { display: grid; gap: 8px; }
-.family-nav a { color: var(--ink); text-decoration: none; border: 1px solid rgba(55, 216, 255, .12); padding: 9px 10px; border-radius: 6px; background: rgba(55, 216, 255, .06); }
+.family-nav button { color: var(--ink); text-align: left; border: 1px solid rgba(55, 216, 255, .12); padding: 9px 10px; border-radius: 6px; background: rgba(55, 216, 255, .06); cursor: pointer; }
+.family-nav button.active { border-color: rgba(73, 242, 161, .55); background: rgba(73, 242, 161, .12); }
 h1, h2, h3, p { margin-top: 0; letter-spacing: 0; }
 h1 { font-size: 44px; line-height: 1.02; margin-bottom: 14px; }
 h2 { font-size: 20px; margin-bottom: 8px; }
@@ -432,13 +449,20 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .metric-tile span, .summary-block span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 760; }
 .metric-tile strong, .summary-block strong { display: block; font-size: 24px; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid rgba(55,216,255,.16); background: rgba(3, 8, 16, .5); border-radius: 8px; }
-.tabs a { color: var(--ink); text-decoration: none; padding: 9px 13px; border-radius: 6px; background: rgba(55, 216, 255, .08); border: 1px solid rgba(55, 216, 255, .12); }
+.tabs button { color: var(--ink); padding: 9px 13px; border-radius: 6px; background: rgba(55, 216, 255, .08); border: 1px solid rgba(55, 216, 255, .12); cursor: pointer; }
+.tabs button.active { border-color: rgba(73, 242, 161, .55); background: rgba(73, 242, 161, .12); }
 .panel { padding: 20px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 .section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
 .section-heading p { max-width: 480px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .chips span, code { color: #dff9ff; border: 1px solid rgba(55,216,255,.18); background: rgba(55,216,255,.08); border-radius: 5px; padding: 3px 6px; font-family: "Cascadia Mono", Consolas, monospace; font-size: .88em; }
 .group-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.filter-bar { display: grid; gap: 8px; margin-bottom: 14px; }
+.filter-bar label { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 760; }
+.filter-bar input { width: 100%; min-height: 40px; color: var(--ink); background: rgba(3,8,16,.62); border: 1px solid rgba(55,216,255,.18); border-radius: 6px; padding: 9px 11px; }
+.hidden { display: none; }
 .group-card, .mini-card { padding: 14px; }
 .mini-card { display: grid; gap: 5px; }
 .mini-card span { color: var(--muted); }
@@ -468,4 +492,63 @@ button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px soli
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
 }
+"""
+
+JS = """
+const state = {
+  tab: 'overview',
+  family: 'all',
+  query: ''
+};
+
+function setActiveTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('[data-tab-target]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.tabTarget === tab);
+  });
+  document.querySelectorAll('[data-tab-panel]').forEach((panel) => {
+    panel.classList.toggle('active', panel.dataset.tabPanel === tab);
+  });
+}
+
+function applyGroupFilters() {
+  const query = state.query.trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('.group-card').forEach((card) => {
+    const familyMatch = state.family === 'all' || card.dataset.family === state.family;
+    const queryMatch = !query || (card.dataset.search || '').includes(query);
+    const show = familyMatch && queryMatch;
+    card.classList.toggle('hidden', !show);
+    if (show) visible += 1;
+  });
+  const count = document.getElementById('visible-group-count');
+  if (count) count.textContent = String(visible);
+  const empty = document.getElementById('group-empty-state');
+  if (empty) empty.classList.toggle('hidden', visible !== 0);
+}
+
+document.querySelectorAll('[data-tab-target]').forEach((button) => {
+  button.addEventListener('click', () => setActiveTab(button.dataset.tabTarget));
+});
+
+document.querySelectorAll('[data-family-filter]').forEach((button) => {
+  button.addEventListener('click', () => {
+    state.family = button.dataset.familyFilter || 'all';
+    document.querySelectorAll('[data-family-filter]').forEach((item) => {
+      item.classList.toggle('active', item === button);
+    });
+    setActiveTab('knobs');
+    applyGroupFilters();
+  });
+});
+
+const search = document.getElementById('knob-search');
+if (search) {
+  search.addEventListener('input', () => {
+    state.query = search.value;
+    applyGroupFilters();
+  });
+}
+
+applyGroupFilters();
 """

@@ -68,3 +68,42 @@ def test_web_cockpit_renders_empty_states_for_optional_artifacts() -> None:
     assert "No execution status loaded" in html
     assert "No canonical report loaded" in html
 
+
+def test_web_cockpit_includes_local_interaction_hooks() -> None:
+    html = render_web_cockpit(
+        catalog={
+            "groups": [
+                {
+                    "id": "safe-a",
+                    "label": "Safe A",
+                    "family": "safe-vllm",
+                    "safety_tier": "safe-session",
+                    "requires_opt_in": False,
+                    "description": "Safe sweep.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/safe-a.json",
+                },
+                {
+                    "id": "risky-b",
+                    "label": "Risky B",
+                    "family": "risky-session",
+                    "safety_tier": "risky-session",
+                    "requires_opt_in": True,
+                    "description": "Risky sweep.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/risky-b.json",
+                },
+            ]
+        }
+    )
+
+    assert 'data-tab-target="knobs"' in html
+    assert 'id="knob-search"' in html
+    assert 'data-family-filter="safe-vllm"' in html
+    assert 'data-family-filter="risky-session"' in html
+    assert 'data-family="safe-vllm"' in html
+    assert 'data-search="safe a safe-a safe-vllm safe-session safe sweep. sweep config/sweeps/safe-a.json"' in html
+    assert 'id="visible-group-count"' in html
+    assert 'id="group-empty-state"' in html
+    assert "function applyGroupFilters()" in html
+    assert "button disabled" in html

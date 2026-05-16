@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.38.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.39.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -87,6 +87,8 @@ The project is spec-driven with SpecKit and currently supports:
 - A standalone high-tech `web-cockpit` interface that combines knob groups,
   pipeline stages, execution status, report summaries, safety gates, and
   disabled future controller controls from deterministic artifacts.
+- Local-only `web-cockpit` interactions for tab switching, knob family filters,
+  search, visible group counts, and no-match empty states.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -239,9 +241,10 @@ files before packaging or handoff.
 `web-cockpit` is the first combined web interface. It is static and read-only:
 knob groups, pipeline stages, safety gates, status, and report summaries are
 loaded from existing artifacts, while future controller actions are visible but
-disabled. This implementation intentionally uses no npm packages. If a future
-spec adds npm, dependency versions must be pinned, vulnerability-reviewed, and
-installed with `npm ci`.
+disabled. It includes local-only tab switching, knob family filters, and search
+without a server. This implementation intentionally uses no npm packages. If a
+future spec adds npm, dependency versions must be pinned, vulnerability-reviewed,
+and installed with `npm ci`.
 
 Smoke serve:
 
