@@ -17,6 +17,8 @@ from .canonical_report import (
 from .cockpit_controller import (
     CockpitControllerError,
     CockpitPreviewRequest,
+    CockpitRunRequest,
+    run_cockpit_live,
     run_cockpit_preview,
 )
 from .discovery import DiscoveryError, load_target, run_discovery
@@ -373,6 +375,19 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_preview_parser.add_argument("--result-out", type=Path)
     cockpit_preview_parser.add_argument("--allow-risky-session-flags", action="store_true")
     cockpit_preview_parser.set_defaults(func=cmd_cockpit_preview)
+
+    cockpit_run_parser = subparsers.add_parser(
+        "cockpit-run", help="Start a confirmed live cockpit optimization run"
+    )
+    cockpit_run_parser.add_argument("--sweep", required=True, type=Path)
+    cockpit_run_parser.add_argument("--config", required=True, type=Path)
+    cockpit_run_parser.add_argument("--out-dir", required=True, type=Path)
+    cockpit_run_parser.add_argument("--result-out", type=Path)
+    cockpit_run_parser.add_argument("--confirm-live-run", action="store_true")
+    cockpit_run_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    cockpit_run_parser.add_argument("--continue-on-failure", action="store_true")
+    cockpit_run_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    cockpit_run_parser.set_defaults(func=cmd_cockpit_run)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -813,6 +828,24 @@ def cmd_cockpit_preview(args: argparse.Namespace) -> int:
     if args.result_out is not None:
         write_json(args.result_out, result)
     print(result["preview_path"])
+    return 0
+
+
+def cmd_cockpit_run(args: argparse.Namespace) -> int:
+    result = run_cockpit_live(
+        CockpitRunRequest(
+            sweep_path=args.sweep,
+            config_path=args.config,
+            out_dir=args.out_dir,
+            confirm_live_run=args.confirm_live_run,
+            timeout_seconds=args.timeout_seconds,
+            continue_on_failure=args.continue_on_failure,
+            allow_risky_session_flags=args.allow_risky_session_flags,
+        )
+    )
+    if args.result_out is not None:
+        write_json(args.result_out, result)
+    print(result["result_path"])
     return 0
 
 

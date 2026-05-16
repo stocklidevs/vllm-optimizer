@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.43.0 - 2026-05-16
+
+- Added the `cockpit-run` command for confirmed live-run control through the
+  existing deterministic optimizer pipeline.
+- Required `--confirm-live-run`, preserved `config/` and `artifacts/` path
+  gates, and kept promotion disabled for cockpit run control.
+
 ## 0.42.0 - 2026-05-16
 
 - Added the `cockpit-preview` command to generate local sweep plan, preview,

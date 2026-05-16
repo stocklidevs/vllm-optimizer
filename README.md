@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.42.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.43.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -96,6 +96,8 @@ The project is spec-driven with SpecKit and currently supports:
   result files.
 - Local cockpit preview control for generating sweep plans, dry-run previews,
   and controller result artifacts while preserving path and risky-session gates.
+- Confirmed cockpit live-run control that invokes the deterministic pipeline
+  only after an explicit live execution gate.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -201,6 +203,7 @@ uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contra
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 uv run vllm-optimizer run-browser --artifacts-root artifacts --out artifacts/catalog/run-index.json --html-out artifacts/catalog/run-index.html
 uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-prefix-prefill-tool-json.json --out-dir artifacts/controller/qwen-prefix-prefill-tool-json --result-out artifacts/controller/qwen-prefix-prefill-tool-json/controller-result.json
+uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-live --confirm-live-run
 uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --out artifacts/cockpit/index.html
 ```
 
@@ -256,6 +259,11 @@ writes a JSON/HTML index for the cockpit Runs tab.
 under `config/`, writes controller artifacts under `artifacts/`, preserves the
 risky-session preview gate, and does not connect to the GX10, execute trials, or
 promote profiles.
+
+`cockpit-run` is the first remote-capable cockpit controller command. It keeps
+the same `config/` and `artifacts/` path envelope, requires
+`--confirm-live-run`, delegates execution to the deterministic optimizer
+pipeline in `run` mode, and never promotes profiles.
 
 `web-cockpit` is the first combined web interface. It is static and read-only:
 knob groups, pipeline stages, safety gates, status, and report summaries are
