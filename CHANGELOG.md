@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.38.0 - 2026-05-16
+
+- Improved the `web-cockpit` mobile layout so the main Mission Control
+  workspace appears before the long knob navigation rail on narrow screens.
+
 ## 0.37.0 - 2026-05-15
 
 - Added the static `web-cockpit` mission-control interface for knob groups,

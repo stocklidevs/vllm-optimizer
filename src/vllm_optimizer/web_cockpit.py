@@ -462,6 +462,9 @@ button { min-width: 74px; min-height: 34px; border-radius: 6px; border: 1px soli
 @media (max-width: 820px) {
   .cockpit, .hero, .status-grid, .right-rail { grid-template-columns: 1fr; }
   .left-rail, .right-rail { position: static; max-height: none; }
+  .workspace { order: 1; }
+  .left-rail { order: 2; }
+  .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
 }

@@ -23,6 +23,6 @@ def test_readme_links_setup_guide() -> None:
 def test_changelog_contains_current_version_release_notes() -> None:
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert f"## {__version__} - 2026-05-15" in changelog
+    assert f"## {__version__} - 2026-05-16" in changelog
     assert "artifact-contracts" in changelog
     assert "release-check" in changelog
