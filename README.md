@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.45.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.46.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -102,6 +102,8 @@ The project is spec-driven with SpecKit and currently supports:
   confirmation-oriented command hints, and disabled promotion controls.
 - A dependency-free `cockpit-server` that serves the cockpit on localhost,
   runs Plan/Preview through local API endpoints, and keeps Run gated.
+- Active cockpit operation feedback with a progress bar, plain-language result
+  cards, polling, and cancel requests for in-flight controller jobs.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -274,7 +276,11 @@ pipeline in `run` mode, and never promotes profiles.
 localhost, lets Plan and Preview run through local API endpoints, and requires
 an explicit browser confirmation before Run can call the remote-capable
 controller. If the cockpit is opened without the server, controller buttons
-fall back to command-copy behavior.
+fall back to command-copy behavior. Active operations show a progress bar and
+plain-language result cards: what happened, what it means, and what to do next.
+Cancel requests are recorded through the server; if remote work is already in a
+non-interruptible step, the cockpit says that honestly instead of pretending it
+stopped instantly.
 
 `web-cockpit` is the first combined web interface. It is static and read-only:
 knob groups, pipeline stages, safety gates, status, and report summaries are

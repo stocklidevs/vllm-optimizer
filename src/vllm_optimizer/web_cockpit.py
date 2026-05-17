@@ -178,6 +178,7 @@ def render_overview(
         <div>{render_status_summary(status)}</div>
         <div>{render_report_summary(report)}</div>
       </div>
+      {render_operation_result_panel()}
       {render_disabled_actions(manifest)}
     </section>
     <section class="panel tab-panel" id="knobs" data-tab-panel="knobs">
@@ -374,6 +375,36 @@ def render_how_to_use() -> str:
         <p>The cockpit follows the same deterministic pipeline as the CLI. The server can run safe local actions; remote actions stay gated.</p>
       </div>
       <div class="how-grid">{cards}</div>
+    </section>"""
+
+
+def render_operation_result_panel() -> str:
+    return """
+    <section class="operation-result" aria-live="polite">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Operation Result</p>
+          <h3 id="operation-title">Nothing is running yet.</h3>
+        </div>
+        <button type="button" id="operation-cancel" disabled>Cancel</button>
+      </div>
+      <div class="progress-track" aria-label="Operation progress">
+        <div id="operation-progress-bar" class="progress-bar" style="width:0%"></div>
+      </div>
+      <div class="explain-grid">
+        <article>
+          <strong>What happened?</strong>
+          <p id="operation-what">Click Plan to make a blueprint. I made the plan will appear here after Plan finishes.</p>
+        </article>
+        <article>
+          <strong>What does it mean?</strong>
+          <p id="operation-meaning">The cockpit will explain each step in plain words.</p>
+        </article>
+        <article>
+          <strong>Next step</strong>
+          <p id="operation-next">Click Preview to check if it is safe after you make a plan.</p>
+        </article>
+      </div>
     </section>"""
 
 
@@ -787,6 +818,12 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .actions button { width: 100%; margin: 4px 0; }
 .controller-feedback { min-height: 42px; margin: 10px 0 0; font-size: 13px; }
 .help-dot { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; border: 1px solid rgba(55,216,255,.32); color: var(--cyan); font-size: 12px; font-weight: 800; vertical-align: middle; }
+.operation-result { border: 1px solid rgba(73,242,161,.2); border-radius: 8px; background: rgba(73,242,161,.05); padding: 16px; margin: 16px 0; }
+.progress-track { height: 14px; border-radius: 999px; background: rgba(141,164,187,.16); overflow: hidden; margin-bottom: 14px; }
+.progress-bar { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--green)); transition: width .24s ease; }
+.explain-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.explain-grid article { border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(3,8,16,.32); padding: 12px; }
+.explain-grid strong { display: block; margin-bottom: 6px; }
 .how-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .how-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 14px; }
 .how-card strong { display: block; margin-bottom: 8px; color: var(--ink); }
@@ -830,7 +867,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid { grid-template-columns: 1fr; }
 }
 """
 
@@ -838,7 +875,9 @@ JS = """
 const state = {
   tab: 'overview',
   family: 'all',
-  query: ''
+  query: '',
+  currentJobId: null,
+  pollTimer: null
 };
 
 function setActiveTab(tab) {
@@ -928,6 +967,16 @@ async function runControllerAction(button) {
     }
     payload.confirm_live_run = true;
   }
+  renderOperationResult({
+    action,
+    status: 'running',
+    progress_percent: 5,
+    plain_summary: {
+      what_happened: 'I am starting ' + action + '.',
+      what_it_means: 'The local controller got your request.',
+      next_step: 'Watch the progress bar.'
+    }
+  });
   if (feedback) feedback.textContent = 'Running ' + action + '...';
   try {
     const response = await fetch(endpoint, {
@@ -939,16 +988,103 @@ async function runControllerAction(button) {
     if (!response.ok || result.status === 'error') {
       throw new Error(result.error || 'Controller request failed');
     }
-    const artifact = result.preview_path || result.result_path || (result.artifacts && (result.artifacts.pipeline_summary || result.artifacts.pipeline_plan)) || 'artifact written';
-    if (feedback) feedback.textContent = action + ' completed: ' + artifact;
+    if (result.job_id) {
+      state.currentJobId = result.job_id;
+      renderOperationResult(result);
+      pollControllerJob(result.job_id);
+      if (feedback) feedback.textContent = action + ' started.';
+      return;
+    }
+    renderOperationResult(result);
+    if (feedback) feedback.textContent = action + ' completed.';
   } catch (error) {
+    renderOperationResult({
+      action,
+      status: 'failed',
+      progress_percent: 100,
+      plain_summary: {
+        what_happened: action + ' did not finish.',
+        what_it_means: error.message,
+        next_step: 'Check the message and try again.'
+      }
+    });
     if (feedback) feedback.textContent = action + ' failed: ' + error.message;
+  }
+}
+
+function renderOperationResult(job) {
+  const title = document.getElementById('operation-title');
+  const bar = document.getElementById('operation-progress-bar');
+  const what = document.getElementById('operation-what');
+  const meaning = document.getElementById('operation-meaning');
+  const next = document.getElementById('operation-next');
+  const cancel = document.getElementById('operation-cancel');
+  const summary = job.plain_summary || {};
+  const progress = Math.max(0, Math.min(100, Number(job.progress_percent || 0)));
+  if (title) title.textContent = (job.action || 'Action') + ': ' + (job.status || 'unknown');
+  if (bar) bar.style.width = progress + '%';
+  if (what) what.textContent = summary.what_happened || 'The controller updated this operation.';
+  if (meaning) meaning.textContent = summary.what_it_means || 'The cockpit is waiting for more details.';
+  if (next) next.textContent = summary.next_step || 'Choose the next safe step.';
+  if (cancel) {
+    cancel.disabled = !job.job_id || !['running', 'cancel-requested'].includes(job.status);
+    cancel.dataset.jobId = job.job_id || '';
+  }
+}
+
+async function pollControllerJob(jobId) {
+  if (state.pollTimer) window.clearTimeout(state.pollTimer);
+  try {
+    const response = await fetch('/api/jobs/' + encodeURIComponent(jobId));
+    const job = await response.json();
+    renderOperationResult(job);
+    if (['running', 'cancel-requested'].includes(job.status)) {
+      state.pollTimer = window.setTimeout(() => pollControllerJob(jobId), 1000);
+    }
+  } catch (error) {
+    renderOperationResult({
+      action: 'status',
+      status: 'failed',
+      progress_percent: 100,
+      plain_summary: {
+        what_happened: 'I could not check progress.',
+        what_it_means: error.message,
+        next_step: 'Refresh the page or check the server.'
+      }
+    });
+  }
+}
+
+async function cancelControllerJob() {
+  const cancel = document.getElementById('operation-cancel');
+  const jobId = cancel ? cancel.dataset.jobId : '';
+  if (!jobId) return;
+  try {
+    const response = await fetch('/api/jobs/' + encodeURIComponent(jobId) + '/cancel', { method: 'POST' });
+    const job = await response.json();
+    renderOperationResult(job);
+  } catch (error) {
+    renderOperationResult({
+      action: 'cancel',
+      status: 'failed',
+      progress_percent: 100,
+      plain_summary: {
+        what_happened: 'Cancel did not work.',
+        what_it_means: error.message,
+        next_step: 'Check the server.'
+      }
+    });
   }
 }
 
 document.querySelectorAll('[data-controller-command]').forEach((button) => {
   button.addEventListener('click', () => runControllerAction(button));
 });
+
+const cancelButton = document.getElementById('operation-cancel');
+if (cancelButton) {
+  cancelButton.addEventListener('click', cancelControllerJob);
+}
 
 applyGroupFilters();
 """

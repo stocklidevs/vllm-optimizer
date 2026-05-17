@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.46.0 - 2026-05-17
+
+- Added active cockpit job status for controller actions, including progress
+  percentage, polling, and cancel-request state.
+- Added an Operation Result panel with kid-simple "what happened", "what it
+  means", and "next step" guidance.
+- Replaced vague running feedback with progress UI and honest cancellation
+  messaging for in-flight controller jobs.
+
 ## 0.45.0 - 2026-05-16
 
 - Added `cockpit-server`, a dependency-free localhost controller that serves

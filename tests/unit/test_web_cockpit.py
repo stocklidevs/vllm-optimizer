@@ -161,6 +161,19 @@ def test_web_cockpit_controller_buttons_have_active_api_hooks() -> None:
     assert "fetch(endpoint" in html
 
 
+def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
+    html = render_web_cockpit(catalog={"groups": []})
+
+    assert "Operation Result" in html
+    assert 'id="operation-progress-bar"' in html
+    assert 'id="operation-cancel"' in html
+    assert "I made the plan" in html
+    assert "Click Preview to check if it is safe" in html
+    assert "function renderOperationResult" in html
+    assert "async function pollControllerJob" in html
+    assert "async function cancelControllerJob" in html
+
+
 def test_web_cockpit_renders_report_visuals() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},
