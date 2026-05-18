@@ -21,6 +21,7 @@ from .cockpit_controller import (
     run_cockpit_live,
     run_cockpit_preview,
 )
+from .cockpit_launcher import CockpitLaunchError, CockpitLaunchRequest, launch_cockpit
 from .cockpit_server import CockpitServerConfig, CockpitServerError, serve_cockpit
 from .discovery import DiscoveryError, load_target, run_discovery
 from .default_report import DefaultReportError, DefaultReportInputs, build_default_decision_report
@@ -129,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         AbConfirmationError,
         CockpitControllerError,
         CockpitServerError,
+        CockpitLaunchError,
         ValueError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -408,6 +410,24 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_server_parser.add_argument("--continue-on-failure", action="store_true")
     cockpit_server_parser.add_argument("--allow-risky-session-flags", action="store_true")
     cockpit_server_parser.set_defaults(func=cmd_cockpit_server)
+
+    cockpit_launch_parser = subparsers.add_parser(
+        "cockpit-launch", help="Prepare artifacts and launch the active cockpit with sensible defaults"
+    )
+    cockpit_launch_parser.add_argument("--host", default="127.0.0.1")
+    cockpit_launch_parser.add_argument("--port", type=int, default=8787)
+    cockpit_launch_parser.add_argument("--sweep", type=Path, default=Path("config/sweeps/qwen-small-sweep.json"))
+    cockpit_launch_parser.add_argument("--config", type=Path)
+    cockpit_launch_parser.add_argument("--config-root", type=Path, default=Path("config"))
+    cockpit_launch_parser.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
+    cockpit_launch_parser.add_argument("--out-dir", type=Path, default=Path("artifacts/controller/cockpit-active"))
+    cockpit_launch_parser.add_argument("--catalog", type=Path, default=Path("artifacts/catalog/knob-groups.json"))
+    cockpit_launch_parser.add_argument("--manifest", type=Path)
+    cockpit_launch_parser.add_argument("--run-index", type=Path, default=Path("artifacts/catalog/run-index.json"))
+    cockpit_launch_parser.add_argument("--timeout-seconds", type=int, default=1200)
+    cockpit_launch_parser.add_argument("--continue-on-failure", action="store_true")
+    cockpit_launch_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    cockpit_launch_parser.set_defaults(func=cmd_cockpit_launch)
 
     flag_catalog_parser = subparsers.add_parser(
         "flag-catalog", help="Generate a vLLM flag catalog from local help text"
@@ -886,6 +906,29 @@ def cmd_cockpit_server(args: argparse.Namespace) -> int:
         ),
         args.host,
         args.port,
+    )
+    return 0
+
+
+def cmd_cockpit_launch(args: argparse.Namespace) -> int:
+    print(f"Preparing cockpit artifacts for {args.sweep}")
+    print(f"Open http://{args.host}:{args.port} after the server starts.")
+    launch_cockpit(
+        CockpitLaunchRequest(
+            sweep_path=args.sweep,
+            config_path=args.config,
+            config_root=args.config_root,
+            artifacts_root=args.artifacts_root,
+            out_dir=args.out_dir,
+            catalog_path=args.catalog,
+            manifest_path=args.manifest,
+            run_index_path=args.run_index,
+            host=args.host,
+            port=args.port,
+            allow_risky_session_flags=args.allow_risky_session_flags,
+            timeout_seconds=args.timeout_seconds,
+            continue_on_failure=args.continue_on_failure,
+        )
     )
     return 0
 

@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.46.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.47.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -104,6 +104,8 @@ The project is spec-driven with SpecKit and currently supports:
   runs Plan/Preview through local API endpoints, and keeps Run gated.
 - Active cockpit operation feedback with a progress bar, plain-language result
   cards, polling, and cancel requests for in-flight controller jobs.
+- A one-command `cockpit-launch` shortcut that prepares standard cockpit
+  artifacts and starts the active localhost cockpit.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -210,6 +212,7 @@ uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json -
 uv run vllm-optimizer run-browser --artifacts-root artifacts --out artifacts/catalog/run-index.json --html-out artifacts/catalog/run-index.html
 uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-prefix-prefill-tool-json.json --out-dir artifacts/controller/qwen-prefix-prefill-tool-json --result-out artifacts/controller/qwen-prefix-prefill-tool-json/controller-result.json
 uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-live --confirm-live-run
+uv run vllm-optimizer cockpit-launch
 uv run vllm-optimizer cockpit-server --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-active --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --run-index artifacts/catalog/run-index.json
 uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --out artifacts/cockpit/index.html
 ```
@@ -281,6 +284,11 @@ plain-language result cards: what happened, what it means, and what to do next.
 Cancel requests are recorded through the server; if remote work is already in a
 non-interruptible step, the cockpit says that honestly instead of pretending it
 stopped instantly.
+
+`cockpit-launch` is the simplest way to start the cockpit. With no arguments it
+generates the knob catalog, selected sweep control manifest, and run index, then
+starts the active cockpit at `http://127.0.0.1:8787`. Optional flags can override
+the sweep, config, output directory, host, and port.
 
 `web-cockpit` is the first combined web interface. It is static and read-only:
 knob groups, pipeline stages, safety gates, status, and report summaries are

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.47.0 - 2026-05-18
+
+- Added `cockpit-launch`, a one-command launcher that generates standard
+  cockpit artifacts and starts the active localhost cockpit.
+- Added launcher defaults for the small Qwen sweep, GX10 local/example config,
+  knob catalog, control manifest, run index, and active controller output dir.
+
 ## 0.46.0 - 2026-05-17
 
 - Added active cockpit job status for controller actions, including progress

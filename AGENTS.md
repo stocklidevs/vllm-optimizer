@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/048-active-cockpit-operation-feedback/plan.md
+specs/049-one-command-cockpit-launcher/plan.md
 <!-- SPECKIT END -->
