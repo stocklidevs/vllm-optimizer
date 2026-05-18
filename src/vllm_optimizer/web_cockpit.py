@@ -100,10 +100,10 @@ def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
     for group in groups[:10]:
         group_items.append(
             f"""
-            <article class="mini-card {escape(str(group.get('safety_tier') or 'unknown'))}">
-              <strong>{escape(str(group.get('label') or group.get('id') or 'Unnamed group'))}</strong>
+            <button type="button" class="mini-card tuning-area-option {escape(str(group.get('safety_tier') or 'unknown'))}" data-tuning-area-id="{escape(str(group.get('id') or ''))}" data-tuning-area-label="{escape(group_label(group))}" data-tuning-area-family="{escape(group_display_family(group))}" data-tuning-area-safety="{escape(str(group.get('safety_tier') or 'unknown'))}" data-tuning-area-description="{escape(str(group.get('description') or 'No description.'))}" data-tuning-area-config="{escape(str(group.get('config_path') or 'n/a'))}" data-knobs-tuned="{escape('|'.join(group_knobs(group)))}">
+              <strong>{escape(group_label(group))}</strong>
               <span>{escape(str(group.get('safety_tier') or 'unknown'))}</span>
-            </article>"""
+            </button>"""
         )
     return f"""
     <aside class="left-rail">
@@ -111,13 +111,13 @@ def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
         <span class="pulse"></span>
         <div><strong>vLLM</strong><small>Optimizer</small></div>
       </div>
-      <nav class="family-nav" aria-label="Knob family filters">
+      <nav class="family-nav" aria-label="Tuning area family filters">
         <button type="button" class="active" data-family-filter="all">All families</button>
         {family_items}
       </nav>
       <div class="rail-section">
-        <h2>Knob Groups</h2>
-        {''.join(group_items) or '<p class="empty">No knob groups loaded.</p>'}
+        <h2>Tuning Areas</h2>
+        {''.join(group_items) or '<p class="empty">No tuning areas loaded.</p>'}
       </div>
     </aside>"""
 
@@ -130,10 +130,10 @@ def render_hero(groups: list[dict[str, Any]], status: dict[str, Any] | None, rep
       <div>
         <p class="eyebrow">GX10 Optimization Cockpit</p>
         <h1>vLLM Mission Control</h1>
-        <p class="hero-copy">Select knob families, inspect safety gates, monitor artifact progress, and review optimization outcomes from one deterministic static interface.</p>
+        <p class="hero-copy">Select tuning areas, inspect safety gates, monitor artifact progress, and review optimization outcomes from one deterministic cockpit.</p>
       </div>
       <div class="hero-grid">
-        {metric_tile("Groups", len(groups), "catalog entries")}
+        {metric_tile("Tuning Areas", len(groups), "catalog entries")}
         {metric_tile("Status", overall, "execution")}
         {metric_tile("Decision", recommendation.get("status", "no report"), "report")}
       </div>
@@ -144,7 +144,7 @@ def render_tabs() -> str:
     return """
     <div class="tabs" aria-label="Cockpit sections">
       <button type="button" class="active" data-tab-target="overview">Overview</button>
-      <button type="button" data-tab-target="knobs">Knobs</button>
+      <button type="button" data-tab-target="knobs">Tuning Areas</button>
       <button type="button" data-tab-target="pipeline">Pipeline</button>
       <button type="button" data-tab-target="runs">Runs</button>
       <button type="button" data-tab-target="reports">Reports</button>
@@ -216,17 +216,17 @@ def render_overview(
     <section class="panel tab-panel" id="knobs" data-tab-panel="knobs">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Knobs</p>
-          <h2>Optimization families</h2>
+          <p class="eyebrow">Tuning Areas</p>
+          <h2>Optimization areas</h2>
         </div>
-        <p><span id="visible-group-count">{len(groups)}</span> of {len(groups)} groups visible from the deterministic knob catalog.</p>
+        <p><span id="visible-group-count">{len(groups)}</span> of {len(groups)} tuning areas visible from the deterministic catalog.</p>
       </div>
       <div class="filter-bar">
-        <label for="knob-search">Search knob groups</label>
+        <label for="knob-search">Search tuning areas</label>
         <input id="knob-search" type="search" placeholder="Search by name, family, safety, or config">
       </div>
-      <div class="group-grid">{''.join(render_group_card(group) for group in groups) or '<p class="empty">No knob groups loaded.</p>'}</div>
-      <p class="empty hidden" id="group-empty-state">No knob groups match the current filter.</p>
+      <div class="group-grid">{''.join(render_group_card(group) for group in groups) or '<p class="empty">No tuning areas loaded.</p>'}</div>
+      <p class="empty hidden" id="group-empty-state">No tuning areas match the current filter.</p>
     </section>"""
 
 
@@ -339,10 +339,14 @@ def render_guided_step_workspace(
     return f"""
     <div class="guided-grid">
       <article class="selected-group-card">
-        <p class="eyebrow">Selected Knob Group</p>
-        <h2>{escape(selected)}</h2>
-        <p>{escape(step['group_hint'])}</p>
+        <p class="eyebrow">Selected Tuning Area</p>
+        <h2 id="selected-tuning-area-label">{escape(selected)}</h2>
+        <p id="selected-tuning-area-description">{escape(selected_group_description(groups, manifest) or step['group_hint'])}</p>
         <div class="chips">{render_selected_group_chips(groups, manifest)}</div>
+        <div class="knobs-tuned-panel">
+          <strong>Knobs tuned</strong>
+          <ul id="selected-knobs-tuned">{render_selected_knob_items(groups, manifest)}</ul>
+        </div>
       </article>
       <article class="active-step-card">
         <p class="eyebrow">Step {workflow_index(action)}: {escape(step['label'])}</p>
@@ -420,7 +424,7 @@ def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str,
 
 def render_how_to_use() -> str:
     steps = [
-        ("Choose", "Pick a knob group that matches the workload or tuning family you want to explore."),
+        ("Choose", "Pick a tuning area that matches the workload or parameter family you want to explore."),
         ("Plan", "Plan creates the deterministic run blueprint: candidates, trial IDs, artifacts, objectives, and safety metadata."),
         ("Preview", "Preview validates the blueprint before execution and shows blocked trials or required gates."),
         ("Run", "Run starts remote-capable execution only from the local cockpit server and only after explicit confirmation."),
@@ -663,16 +667,28 @@ def render_sources(sources: dict[str, str | None]) -> str:
 def render_group_card(group: dict[str, Any]) -> str:
     gate = "requires opt-in" if group.get("requires_opt_in") else "no extra opt-in"
     search_text = " ".join(
-        str(group.get(key) or "")
-        for key in ("label", "id", "family", "safety_tier", "description", "command_kind", "config_path")
+        dedupe_strings(
+            [
+                group_label(group),
+                group_display_family(group),
+                str(group.get("id") or ""),
+                str(group.get("family") or ""),
+                str(group.get("safety_tier") or ""),
+                str(group.get("description") or ""),
+                str(group.get("command_kind") or ""),
+                str(group.get("config_path") or ""),
+            ]
+        )
     ).lower()
+    knobs = group_knobs(group)
     return f"""
-    <article class="group-card {escape(str(group.get('safety_tier') or 'unknown'))}" data-family="{escape(str(group.get('family') or 'unknown'))}" data-search="{escape(search_text)}">
-      <div class="card-topline"><span>{escape(str(group.get('family') or 'unknown'))}</span><strong>{escape(str(group.get('safety_tier') or 'unknown'))}</strong></div>
-      <h3>{escape(str(group.get('label') or group.get('id') or 'Unnamed group'))}</h3>
+    <article class="group-card {escape(str(group.get('safety_tier') or 'unknown'))}" data-family="{escape(str(group.get('family') or 'unknown'))}" data-search="{escape(search_text)}" data-tuning-area-id="{escape(str(group.get('id') or ''))}">
+      <div class="card-topline"><span>{escape(group_display_family(group))}</span><strong>{escape(str(group.get('safety_tier') or 'unknown'))}</strong></div>
+      <h3>{escape(group_label(group))}</h3>
       <p>{escape(str(group.get('description') or 'No description.'))}</p>
       <dl>
         <div><dt>Command</dt><dd>{escape(str(group.get('command_kind') or 'n/a'))}</dd></div>
+        <div><dt>Knobs tuned</dt><dd>{escape(', '.join(knobs) or 'n/a')}</dd></div>
         <div><dt>Gate</dt><dd>{escape(gate)}</dd></div>
         <div><dt>Config</dt><dd><code>{escape(str(group.get('config_path') or 'n/a'))}</code></dd></div>
       </dl>
@@ -747,8 +763,8 @@ WORKFLOW_STEPS = [
         "action": "plan",
         "label": "Generate Plan",
         "headline": "Generate Plan",
-        "description": "Build the proposed vLLM tuning plan for the selected knob group.",
-        "group_hint": "Start by turning the selected knob group into a deterministic blueprint.",
+        "description": "Build the proposed vLLM tuning plan for the selected tuning area.",
+        "group_hint": "Start by turning the selected tuning area into a deterministic blueprint.",
         "facts": ["No execution", "Deterministic output", "Safe to run"],
         "next": "Preview Commands will be enabled.",
         "what_next": "After planning, preview the exact commands before execution.",
@@ -846,26 +862,69 @@ def workflow_locked_label(action: str, manifest: dict[str, Any] | None) -> str:
 
 def selected_group_label(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> str:
     group = manifest.get("group", {}) if isinstance((manifest or {}).get("group"), dict) else {}
-    label = group.get("label") or group.get("id")
+    label = group.get("display_label") or group.get("label") or group.get("id")
     if label:
         return str(label)
     if groups:
-        return str(groups[0].get("label") or groups[0].get("id") or "No knob group selected")
-    return "No knob group selected"
+        return group_label(groups[0])
+    return "No tuning area selected"
+
+
+def selected_group_description(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> str:
+    group = selected_group(groups, manifest)
+    return str(group.get("description") or "")
 
 
 def render_selected_group_chips(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> str:
-    selected = selected_group_label(groups, manifest)
-    selected_group = next(
-        (group for group in groups if selected in {str(group.get("label") or ""), str(group.get("id") or "")}),
-        groups[0] if groups else {},
-    )
+    selected = selected_group(groups, manifest)
     values = [
-        str(selected_group.get("family") or "unknown family"),
-        str(selected_group.get("safety_tier") or "unknown safety"),
-        str(selected_group.get("command_kind") or "workflow"),
+        group_display_family(selected),
+        str(selected.get("safety_tier") or "unknown safety"),
+        str(selected.get("command_kind") or "workflow"),
     ]
     return "".join(f"<span>{escape(value)}</span>" for value in values)
+
+
+def render_selected_knob_items(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> str:
+    knobs = group_knobs(selected_group(groups, manifest))
+    return "".join(f"<li>{escape(knob)}</li>" for knob in knobs) or "<li>No knob metadata loaded.</li>"
+
+
+def selected_group(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> dict[str, Any]:
+    manifest_group = manifest.get("group", {}) if isinstance((manifest or {}).get("group"), dict) else {}
+    group_id = str(manifest_group.get("id") or "")
+    if group_id:
+        for group in groups:
+            if str(group.get("id") or "") == group_id:
+                return group
+        return manifest_group
+    return groups[0] if groups else {}
+
+
+def group_label(group: dict[str, Any]) -> str:
+    return str(group.get("display_label") or group.get("label") or group.get("id") or "Unnamed tuning area")
+
+
+def group_display_family(group: dict[str, Any]) -> str:
+    return str(group.get("display_family") or group.get("family") or "Unknown family")
+
+
+def group_knobs(group: dict[str, Any]) -> list[str]:
+    value = group.get("knobs_tuned")
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def dedupe_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        deduped.append(value)
+        seen.add(value)
+    return deduped
 
 
 def render_primary_action_button(action: str, manifest: dict[str, Any] | None) -> str:
@@ -1058,6 +1117,10 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .command-shell pre code { display: block; border: 0; background: transparent; padding: 0; }
 .what-next { margin-top: 14px; padding: 12px; border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(55,216,255,.06); }
 .what-next strong { display: block; margin-bottom: 6px; }
+.knobs-tuned-panel { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(55,216,255,.14); }
+.knobs-tuned-panel strong { display: block; margin-bottom: 8px; }
+.knobs-tuned-panel ul { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.knobs-tuned-panel li { border: 1px solid rgba(55,216,255,.18); background: rgba(55,216,255,.08); border-radius: 999px; padding: 4px 8px; color: #dff9ff; font-family: "Cascadia Mono", Consolas, monospace; font-size: .86em; }
 .next-action-card { border-color: rgba(55,216,255,.34); background: linear-gradient(180deg, rgba(10, 25, 45, .96), rgba(7, 14, 26, .96)); }
 .next-action-card h2 { font-size: 22px; margin: 14px 0 10px; }
 .after-this { border-top: 1px solid rgba(55,216,255,.15); margin-top: 16px; padding-top: 14px; }
@@ -1072,7 +1135,8 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .filter-bar input { width: 100%; min-height: 40px; color: var(--ink); background: rgba(3,8,16,.62); border: 1px solid rgba(55,216,255,.18); border-radius: 6px; padding: 9px 11px; }
 .hidden { display: none; }
 .group-card, .mini-card { padding: 14px; }
-.mini-card { display: grid; gap: 5px; }
+.mini-card { display: grid; gap: 5px; width: 100%; min-height: auto; text-align: left; }
+.tuning-area-option.active { border-color: rgba(73,242,161,.72); background: rgba(73,242,161,.12); box-shadow: inset 0 0 0 1px rgba(73,242,161,.18); }
 .mini-card span { color: var(--muted); }
 .card-topline { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .card-topline strong { color: var(--green); }
@@ -1213,6 +1277,34 @@ if (search) {
     state.query = search.value;
     applyGroupFilters();
   });
+}
+
+function selectTuningArea(button) {
+  const label = button.dataset.tuningAreaLabel || 'Unnamed tuning area';
+  const description = button.dataset.tuningAreaDescription || 'No description.';
+  const knobs = (button.dataset.knobsTuned || '').split('|').filter(Boolean);
+  document.querySelectorAll('[data-tuning-area-id]').forEach((item) => {
+    item.classList.toggle('active', item.dataset.tuningAreaId === button.dataset.tuningAreaId);
+  });
+  const labelTarget = document.getElementById('selected-tuning-area-label');
+  const descriptionTarget = document.getElementById('selected-tuning-area-description');
+  const knobsTarget = document.getElementById('selected-knobs-tuned');
+  if (labelTarget) labelTarget.textContent = label;
+  if (descriptionTarget) descriptionTarget.textContent = description;
+  if (knobsTarget) {
+    knobsTarget.innerHTML = '';
+    if (knobs.length === 0) {
+      const item = document.createElement('li');
+      item.textContent = 'No knob metadata loaded.';
+      knobsTarget.appendChild(item);
+    } else {
+      knobs.forEach((knob) => {
+        const item = document.createElement('li');
+        item.textContent = knob;
+        knobsTarget.appendChild(item);
+      });
+    }
+  }
 }
 
 async function copyControllerCommand(button) {
@@ -1365,6 +1457,11 @@ async function cancelControllerJob() {
 
 document.querySelectorAll('[data-controller-command]').forEach((button) => {
   button.addEventListener('click', () => runControllerAction(button));
+});
+
+document.querySelectorAll('.tuning-area-option').forEach((button, index) => {
+  button.addEventListener('click', () => selectTuningArea(button));
+  if (index === 0) button.classList.add('active');
 });
 
 const cancelButton = document.getElementById('operation-cancel');

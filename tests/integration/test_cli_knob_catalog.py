@@ -14,7 +14,7 @@ def test_knob_groups_cli_writes_catalog_and_html(tmp_path: Path) -> None:
     catalog = read_json(out)
     assert catalog["group_count"] >= 5
     assert any(group["requires_opt_in"] for group in catalog["groups"])
-    assert "Knob Group Selector" in html.read_text(encoding="utf-8")
+    assert "Tuning Area Selector" in html.read_text(encoding="utf-8")
 
 
 def test_knob_groups_cli_rejects_missing_config_root(tmp_path: Path) -> None:

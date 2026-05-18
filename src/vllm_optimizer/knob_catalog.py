@@ -60,15 +60,19 @@ def classify_group(path: Path) -> dict[str, Any]:
     family = infer_family(path)
     safety_tier = infer_safety(path, family)
     command_kind = "session-tuning-sweep" if "session-tuning-sweeps" in path.as_posix() else "sweep"
+    display_label = display_label_for(stem, family)
     return {
         "id": stem,
         "label": labelize(stem),
+        "display_label": display_label,
+        "display_family": display_family_for(stem, family),
         "family": family,
         "safety_tier": safety_tier,
         "config_path": path.as_posix(),
         "command_kind": command_kind,
         "requires_opt_in": safety_tier in {"risky-session", "session-tuning"},
         "description": description_for(stem, family, safety_tier),
+        "knobs_tuned": knobs_tuned_for(stem, family, command_kind),
         "action_scope": action_scope_for(safety_tier),
     }
 
@@ -122,6 +126,83 @@ def description_for(stem: str, family: str, safety_tier: str) -> str:
     return "Explore safe vLLM serve parameter candidates."
 
 
+def display_label_for(stem: str, family: str) -> str:
+    name = stem.lower()
+    if family == "concurrency":
+        count = concurrency_count(name)
+        return f"Concurrency - {count} Request{'s' if count != '1' else ''}" if count else "Concurrency Saturation"
+    if family == "fp8":
+        workload = workload_label(name)
+        return f"FP8 KV Cache - {workload}" if workload else "FP8 KV Cache"
+    if family == "workload":
+        workload = workload_label(name)
+        return f"Workload Shape - {workload}" if workload else "Workload Shape"
+    if family == "session-tuning":
+        return "Runtime Environment Session Sweep"
+    if family == "risky-session":
+        return "Risky Session vLLM Flags"
+    if "small-sweep" in name:
+        return "Safe vLLM Baseline Sweep"
+    if "scheduler" in name:
+        return "Scheduler and Prefill Sweep"
+    if "expanded" in name:
+        return "Expanded Safe vLLM Sweep"
+    if "top2" in name:
+        return "Top Two Stability Sweep"
+    return labelize(stem)
+
+
+def display_family_for(stem: str, family: str) -> str:
+    if family == "fp8":
+        return "FP8 KV Cache"
+    if family == "concurrency":
+        return "Concurrency"
+    if family == "workload":
+        return "Workload Shape"
+    if family == "session-tuning":
+        return "Runtime Environment"
+    if family == "risky-session":
+        return "Risky Session Flags"
+    if "scheduler" in stem.lower():
+        return "Scheduler and Prefill"
+    return "Safe vLLM"
+
+
+def knobs_tuned_for(stem: str, family: str, command_kind: str) -> list[str]:
+    name = stem.lower()
+    if family == "fp8":
+        return ["kv_cache_dtype", "block_size", "max_num_batched_tokens", "max_num_seqs"]
+    if family == "concurrency":
+        return ["request_concurrency", "gpu_memory_utilization", "max_num_batched_tokens", "max_num_seqs"]
+    if family == "workload":
+        return ["prompt_set", "workload_mix", "performance_mode", "max_model_len"]
+    if command_kind == "session-tuning-sweep":
+        return ["environment_variables", "ulimit", "session_scope"]
+    if family == "risky-session":
+        return ["risky_vllm_flags", "scheduler_flags", "session_only"]
+    if "scheduler" in name:
+        return ["max_num_batched_tokens", "max_num_seqs", "enable_chunked_prefill", "enable_prefix_caching"]
+    return ["gpu_memory_utilization", "max_model_len", "performance_mode", "safe_vllm_flags"]
+
+
+def concurrency_count(name: str) -> str | None:
+    marker = "saturation-c"
+    if marker not in name:
+        return None
+    suffix = name.split(marker, 1)[1].split("-", 1)[0]
+    return suffix if suffix.isdigit() else None
+
+
+def workload_label(name: str) -> str:
+    if "interactive" in name:
+        return "Interactive Coding"
+    if "tool-json" in name:
+        return "Tool JSON"
+    if "long" in name:
+        return "Long Context"
+    return ""
+
+
 def labelize(stem: str) -> str:
     words = [word for word in stem.replace("-", " ").replace("_", " ").split() if word]
     return " ".join(word.upper() if word in {"fp8", "kv"} else word.capitalize() for word in words)
@@ -137,11 +218,12 @@ def render_knob_catalog_html(catalog: dict[str, Any]) -> str:
         cards.append(
             f"""
             <article class="card {escape(str(group.get('safety_tier')))}">
-              <div class="topline"><span>{escape(str(group.get('family')))}</span><strong>{escape(str(group.get('safety_tier')))}</strong></div>
-              <h2>{escape(str(group.get('label')))}</h2>
+              <div class="topline"><span>{escape(str(group.get('display_family') or group.get('family')))}</span><strong>{escape(str(group.get('safety_tier')))}</strong></div>
+              <h2>{escape(str(group.get('display_label') or group.get('label')))}</h2>
               <p>{escape(str(group.get('description')))}</p>
               <dl>
                 <div><dt>Command</dt><dd>{escape(str(group.get('command_kind')))}</dd></div>
+                <div><dt>Knobs tuned</dt><dd>{escape(', '.join(str(item) for item in group.get('knobs_tuned', [])) or 'n/a')}</dd></div>
                 <div><dt>Config</dt><dd><code>{escape(str(group.get('config_path')))}</code></dd></div>
                 <div><dt>Gate</dt><dd>{escape(opt_in)}</dd></div>
               </dl>
@@ -154,14 +236,14 @@ def render_knob_catalog_html(catalog: dict[str, Any]) -> str:
             "<head>",
             '  <meta charset="utf-8">',
             '  <meta name="viewport" content="width=device-width, initial-scale=1">',
-            "  <title>Knob Group Selector</title>",
+            "  <title>Tuning Area Selector</title>",
             f"  <style>{CSS}</style>",
             "</head>",
             "<body>",
             '  <main class="shell">',
             "    <header>",
-            "      <h1>Knob Group Selector</h1>",
-            "      <p>Choose an optimization family. Safety tiers and opt-in gates come from the deterministic catalog.</p>",
+            "      <h1>Tuning Area Selector</h1>",
+            "      <p>Choose an optimization area. Safety tiers, knobs tuned, and opt-in gates come from the deterministic catalog.</p>",
             "    </header>",
             f"    <section class=\"grid\">{''.join(cards)}</section>",
             "  </main>",

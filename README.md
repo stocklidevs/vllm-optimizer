@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.48.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.49.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -72,10 +72,10 @@ The project is spec-driven with SpecKit and currently supports:
 - Local execution-status snapshots and static HTML progress dashboards for
   pipeline/run directories, including stages, trial counts, failures, and
   artifact availability.
-- Deterministic knob group catalog and static selector preview for future web
-  UI selection of safe, risky, workload, concurrency, FP8, session tuning, and
-  read-only discovery families.
-- Pipeline control manifests for selected knob groups, exposing ordered command
+- Deterministic tuning-area catalog and static selector preview for safe,
+  risky, workload, concurrency, FP8, session tuning, and read-only discovery
+  families.
+- Pipeline control manifests for selected tuning areas, exposing ordered command
   stages, artifact targets, remote-action markers, and safety gates for future
   web orchestration.
 - Curated impactful sweep bundles for KV/cache memory tradeoffs and
@@ -84,7 +84,7 @@ The project is spec-driven with SpecKit and currently supports:
   schema versions, producers, and dashboard consumers.
 - Local release readiness checks for package version consistency, active
   SpecKit metadata, release docs, artifact contracts, and essential files.
-- A standalone high-tech `web-cockpit` interface that combines knob groups,
+- A standalone high-tech `web-cockpit` interface that combines tuning areas,
   pipeline stages, execution status, report summaries, safety gates, and
   disabled future controller controls from deterministic artifacts.
 - Local-only `web-cockpit` interactions for tab switching, knob family filters,
@@ -108,6 +108,8 @@ The project is spec-driven with SpecKit and currently supports:
   artifacts and starts the active localhost cockpit.
 - A guided mission-control cockpit layout with a six-step workflow, Next Action
   panel, active command shell, and clearer locked safety states.
+- User-facing tuning-area labels, visible knobs-tuned metadata, and left-rail
+  selection for the cockpit.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -244,10 +246,11 @@ produces a progress snapshot plus optional standalone HTML dashboard for stage
 state, trial counts, failures, and artifact availability.
 
 `knob-groups` is also local-only. It reads repository configuration files and
-generates a selectable catalog with family, safety tier, opt-in requirement,
-command kind, and config path for each optimization group.
+generates a selectable tuning-area catalog with friendly labels, family, safety
+tier, knobs tuned, opt-in requirement, command kind, and config path for each
+optimization group.
 
-`pipeline-control` is local-only as well. It turns a selected knob group into a
+`pipeline-control` is local-only as well. It turns a selected tuning area into a
 UI-readable ordered control manifest with command hints, remote markers,
 artifact targets, and explicit gates such as `--allow-risky-session-flags`,
 `--allow-session-tuning`, and `--allow-promotion`.
@@ -295,14 +298,16 @@ the sweep, config, output directory, host, and port.
 `web-cockpit` is the combined web interface. It presents a guided
 mission-control workflow for Plan, Preview, Run, Report, Confirm, and Promote,
 with a Next Action panel, active command shell, progress feedback, safety gates,
-and secondary tabs for detailed inspection. Knob groups, pipeline stages,
+and secondary tabs for detailed inspection. Tuning areas, pipeline stages,
 safety gates, status, report summaries, and run indexes are loaded from
-deterministic artifacts. Controller buttons call the local server when served by
-`cockpit-server`, or copy deterministic CLI commands when opened as static
-HTML. Browser-side execution and promotion remain explicitly gated. This
-implementation intentionally uses no npm packages. If a future spec adds npm,
-dependency versions must be pinned, vulnerability-reviewed, and installed with
-`npm ci`.
+deterministic artifacts. The left rail lets you select a tuning area and see
+the actual knobs being tuned, while internal experiment history terms such as
+rerun stay out of user-facing labels. Controller buttons call the local server
+when served by `cockpit-server`, or copy deterministic CLI commands when opened
+as static HTML. Browser-side execution and promotion remain explicitly gated.
+This implementation intentionally uses no npm packages. If a future spec adds
+npm, dependency versions must be pinned, vulnerability-reviewed, and installed
+with `npm ci`.
 
 Smoke serve:
 

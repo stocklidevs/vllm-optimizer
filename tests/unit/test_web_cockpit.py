@@ -104,7 +104,7 @@ def test_web_cockpit_includes_local_interaction_hooks() -> None:
     assert 'data-family-filter="safe-vllm"' in html
     assert 'data-family-filter="risky-session"' in html
     assert 'data-family="safe-vllm"' in html
-    assert 'data-search="safe a safe-a safe-vllm safe-session safe sweep. sweep config/sweeps/safe-a.json"' in html
+    assert 'data-search="safe a safe-vllm safe-a safe-session safe sweep. sweep config/sweeps/safe-a.json"' in html
     assert 'id="visible-group-count"' in html
     assert 'id="group-empty-state"' in html
     assert "function applyGroupFilters()" in html
@@ -294,6 +294,52 @@ def test_web_cockpit_renders_guided_mission_workflow() -> None:
     assert "Safe to run" in html
     assert "Controller command shell" in html
     assert "What happens next?" in html
+
+
+def test_web_cockpit_renders_selectable_tuning_areas() -> None:
+    html = render_web_cockpit(
+        catalog={
+            "groups": [
+                {
+                    "id": "qwen-fp8-rerun-interactive",
+                    "label": "Qwen FP8 Rerun Interactive",
+                    "display_label": "FP8 KV Cache - Interactive Coding",
+                    "display_family": "FP8 KV Cache",
+                    "family": "fp8",
+                    "safety_tier": "safe-session",
+                    "requires_opt_in": False,
+                    "description": "Explore FP8 cache dtype.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/qwen-fp8-rerun-interactive.json",
+                    "knobs_tuned": ["kv_cache_dtype", "block_size"],
+                },
+                {
+                    "id": "qwen-concurrency-saturation-c8",
+                    "label": "Qwen Concurrency Saturation C8",
+                    "display_label": "Concurrency - 8 Requests",
+                    "display_family": "Concurrency",
+                    "family": "concurrency",
+                    "safety_tier": "safe-session",
+                    "requires_opt_in": False,
+                    "description": "Explore concurrency.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/qwen-concurrency-saturation-c8.json",
+                    "knobs_tuned": ["request_concurrency", "max_num_seqs"],
+                },
+            ]
+        }
+    )
+
+    assert "Tuning Areas" in html
+    assert "Selected Tuning Area" in html
+    assert "Knobs tuned" in html
+    assert "FP8 KV Cache - Interactive Coding" in html
+    assert "Concurrency - 8 Requests" in html
+    assert 'data-tuning-area-id="qwen-fp8-rerun-interactive"' in html
+    assert 'data-tuning-area-label="FP8 KV Cache - Interactive Coding"' in html
+    assert 'data-knobs-tuned="kv_cache_dtype|block_size"' in html
+    assert "function selectTuningArea" in html
+    assert "Rerun Interactive" not in html
 
 
 def test_web_cockpit_renders_promotion_workflow() -> None:

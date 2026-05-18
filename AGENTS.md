@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/050-guided-mission-control-cockpit-ui/plan.md
+specs/051-tuning-area-selection-labels/plan.md
 <!-- SPECKIT END -->

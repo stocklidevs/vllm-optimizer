@@ -24,6 +24,19 @@ def test_build_knob_catalog_includes_expected_families() -> None:
     assert all("config_path" in group for group in catalog["groups"])
 
 
+def test_classify_group_uses_friendly_tuning_area_labels() -> None:
+    fp8 = classify_group(Path("config/sweeps/qwen-fp8-rerun-interactive.json"))
+    concurrency = classify_group(Path("config/sweeps/qwen-concurrency-saturation-c8.json"))
+
+    assert fp8["display_label"] == "FP8 KV Cache - Interactive Coding"
+    assert "Rerun" not in fp8["display_label"]
+    assert fp8["display_family"] == "FP8 KV Cache"
+    assert {"kv_cache_dtype", "block_size"} <= set(fp8["knobs_tuned"])
+    assert concurrency["display_label"] == "Concurrency - 8 Requests"
+    assert concurrency["display_family"] == "Concurrency"
+    assert {"request_concurrency", "max_num_seqs", "max_num_batched_tokens"} <= set(concurrency["knobs_tuned"])
+
+
 def test_render_knob_catalog_html_contains_groups_and_safety() -> None:
     html = render_knob_catalog_html(
         {
@@ -42,7 +55,8 @@ def test_render_knob_catalog_html_contains_groups_and_safety() -> None:
         }
     )
 
-    assert "Knob Group Selector" in html
+    assert "Tuning Area Selector" in html
     assert "Qwen Risky Session Small" in html
     assert "risky-session" in html
     assert "requires opt-in" in html
+    assert "Knobs tuned" in html

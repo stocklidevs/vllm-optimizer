@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.49.0 - 2026-05-18
+
+- Added user-facing tuning-area labels and knobs-tuned metadata to the knob
+  catalog while preserving internal group IDs and config filenames.
+- Updated the cockpit left rail from passive knob-group cards to selectable
+  tuning areas.
+- Hid internal history terms such as "rerun" from FP8 user-facing labels.
+
 ## 0.48.0 - 2026-05-18
 
 - Redesigned `web-cockpit` around a guided six-step mission-control workflow.
