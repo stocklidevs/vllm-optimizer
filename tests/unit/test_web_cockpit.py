@@ -247,6 +247,55 @@ def test_web_cockpit_renders_run_browser_tab() -> None:
     assert "artifacts/sweeps/demo/live/ranking.json" in html
 
 
+def test_web_cockpit_renders_guided_mission_workflow() -> None:
+    html = render_web_cockpit(
+        catalog={
+            "groups": [
+                {
+                    "id": "qwen-concurrency-c1",
+                    "label": "Qwen Concurrency Saturation C1",
+                    "family": "concurrency",
+                    "safety_tier": "safe-session",
+                    "requires_opt_in": False,
+                    "description": "Concurrency sweep.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/qwen-concurrency-saturation-c1.json",
+                }
+            ]
+        },
+        manifest={
+            "group": {"id": "qwen-concurrency-c1", "label": "Qwen Concurrency Saturation C1"},
+            "stages": [
+                {
+                    "name": "plan",
+                    "command_hint": "uv run vllm-optimizer optimize-workload --mode plan",
+                },
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer cockpit-run --confirm-live-run",
+                    "remote": True,
+                    "required_gates": ["--confirm-live-run"],
+                },
+            ],
+            "promotion": {"automatic": False, "required_gate": "--allow-promotion"},
+        },
+    )
+
+    assert "Optimization Workflow" in html
+    assert 'class="workflow-step active"' in html
+    assert 'data-workflow-step="plan"' in html
+    assert 'data-workflow-step="promote"' in html
+    assert "Locked (--allow-promotion)" in html
+    assert "Step 1 of 6" in html
+    assert "Next Action" in html
+    assert "Generate Plan" in html
+    assert "No execution" in html
+    assert "Deterministic output" in html
+    assert "Safe to run" in html
+    assert "Controller command shell" in html
+    assert "What happens next?" in html
+
+
 def test_web_cockpit_renders_promotion_workflow() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},

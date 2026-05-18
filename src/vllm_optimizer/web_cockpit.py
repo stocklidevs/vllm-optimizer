@@ -72,6 +72,7 @@ def render_web_cockpit(
             render_left_rail(families, groups),
             '<section class="workspace">',
             render_hero(groups, status, report),
+            render_workflow(manifest, status, report),
             render_tabs(),
             render_overview(groups, manifest, status, report),
             render_pipeline(manifest),
@@ -81,7 +82,7 @@ def render_web_cockpit(
             render_how_to_use(),
             render_sources(sources or {}),
             "</section>",
-            render_right_rail(manifest, status),
+            render_right_rail(manifest, status, report),
             f"<script>{JS}</script>",
             "</main>",
             "</body>",
@@ -153,6 +154,43 @@ def render_tabs() -> str:
     </div>"""
 
 
+def render_workflow(
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    current = current_workflow_action(status, report)
+    current_index = workflow_index(current)
+    steps = []
+    for index, step in enumerate(WORKFLOW_STEPS, start=1):
+        action = step["action"]
+        if action == current:
+            state = "active"
+            label = "Ready"
+        elif index < current_index:
+            state = "complete"
+            label = "Done"
+        else:
+            state = "locked"
+            label = workflow_locked_label(action, manifest)
+        steps.append(
+            f"""
+            <article class="workflow-step {state}" data-workflow-step="{escape(action)}">
+              <span class="step-index">{index}</span>
+              <strong>{escape(step['label'])}</strong>
+              <small>{escape(label)}</small>
+            </article>"""
+        )
+    return f"""
+    <section class="workflow-band" aria-label="Optimization workflow">
+      <div class="workflow-heading">
+        <h2>Optimization Workflow</h2>
+        <span>Step {current_index} of {len(WORKFLOW_STEPS)}</span>
+      </div>
+      <div class="workflow-steps">{''.join(steps)}</div>
+    </section>"""
+
+
 def render_overview(
     groups: list[dict[str, Any]],
     manifest: dict[str, Any] | None,
@@ -166,13 +204,7 @@ def render_overview(
     chips = "".join(f"<span>{escape(tier)}: {count}</span>" for tier, count in sorted(risk_counts.items()))
     return f"""
     <section class="panel tab-panel active" id="overview" data-tab-panel="overview">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Overview</p>
-          <h2>Controller command shell</h2>
-        </div>
-        <p>Controller buttons copy deterministic CLI commands; live execution still requires explicit terminal gates.</p>
-      </div>
+      {render_guided_step_workspace(groups, manifest, status, report)}
       <div class="status-grid">
         <div>{metric_tile("Safety tiers", len(risk_counts), "families")}{'<div class="chips">' + chips + '</div>' if chips else ''}</div>
         <div>{render_status_summary(status)}</div>
@@ -291,6 +323,45 @@ def render_runs(run_index: dict[str, Any] | None) -> str:
       </div>
       {content}
     </section>"""
+
+
+def render_guided_step_workspace(
+    groups: list[dict[str, Any]],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    action = current_workflow_action(status, report)
+    step = workflow_step(action)
+    selected = selected_group_label(groups, manifest)
+    command = controller_commands(manifest).get(action, "")
+    facts = "".join(f"<li>{escape(item)}</li>" for item in step["facts"])
+    return f"""
+    <div class="guided-grid">
+      <article class="selected-group-card">
+        <p class="eyebrow">Selected Knob Group</p>
+        <h2>{escape(selected)}</h2>
+        <p>{escape(step['group_hint'])}</p>
+        <div class="chips">{render_selected_group_chips(groups, manifest)}</div>
+      </article>
+      <article class="active-step-card">
+        <p class="eyebrow">Step {workflow_index(action)}: {escape(step['label'])}</p>
+        <h2>{escape(step['headline'])}</h2>
+        <ul class="fact-list">{facts}</ul>
+        {render_primary_action_button(action, manifest)}
+        <p class="next-note">Next: {escape(step['next'])}</p>
+      </article>
+      <article class="command-shell">
+        <p class="eyebrow">Controller command shell</p>
+        <h2>{escape(step['label'])} command</h2>
+        <pre><code>{escape(command or 'No command loaded for this step.')}</code></pre>
+        <button type="button" data-controller-action="{escape(action)}" data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">Run {escape(step['label'])}</button>
+        <div class="what-next">
+          <strong>What happens next?</strong>
+          <p>{escape(step['what_next'])}</p>
+        </div>
+      </article>
+    </div>"""
 
 
 def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str, Any] | None) -> str:
@@ -517,7 +588,11 @@ def render_failure_summary(candidates: dict[str, Any]) -> str:
     </div>"""
 
 
-def render_right_rail(manifest: dict[str, Any] | None, status: dict[str, Any] | None) -> str:
+def render_right_rail(
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
     gates: list[str] = []
     if manifest is not None:
         for stage in _list_of_dicts(manifest.get("stages")):
@@ -530,6 +605,7 @@ def render_right_rail(manifest: dict[str, Any] | None, status: dict[str, Any] | 
     unique_gates = sorted(set(gates))
     return f"""
     <aside class="right-rail">
+      {render_next_action_panel(manifest, status, report)}
       <section class="rail-panel">
         <h2>Execution</h2>
         {render_status_summary(status)}
@@ -544,6 +620,31 @@ def render_right_rail(manifest: dict[str, Any] | None, status: dict[str, Any] | 
         <p id="controller-feedback" class="controller-feedback" aria-live="polite">Choose an action to copy its CLI command.</p>
       </section>
     </aside>"""
+
+
+def render_next_action_panel(
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    action = current_workflow_action(status, report)
+    step = workflow_step(action)
+    command = controller_commands(manifest).get(action, "")
+    facts = "".join(f"<li>{escape(item)}</li>" for item in step["facts"])
+    followups = "".join(f"<li>{escape(item['label'])}</li>" for item in WORKFLOW_STEPS[workflow_index(action) : workflow_index(action) + 3])
+    return f"""
+      <section class="rail-panel next-action-card">
+        <p class="eyebrow">Next Action</p>
+        <span class="step-pill">Step {workflow_index(action)} of {len(WORKFLOW_STEPS)}</span>
+        <h2>{escape(step['headline'])}</h2>
+        <p>{escape(step['description'])}</p>
+        <ul class="fact-list compact">{facts}</ul>
+        <button type="button" class="primary-action" data-controller-action="{escape(action)}" data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">{escape(step['label'])}</button>
+        <div class="after-this">
+          <strong>After this:</strong>
+          <ul>{followups or '<li>Review the resulting artifacts.</li>'}</ul>
+        </div>
+      </section>"""
 
 
 def render_sources(sources: dict[str, str | None]) -> str:
@@ -611,22 +712,8 @@ def render_disabled_actions(manifest: dict[str, Any] | None) -> str:
 
 
 def render_controller_buttons(manifest: dict[str, Any] | None, *, compact: bool = False) -> str:
-    stages = _list_of_dicts((manifest or {}).get("stages"))
-    commands = {
-        str(stage.get("name") or "stage"): str(stage.get("command_hint") or "")
-        for stage in stages
-        if stage.get("command_hint")
-    }
-    if not commands:
-        commands = {
-            "plan": "uv run vllm-optimizer optimize-workload --mode plan --sweep SWEEP_JSON --out ARTIFACT_DIR",
-            "preview": "uv run vllm-optimizer cockpit-preview --sweep SWEEP_JSON --out-dir ARTIFACT_DIR",
-            "run": "uv run vllm-optimizer cockpit-run --sweep SWEEP_JSON --config config/local.gx10.json --out-dir ARTIFACT_DIR --confirm-live-run",
-            "report": "uv run vllm-optimizer optimize-workload --mode report --sweep SWEEP_JSON --out ARTIFACT_DIR",
-            "confirm": "uv run vllm-optimizer optimize-workload --mode confirm --sweep SWEEP_JSON --out ARTIFACT_DIR",
-            "promote": "uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT --force",
-        }
-    preferred = ["plan", "preview", "run", "report", "confirm", "promote"]
+    commands = controller_commands(manifest)
+    preferred = [step["action"] for step in WORKFLOW_STEPS]
     ordered = [(name, commands[name]) for name in preferred if name in commands]
     ordered.extend((name, command) for name, command in sorted(commands.items()) if name not in preferred)
     if compact:
@@ -634,6 +721,160 @@ def render_controller_buttons(manifest: dict[str, Any] | None, *, compact: bool 
     return "".join(
         f'<button type="button" data-controller-action="{escape(name)}" data-controller-endpoint="/api/controller/{escape(name)}" data-controller-command="{escape(command)}">{escape(name.title())}{help_button(name)}</button>'
         for name, command in ordered
+    )
+
+
+def controller_commands(manifest: dict[str, Any] | None) -> dict[str, str]:
+    stages = _list_of_dicts((manifest or {}).get("stages"))
+    commands = {
+        str(stage.get("name") or "stage"): str(stage.get("command_hint") or "")
+        for stage in stages
+        if stage.get("command_hint")
+    }
+    defaults = {
+        "plan": "uv run vllm-optimizer optimize-workload --mode plan --sweep SWEEP_JSON --out ARTIFACT_DIR",
+        "preview": "uv run vllm-optimizer cockpit-preview --sweep SWEEP_JSON --out-dir ARTIFACT_DIR",
+        "run": "uv run vllm-optimizer cockpit-run --sweep SWEEP_JSON --config config/local.gx10.json --out-dir ARTIFACT_DIR --confirm-live-run",
+        "report": "uv run vllm-optimizer optimize-workload --mode report --sweep SWEEP_JSON --out ARTIFACT_DIR",
+        "confirm": "uv run vllm-optimizer optimize-workload --mode confirm --sweep SWEEP_JSON --out ARTIFACT_DIR",
+        "promote": "uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT --allow-promotion",
+    }
+    return {**defaults, **commands}
+
+
+WORKFLOW_STEPS = [
+    {
+        "action": "plan",
+        "label": "Generate Plan",
+        "headline": "Generate Plan",
+        "description": "Build the proposed vLLM tuning plan for the selected knob group.",
+        "group_hint": "Start by turning the selected knob group into a deterministic blueprint.",
+        "facts": ["No execution", "Deterministic output", "Safe to run"],
+        "next": "Preview Commands will be enabled.",
+        "what_next": "After planning, preview the exact commands before execution.",
+    },
+    {
+        "action": "preview",
+        "label": "Preview Commands",
+        "headline": "Preview Commands",
+        "description": "Inspect the exact local and remote commands before any live run starts.",
+        "group_hint": "Check command shape, output paths, and required gates before running.",
+        "facts": ["No remote execution", "Shows required gates", "Good checkpoint"],
+        "next": "Run Optimization will be enabled.",
+        "what_next": "If the preview looks right, run the optimization with the live-run gate.",
+    },
+    {
+        "action": "run",
+        "label": "Run Optimization",
+        "headline": "Run Optimization",
+        "description": "Execute the selected sweep and write progress artifacts for reporting.",
+        "group_hint": "Run the selected tuning family and watch status artifacts update.",
+        "facts": ["Can touch GX10", "Requires confirmation", "Cancelable from server jobs"],
+        "next": "Load Report will be enabled after results exist.",
+        "what_next": "When execution finishes, generate or load the canonical report.",
+    },
+    {
+        "action": "report",
+        "label": "Load Report",
+        "headline": "Load Report",
+        "description": "Rank completed results and explain the current recommendation.",
+        "group_hint": "Turn run artifacts into a decision-ready report.",
+        "facts": ["Artifact only", "Shows winner", "Explains failures"],
+        "next": "Confirm Candidate will be enabled if a candidate is recommendable.",
+        "what_next": "Use confirmation before trusting a winner enough to promote it.",
+    },
+    {
+        "action": "confirm",
+        "label": "Confirm Candidate",
+        "headline": "Confirm Candidate",
+        "description": "Repeat checks so the current winner proves stable against baseline.",
+        "group_hint": "Verify the recommendation before writing any profile.",
+        "facts": ["Repeated checks", "Compares baseline", "No promotion yet"],
+        "next": "Promote Profile remains gated by explicit opt-in.",
+        "what_next": "If confirmation passes, decide whether to promote the profile.",
+    },
+    {
+        "action": "promote",
+        "label": "Promote Profile",
+        "headline": "Promote Profile",
+        "description": "Write the confirmed configuration only after the promotion gate.",
+        "group_hint": "Promotion is visible but intentionally gated.",
+        "facts": ["Writes profile", "Requires explicit gate", "Never automatic"],
+        "next": "Review promoted profile and rerun if workloads change.",
+        "what_next": "After promotion, keep the report and profile summary as provenance.",
+    },
+]
+
+
+def workflow_step(action: str) -> dict[str, Any]:
+    for step in WORKFLOW_STEPS:
+        if step["action"] == action:
+            return step
+    return WORKFLOW_STEPS[0]
+
+
+def workflow_index(action: str) -> int:
+    for index, step in enumerate(WORKFLOW_STEPS, start=1):
+        if step["action"] == action:
+            return index
+    return 1
+
+
+def current_workflow_action(status: dict[str, Any] | None, report: dict[str, Any] | None) -> str:
+    if report is not None:
+        recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
+        if str(recommendation.get("status") or "").lower() in {"confirmed", "promotable", "promoted"}:
+            return "promote"
+        return "confirm"
+    if status is not None:
+        overall = str(status.get("overall_status") or "").lower()
+        if overall in {"completed", "complete", "succeeded", "success"}:
+            return "report"
+        if overall in {"running", "cancel-requested", "failed"}:
+            return "run"
+    return "plan"
+
+
+def workflow_locked_label(action: str, manifest: dict[str, Any] | None) -> str:
+    if action == "promote":
+        promotion = manifest.get("promotion", {}) if isinstance((manifest or {}).get("promotion"), dict) else {}
+        return f"Locked ({promotion.get('required_gate') or '--allow-promotion'})"
+    if action == "run":
+        return "Locked (--confirm-live-run)"
+    return "Locked"
+
+
+def selected_group_label(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> str:
+    group = manifest.get("group", {}) if isinstance((manifest or {}).get("group"), dict) else {}
+    label = group.get("label") or group.get("id")
+    if label:
+        return str(label)
+    if groups:
+        return str(groups[0].get("label") or groups[0].get("id") or "No knob group selected")
+    return "No knob group selected"
+
+
+def render_selected_group_chips(groups: list[dict[str, Any]], manifest: dict[str, Any] | None) -> str:
+    selected = selected_group_label(groups, manifest)
+    selected_group = next(
+        (group for group in groups if selected in {str(group.get("label") or ""), str(group.get("id") or "")}),
+        groups[0] if groups else {},
+    )
+    values = [
+        str(selected_group.get("family") or "unknown family"),
+        str(selected_group.get("safety_tier") or "unknown safety"),
+        str(selected_group.get("command_kind") or "workflow"),
+    ]
+    return "".join(f"<span>{escape(value)}</span>" for value in values)
+
+
+def render_primary_action_button(action: str, manifest: dict[str, Any] | None) -> str:
+    step = workflow_step(action)
+    command = controller_commands(manifest).get(action, "")
+    return (
+        f'<button type="button" class="primary-action" data-controller-action="{escape(action)}" '
+        f'data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">'
+        f'{escape(step["label"])} -></button>'
     )
 
 
@@ -790,6 +1031,37 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .panel { padding: 20px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
+.workflow-band { padding: 18px 22px; border: 1px solid rgba(55, 216, 255, .22); border-radius: 8px; background: linear-gradient(135deg, rgba(7, 17, 31, .94), rgba(10, 22, 39, .88)); }
+.workflow-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.workflow-heading h2 { margin: 0; }
+.workflow-heading span, .step-pill { color: var(--ink); border: 1px solid rgba(55,216,255,.28); background: rgba(55,216,255,.12); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 760; }
+.workflow-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.workflow-step { position: relative; display: grid; gap: 8px; justify-items: center; min-height: 118px; padding: 14px 10px; border-radius: 8px; border: 1px solid rgba(55,216,255,.14); background: rgba(13,27,47,.64); text-align: center; }
+.workflow-step:not(:last-child)::after { content: "->"; position: absolute; right: -12px; top: 45px; color: var(--cyan); font-weight: 900; z-index: 2; }
+.workflow-step.active { border-color: rgba(73,242,161,.62); background: rgba(73,242,161,.09); box-shadow: inset 0 0 0 1px rgba(73,242,161,.18); }
+.workflow-step.complete { border-color: rgba(55,216,255,.36); }
+.workflow-step.locked { opacity: .78; }
+.step-index { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan), var(--green)); color: #04101b; font-weight: 900; }
+.workflow-step.locked .step-index { background: rgba(141,164,187,.24); color: var(--muted); }
+.workflow-step strong { font-size: 15px; }
+.workflow-step small { color: var(--muted); min-height: 20px; overflow-wrap: anywhere; }
+.guided-grid { display: grid; grid-template-columns: minmax(220px, .95fr) minmax(260px, 1fr) minmax(260px, .9fr); gap: 14px; margin-bottom: 16px; }
+.selected-group-card, .active-step-card, .command-shell { border: 1px solid rgba(55,216,255,.18); border-radius: 8px; background: rgba(3,8,16,.34); padding: 16px; }
+.selected-group-card h2, .active-step-card h2, .command-shell h2 { font-size: 22px; line-height: 1.2; }
+.fact-list { display: grid; gap: 8px; padding: 0; margin: 14px 0; list-style: none; }
+.fact-list li { position: relative; min-height: 28px; padding: 7px 9px 7px 32px; border: 1px solid rgba(73,242,161,.16); border-radius: 8px; background: rgba(73,242,161,.06); }
+.fact-list li::before { content: "✓"; position: absolute; left: 10px; color: var(--green); font-weight: 900; }
+.fact-list.compact li { background: transparent; border: 0; padding-top: 3px; padding-bottom: 3px; }
+.primary-action { width: 100%; min-height: 52px; color: white; border: 0; background: linear-gradient(135deg, #22b8ff, #4653ff); font-size: 16px; font-weight: 850; }
+.next-note { margin: 14px 0 0; color: var(--amber); }
+.command-shell pre { margin: 12px 0; padding: 14px; min-height: 108px; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid rgba(55,216,255,.18); border-radius: 8px; background: rgba(0,0,0,.26); }
+.command-shell pre code { display: block; border: 0; background: transparent; padding: 0; }
+.what-next { margin-top: 14px; padding: 12px; border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(55,216,255,.06); }
+.what-next strong { display: block; margin-bottom: 6px; }
+.next-action-card { border-color: rgba(55,216,255,.34); background: linear-gradient(180deg, rgba(10, 25, 45, .96), rgba(7, 14, 26, .96)); }
+.next-action-card h2 { font-size: 22px; margin: 14px 0 10px; }
+.after-this { border-top: 1px solid rgba(55,216,255,.15); margin-top: 16px; padding-top: 14px; }
+.after-this ul { display: grid; gap: 7px; margin: 10px 0 0; padding-left: 18px; }
 .section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
 .section-heading p { max-width: 480px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -855,19 +1127,33 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .run-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .run-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 14px; }
 .run-paths { display: grid; gap: 5px; margin-top: 10px; overflow-wrap: anywhere; }
+@media (max-width: 1450px) {
+  .cockpit { grid-template-columns: 240px minmax(0, 1fr) 280px; }
+  .hero { grid-template-columns: 1fr; min-height: auto; }
+  .hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .workflow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .workflow-step:nth-child(3)::after { display: none; }
+  .guided-grid { grid-template-columns: 1fr; }
+  .command-shell { grid-column: auto; }
+}
 @media (max-width: 1180px) {
   .cockpit { grid-template-columns: 220px minmax(0, 1fr); }
   .right-rail { grid-column: 1 / -1; position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 820px) {
-  .cockpit, .hero, .status-grid, .right-rail { grid-template-columns: 1fr; }
+  .cockpit, .hero, .hero-grid, .status-grid, .right-rail { grid-template-columns: 1fr; }
   .left-rail, .right-rail { position: static; max-height: none; }
   .workspace { order: 1; }
   .left-rail { order: 2; }
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .workflow-steps { grid-template-columns: 1fr; }
+  .command-shell { grid-column: auto; }
+  .workflow-heading { align-items: flex-start; flex-direction: column; }
+  .workflow-step { justify-items: start; text-align: left; grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 76px; }
+  .workflow-step small { grid-column: 2; }
+  .workflow-step::after { display: none; }
 }
 """
 

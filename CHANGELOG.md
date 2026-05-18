@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.48.0 - 2026-05-18
+
+- Redesigned `web-cockpit` around a guided six-step mission-control workflow.
+- Added a Next Action panel, active-step command shell, and clearer locked
+  safety states for Plan, Preview, Run, Report, Confirm, and Promote.
+- Kept the cockpit deterministic and dependency-free while preserving local
+  controller API hooks and static command-copy fallback.
+
 ## 0.47.0 - 2026-05-18
 
 - Added `cockpit-launch`, a one-command launcher that generates standard

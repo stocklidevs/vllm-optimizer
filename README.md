@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.47.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.48.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -106,6 +106,8 @@ The project is spec-driven with SpecKit and currently supports:
   cards, polling, and cancel requests for in-flight controller jobs.
 - A one-command `cockpit-launch` shortcut that prepares standard cockpit
   artifacts and starts the active localhost cockpit.
+- A guided mission-control cockpit layout with a six-step workflow, Next Action
+  panel, active command shell, and clearer locked safety states.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -290,20 +292,17 @@ generates the knob catalog, selected sweep control manifest, and run index, then
 starts the active cockpit at `http://127.0.0.1:8787`. Optional flags can override
 the sweep, config, output directory, host, and port.
 
-`web-cockpit` is the first combined web interface. It is static and read-only:
-knob groups, pipeline stages, safety gates, status, and report summaries are
-loaded from existing artifacts, while future controller actions are visible but
-disabled. It includes local-only tab switching, knob family filters, and search
-without a server. Report views include recommendation detail, throughput and
-latency bars, candidate failure summaries, rationale, and next actions. The
-Runs tab can browse a `run-browser` index. Controller buttons copy deterministic
-CLI commands or show them inline when clipboard access is unavailable, while
-browser-side execution remains gated. A How to Use tab and question-mark
-tooltips explain Plan, Preview, Run, Report, Confirm, and Promote. The
-Promotion tab displays candidate, objective, gate, and promotion command hints
-while keeping browser promotion disabled. This implementation intentionally uses
-no npm packages. If a future spec adds npm, dependency versions must be pinned,
-vulnerability-reviewed, and installed with `npm ci`.
+`web-cockpit` is the combined web interface. It presents a guided
+mission-control workflow for Plan, Preview, Run, Report, Confirm, and Promote,
+with a Next Action panel, active command shell, progress feedback, safety gates,
+and secondary tabs for detailed inspection. Knob groups, pipeline stages,
+safety gates, status, report summaries, and run indexes are loaded from
+deterministic artifacts. Controller buttons call the local server when served by
+`cockpit-server`, or copy deterministic CLI commands when opened as static
+HTML. Browser-side execution and promotion remain explicitly gated. This
+implementation intentionally uses no npm packages. If a future spec adds npm,
+dependency versions must be pinned, vulnerability-reviewed, and installed with
+`npm ci`.
 
 Smoke serve:
 
