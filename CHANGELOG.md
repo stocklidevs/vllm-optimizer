@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.2 - 2026-05-23
+
+- Removed deprecated standalone `Safety Gates` and `Controller` panels from the
+  cockpit right rail.
+- Moved controller feedback into the command shell so action status appears next
+  to the command being run.
+
 ## 0.50.1 - 2026-05-23
 
 - Fixed cockpit family filters so they update the left-rail tuning-area selector

@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.1-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.2-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -309,9 +309,11 @@ report summaries, and run indexes are loaded from deterministic artifacts. The
 left rail lets you select a tuning area and see the actual knobs being tuned,
 and family filters update that same selector rather than only the detail tab,
 while internal experiment history terms such as rerun stay out of user-facing
-labels. Controller buttons call the local server when served by
-`cockpit-server`, or copy deterministic CLI commands when opened as static
-HTML. Browser-side execution and promotion remain explicitly gated. This
+labels. The right rail focuses on the next action and execution status, while
+the command shell carries controller feedback next to the command being run.
+Controller buttons call the local server when served by `cockpit-server`, or
+copy deterministic CLI commands when opened as static HTML. Browser-side
+execution and promotion remain explicitly gated. This
 implementation intentionally uses no npm packages. If a future spec adds npm,
 dependency versions must be pinned, vulnerability-reviewed, and installed with
 `npm ci`.

@@ -296,6 +296,33 @@ def test_web_cockpit_renders_guided_mission_workflow() -> None:
     assert "What happens next?" in html
 
 
+def test_web_cockpit_right_rail_omits_deprecated_panels() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "stages": [
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer cockpit-run --confirm-live-run",
+                    "required_gates": ["--confirm-live-run"],
+                }
+            ],
+            "promotion": {"required_gate": "--allow-promotion"},
+        },
+    )
+
+    right_rail = html.split('<aside class="right-rail">', 1)[1].split("</aside>", 1)[0]
+
+    assert "Next Action" in right_rail
+    assert "Execution" in right_rail
+    assert "Safety Gates" not in right_rail
+    assert "<h2>Controller</h2>" not in right_rail
+    assert "--confirm-live-run" not in right_rail
+    assert "--allow-promotion" not in right_rail
+    assert 'id="controller-feedback"' in html
+    assert "Controller command shell" in html
+
+
 def test_web_cockpit_renders_selectable_tuning_areas() -> None:
     html = render_web_cockpit(
         catalog={

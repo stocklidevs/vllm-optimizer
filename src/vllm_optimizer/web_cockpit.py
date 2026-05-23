@@ -443,6 +443,7 @@ def render_guided_step_workspace(
         <h2>{escape(step['label'])} command</h2>
         <pre><code>{escape(command or 'No command loaded for this step.')}</code></pre>
         <button type="button" data-controller-action="{escape(action)}" data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">Run {escape(step['label'])}</button>
+        <p id="controller-feedback" class="controller-feedback" aria-live="polite">Ready to run the selected step from the cockpit server.</p>
         <div class="what-next">
           <strong>What happens next?</strong>
           <p>{escape(step['what_next'])}</p>
@@ -680,31 +681,12 @@ def render_right_rail(
     status: dict[str, Any] | None,
     report: dict[str, Any] | None,
 ) -> str:
-    gates: list[str] = []
-    if manifest is not None:
-        for stage in _list_of_dicts(manifest.get("stages")):
-            for gate in stage.get("required_gates") or []:
-                gates.append(str(gate))
-        promotion = manifest.get("promotion", {}) if isinstance(manifest.get("promotion"), dict) else {}
-        gate = promotion.get("required_gate")
-        if gate:
-            gates.append(str(gate))
-    unique_gates = sorted(set(gates))
     return f"""
     <aside class="right-rail">
       {render_next_action_panel(manifest, status, report)}
       <section class="rail-panel">
         <h2>Execution</h2>
         {render_status_summary(status)}
-      </section>
-      <section class="rail-panel">
-        <h2>Safety Gates</h2>
-        {''.join(f'<code>{escape(gate)}</code>' for gate in unique_gates) or '<p class="empty">No gates loaded.</p>'}
-      </section>
-      <section class="rail-panel actions">
-        <h2>Controller</h2>
-        {render_controller_buttons(manifest, compact=True)}
-        <p id="controller-feedback" class="controller-feedback" aria-live="polite">Choose an action to copy its CLI command.</p>
       </section>
     </aside>"""
 

@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/053-family-filter-tuning-area-selection/plan.md
+specs/054-right-rail-cleanup/plan.md
 <!-- SPECKIT END -->
