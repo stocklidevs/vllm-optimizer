@@ -288,10 +288,10 @@ def test_web_cockpit_renders_guided_mission_workflow() -> None:
     assert "Locked (--allow-promotion)" in html
     assert "Step 1 of 6" in html
     assert "Next Action" in html
-    assert "Generate Plan" in html
+    assert "Start Optimization" in html
     assert "No execution" in html
-    assert "Deterministic output" in html
-    assert "Safe to run" in html
+    assert "Plans automatically" in html
+    assert "Stops at real gates" in html
     assert "Controller command shell" in html
     assert "What happens next?" in html
 
@@ -317,10 +317,40 @@ def test_web_cockpit_right_rail_omits_deprecated_panels() -> None:
     assert "Execution" in right_rail
     assert "Safety Gates" not in right_rail
     assert "<h2>Controller</h2>" not in right_rail
-    assert "--confirm-live-run" not in right_rail
     assert "--allow-promotion" not in right_rail
     assert 'id="controller-feedback"' in html
     assert "Controller command shell" in html
+
+
+def test_web_cockpit_uses_start_optimization_as_primary_cta() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "stages": [
+                {
+                    "name": "plan",
+                    "command_hint": "uv run vllm-optimizer optimize-workload --mode plan",
+                },
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer cockpit-run --confirm-live-run",
+                    "remote": True,
+                    "required_gates": ["--confirm-live-run"],
+                },
+            ],
+            "promotion": {"required_gate": "--allow-promotion"},
+        },
+    )
+
+    right_rail = html.split('<aside class="right-rail">', 1)[1].split("</aside>", 1)[0]
+
+    assert "Start Optimization" in right_rail
+    assert "Generate Plan" not in right_rail
+    assert 'data-controller-action="run"' in right_rail
+    assert 'data-controller-command="uv run vllm-optimizer cockpit-run --confirm-live-run"' in right_rail
+    assert "Runs plan and preview first" in right_rail
+    assert 'data-pipeline-stage="plan"' in html
+    assert "<strong>Generate Plan</strong>" in html
 
 
 def test_web_cockpit_renders_selectable_tuning_areas() -> None:

@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.2-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.3-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -301,11 +301,13 @@ starts the active cockpit at `http://127.0.0.1:8787`. Optional flags can overrid
 the sweep, config, output directory, host, and port.
 
 `web-cockpit` is the combined web interface. It presents a guided
-mission-control workflow with one primary optimization flow and automatic
-pipeline progress for Plan, Preview, Run, Report, and Confirm. The cockpit only
-interrupts the user for real gates such as live GX10 execution, risky/session
-opt-in, and promotion. Tuning areas, pipeline stages, safety gates, status,
-report summaries, and run indexes are loaded from deterministic artifacts. The
+mission-control workflow with one primary `Start Optimization` action and
+automatic pipeline progress for Plan, Preview, Run, Report, and Confirm. Plan
+is treated as an internal traceable stage, not the main user choice. The
+cockpit only interrupts the user for real gates such as live GX10 execution,
+risky/session opt-in, and promotion. Tuning areas, pipeline stages, safety
+gates, status, report summaries, and run indexes are loaded from deterministic
+artifacts. The
 left rail lets you select a tuning area and see the actual knobs being tuned,
 and family filters update that same selector rather than only the detail tab,
 while internal experiment history terms such as rerun stay out of user-facing

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.3 - 2026-05-23
+
+- Replaced primary cockpit `Generate Plan` calls-to-action with
+  `Start Optimization`.
+- Kept Plan visible as an internal pipeline progress stage for artifact
+  traceability.
+
 ## 0.50.2 - 2026-05-23
 
 - Removed deprecated standalone `Safety Gates` and `Controller` panels from the

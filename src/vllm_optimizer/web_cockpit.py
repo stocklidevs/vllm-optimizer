@@ -416,9 +416,10 @@ def render_guided_step_workspace(
 ) -> str:
     action = current_workflow_action(status, report)
     step = workflow_step(action)
+    primary = primary_cockpit_action(action)
     selected = selected_group_label(groups, manifest)
-    command = controller_commands(manifest).get(action, "")
-    facts = "".join(f"<li>{escape(item)}</li>" for item in step["facts"])
+    command = controller_commands(manifest).get(primary["action"], controller_commands(manifest).get(action, ""))
+    facts = "".join(f"<li>{escape(item)}</li>" for item in primary["facts"])
     return f"""
     <div class="guided-grid">
       <article class="selected-group-card">
@@ -432,21 +433,21 @@ def render_guided_step_workspace(
         </div>
       </article>
       <article class="active-step-card">
-        <p class="eyebrow">Step {workflow_index(action)}: {escape(step['label'])}</p>
-        <h2>{escape(step['headline'])}</h2>
+        <p class="eyebrow">{escape(primary['eyebrow'])}</p>
+        <h2>{escape(primary['headline'])}</h2>
         <ul class="fact-list">{facts}</ul>
-        {render_primary_action_button(action, manifest)}
-        <p class="next-note">Next: {escape(step['next'])}</p>
+        {render_primary_action_button(primary['action'], manifest, label=primary['label'])}
+        <p class="next-note">Next: {escape(primary['next'])}</p>
       </article>
       <article class="command-shell">
         <p class="eyebrow">Controller command shell</p>
-        <h2>{escape(step['label'])} command</h2>
+        <h2>{escape(primary['label'])} command</h2>
         <pre><code>{escape(command or 'No command loaded for this step.')}</code></pre>
-        <button type="button" data-controller-action="{escape(action)}" data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">Run {escape(step['label'])}</button>
+        <button type="button" data-controller-action="{escape(primary['action'])}" data-controller-endpoint="/api/controller/{escape(primary['action'])}" data-controller-command="{escape(command)}">{escape(primary['label'])}</button>
         <p id="controller-feedback" class="controller-feedback" aria-live="polite">Ready to run the selected step from the cockpit server.</p>
         <div class="what-next">
           <strong>What happens next?</strong>
-          <p>{escape(step['what_next'])}</p>
+          <p>{escape(primary['what_next'])}</p>
         </div>
       </article>
     </div>"""
@@ -697,18 +698,18 @@ def render_next_action_panel(
     report: dict[str, Any] | None,
 ) -> str:
     action = current_workflow_action(status, report)
-    step = workflow_step(action)
-    command = controller_commands(manifest).get(action, "")
-    facts = "".join(f"<li>{escape(item)}</li>" for item in step["facts"])
+    primary = primary_cockpit_action(action)
+    command = controller_commands(manifest).get(primary["action"], controller_commands(manifest).get(action, ""))
+    facts = "".join(f"<li>{escape(item)}</li>" for item in primary["facts"])
     followups = "".join(f"<li>{escape(item['label'])}</li>" for item in WORKFLOW_STEPS[workflow_index(action) : workflow_index(action) + 3])
     return f"""
       <section class="rail-panel next-action-card">
         <p class="eyebrow">Next Action</p>
         <span class="step-pill">Step {workflow_index(action)} of {len(WORKFLOW_STEPS)}</span>
-        <h2>{escape(step['headline'])}</h2>
-        <p>{escape(step['description'])}</p>
+        <h2>{escape(primary['headline'])}</h2>
+        <p>{escape(primary['description'])}</p>
         <ul class="fact-list compact">{facts}</ul>
-        <button type="button" class="primary-action" data-controller-action="{escape(action)}" data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">{escape(step['label'])}</button>
+        <button type="button" class="primary-action" data-controller-action="{escape(primary['action'])}" data-controller-endpoint="/api/controller/{escape(primary['action'])}" data-controller-command="{escape(command)}">{escape(primary['label'])}</button>
         <div class="after-this">
           <strong>After this:</strong>
           <ul>{followups or '<li>Review the resulting artifacts.</li>'}</ul>
@@ -920,6 +921,31 @@ def current_workflow_action(status: dict[str, Any] | None, report: dict[str, Any
     return "plan"
 
 
+def primary_cockpit_action(action: str) -> dict[str, Any]:
+    if action in {"plan", "preview"}:
+        return {
+            "action": "run",
+            "label": "Start Optimization",
+            "headline": "Start Optimization",
+            "eyebrow": "Automatic flow",
+            "description": "Runs plan and preview first, then stops for live GX10 confirmation before remote execution.",
+            "facts": ["Plans automatically", "Previews safety", "Stops at real gates"],
+            "next": "The cockpit will plan, preview, then ask before live GX10 execution.",
+            "what_next": "The cockpit creates the plan and preview artifacts first, then uses the live-run confirmation gate before touching the GX10.",
+        }
+    step = workflow_step(action)
+    return {
+        "action": action,
+        "label": step["label"],
+        "headline": step["headline"],
+        "eyebrow": f"Step {workflow_index(action)}: {step['label']}",
+        "description": step["description"],
+        "facts": step["facts"],
+        "next": step["next"],
+        "what_next": step["what_next"],
+    }
+
+
 def pipeline_progress(status: dict[str, Any] | None, report: dict[str, Any] | None) -> int:
     if report is not None:
         recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
@@ -1059,13 +1085,13 @@ def dedupe_strings(values: list[str]) -> list[str]:
     return deduped
 
 
-def render_primary_action_button(action: str, manifest: dict[str, Any] | None) -> str:
-    step = workflow_step(action)
+def render_primary_action_button(action: str, manifest: dict[str, Any] | None, *, label: str | None = None) -> str:
     command = controller_commands(manifest).get(action, "")
+    text = label or workflow_step(action)["label"]
     return (
         f'<button type="button" class="primary-action" data-controller-action="{escape(action)}" '
         f'data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">'
-        f'{escape(step["label"])} -></button>'
+        f'{escape(text)} -></button>'
     )
 
 
