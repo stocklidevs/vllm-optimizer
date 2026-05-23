@@ -77,7 +77,7 @@ class CockpitJobStore:
         with self._lock:
             if job_id not in self._jobs:
                 raise CockpitServerError(f"unknown job: {job_id}")
-            return dict(self._jobs[job_id])
+            return _job_with_runtime_state(self._jobs[job_id])
 
     def wait(self, job_id: str, timeout_seconds: float) -> dict[str, Any]:
         deadline = monotonic() + timeout_seconds
@@ -182,11 +182,29 @@ def handle_controller_action(
     raise CockpitServerError(f"unsupported controller action: {action}")
 
 
+def _job_with_runtime_state(job: dict[str, Any]) -> dict[str, Any]:
+    visible = dict(job)
+    elapsed = max(0, int(monotonic() - float(job.get("started_at_monotonic", monotonic()))))
+    visible["elapsed_seconds"] = elapsed
+    if visible.get("status") in {"running", "cancel-requested"}:
+        heartbeat = min(85, 8 + (elapsed * 2))
+        visible["progress_percent"] = max(int(visible.get("progress_percent") or 0), heartbeat)
+        visible["plain_summary"] = plain_summary(str(visible.get("action") or "action"), str(visible.get("status") or "running"), visible)
+    return visible
+
+
 def plain_summary(action: str, status: str, result: dict[str, Any] | None = None) -> dict[str, str]:
     result = result or {}
     if status == "running":
+        elapsed = int(result.get("elapsed_seconds") or 0)
+        if action == "run":
+            return {
+                "what_happened": f"Live optimization is running ({elapsed}s elapsed).",
+                "what_it_means": "The cockpit is executing the automatic pipeline and may be using the GX10 for live trials.",
+                "next_step": "Keep this page open to watch progress, or request cancel if you need to stop.",
+            }
         return {
-            "what_happened": f"I am working on {action}.",
+            "what_happened": f"I am working on {action} ({elapsed}s elapsed).",
             "what_it_means": "The cockpit asked the local controller to do one job.",
             "next_step": "Watch the progress bar.",
         }

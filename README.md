@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.3-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.4-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -311,8 +311,9 @@ artifacts. The
 left rail lets you select a tuning area and see the actual knobs being tuned,
 and family filters update that same selector rather than only the detail tab,
 while internal experiment history terms such as rerun stay out of user-facing
-labels. The right rail focuses on the next action and execution status, while
-the command shell carries controller feedback next to the command being run.
+labels. The right rail focuses on the next action and live execution status,
+including active job progress and elapsed time while the controller is running.
+The command shell carries controller feedback next to the command being run.
 Controller buttons call the local server when served by `cockpit-server`, or
 copy deterministic CLI commands when opened as static HTML. Browser-side
 execution and promotion remain explicitly gated. This

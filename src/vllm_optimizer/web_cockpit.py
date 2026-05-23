@@ -687,9 +687,32 @@ def render_right_rail(
       {render_next_action_panel(manifest, status, report)}
       <section class="rail-panel">
         <h2>Execution</h2>
-        {render_status_summary(status)}
+        {render_live_execution_summary(status)}
       </section>
     </aside>"""
+
+
+def render_live_execution_summary(status: dict[str, Any] | None) -> str:
+    initial_status = str((status or {}).get("overall_status") or "idle")
+    initial_summary = "No active operation yet." if status is None else "Loaded status artifact."
+    initial_progress = 0
+    if status is not None:
+        trial_counts = status.get("trial_counts", {}) if isinstance(status.get("trial_counts"), dict) else {}
+        completed = _number(trial_counts.get("completed")) or 0
+        total = _number(trial_counts.get("total")) or 0
+        initial_progress = int((completed / total) * 100) if total else 0
+    return f"""
+    <div class="live-execution" id="live-execution-panel">
+      <div class="summary-block compact">
+        <span id="live-execution-title">Status</span>
+        <strong id="live-execution-status">{escape(initial_status)}</strong>
+        <small id="live-execution-elapsed">{escape(initial_summary)}</small>
+      </div>
+      <div class="progress-track mini-progress" aria-label="Live execution progress">
+        <div id="live-execution-progress-bar" class="progress-bar" style="width:{initial_progress}%"></div>
+      </div>
+      <p id="live-execution-summary" class="controller-feedback">{escape(initial_summary)}</p>
+    </div>"""
 
 
 def render_next_action_panel(
@@ -1586,17 +1609,35 @@ function renderOperationResult(job) {
   const meaning = document.getElementById('operation-meaning');
   const next = document.getElementById('operation-next');
   const cancel = document.getElementById('operation-cancel');
+  const liveTitle = document.getElementById('live-execution-title');
+  const liveStatus = document.getElementById('live-execution-status');
+  const liveElapsed = document.getElementById('live-execution-elapsed');
+  const liveBar = document.getElementById('live-execution-progress-bar');
+  const liveSummary = document.getElementById('live-execution-summary');
   const summary = job.plain_summary || {};
   const progress = Math.max(0, Math.min(100, Number(job.progress_percent || 0)));
-  if (title) title.textContent = (job.action || 'Action') + ': ' + (job.status || 'unknown');
+  const actionLabel = formatActionLabel(job.action || 'action');
+  const statusLabel = job.status || 'unknown';
+  const elapsed = Number(job.elapsed_seconds || 0);
+  if (title) title.textContent = actionLabel + ': ' + statusLabel;
   if (bar) bar.style.width = progress + '%';
   if (what) what.textContent = summary.what_happened || 'The controller updated this operation.';
   if (meaning) meaning.textContent = summary.what_it_means || 'The cockpit is waiting for more details.';
   if (next) next.textContent = summary.next_step || 'Choose the next safe step.';
+  if (liveTitle) liveTitle.textContent = actionLabel;
+  if (liveStatus) liveStatus.textContent = statusLabel;
+  if (liveElapsed) liveElapsed.textContent = elapsed ? elapsed + 's elapsed' : 'Just started';
+  if (liveBar) liveBar.style.width = progress + '%';
+  if (liveSummary) liveSummary.textContent = summary.what_happened || 'Operation state updated.';
   if (cancel) {
     cancel.disabled = !job.job_id || !['running', 'cancel-requested'].includes(job.status);
     cancel.dataset.jobId = job.job_id || '';
   }
+}
+
+function formatActionLabel(action) {
+  if (action === 'run') return 'Start Optimization';
+  return String(action || 'action').replace(/[-_]/g, ' ').replace(/\\b\\w/g, (letter) => letter.toUpperCase());
 }
 
 async function pollControllerJob(jobId) {

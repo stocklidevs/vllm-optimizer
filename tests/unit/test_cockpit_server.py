@@ -88,6 +88,33 @@ def test_cockpit_job_store_tracks_completed_action(tmp_path: Path) -> None:
     assert result["plain_summary"]["next_step"] == "Click Preview to check if it is safe."
 
 
+def test_cockpit_job_store_reports_running_heartbeat() -> None:
+    store = CockpitJobStore()
+
+    def never_finishes(_action, _payload, _config):
+        import time
+
+        time.sleep(2)
+        return {"action": "run", "status": "completed"}
+
+    job = store.start(
+        "run",
+        {"confirm_live_run": True},
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            config_path=Path("config/gx10.example.json"),
+            out_dir=Path("artifacts/server-job-heartbeat-test"),
+        ),
+        action_runner=never_finishes,
+    )
+    running = store.get(job["job_id"])
+
+    assert running["status"] == "running"
+    assert running["elapsed_seconds"] >= 0
+    assert running["progress_percent"] >= 8
+    assert "live optimization is running" in running["plain_summary"]["what_happened"].lower()
+
+
 def test_cockpit_job_store_cancel_marks_running_job() -> None:
     store = CockpitJobStore()
 

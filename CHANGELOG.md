@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.4 - 2026-05-23
+
+- Added live right-rail execution feedback for active cockpit jobs, including
+  progress and elapsed-time updates.
+- Added heartbeat progress to active controller jobs while long-running
+  optimization work is still in progress.
+
 ## 0.50.3 - 2026-05-23
 
 - Replaced primary cockpit `Generate Plan` calls-to-action with
