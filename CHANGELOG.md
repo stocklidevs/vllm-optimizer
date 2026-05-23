@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.1 - 2026-05-23
+
+- Fixed cockpit family filters so they update the left-rail tuning-area selector
+  and the detailed Tuning Areas tab together.
+- Added left-rail empty-state and auto-selection behavior when a family filter
+  is applied.
+
 ## 0.50.0 - 2026-05-23
 
 - Added an automatic pipeline progress panel to `web-cockpit` with one primary

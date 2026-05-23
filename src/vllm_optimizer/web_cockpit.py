@@ -98,10 +98,10 @@ def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
         f'<button type="button" data-family-filter="{escape(family)}">{escape(family)}</button>' for family in families
     ) or '<span class="empty">No families</span>'
     group_items = []
-    for group in groups[:10]:
+    for group in groups:
         group_items.append(
             f"""
-            <button type="button" class="mini-card tuning-area-option {escape(str(group.get('safety_tier') or 'unknown'))}" data-tuning-area-id="{escape(str(group.get('id') or ''))}" data-tuning-area-label="{escape(group_label(group))}" data-tuning-area-family="{escape(group_display_family(group))}" data-tuning-area-safety="{escape(str(group.get('safety_tier') or 'unknown'))}" data-tuning-area-description="{escape(str(group.get('description') or 'No description.'))}" data-tuning-area-config="{escape(str(group.get('config_path') or 'n/a'))}" data-knobs-tuned="{escape('|'.join(group_knobs(group)))}">
+            <button type="button" class="mini-card tuning-area-option {escape(str(group.get('safety_tier') or 'unknown'))}" data-family="{escape(str(group.get('family') or 'unknown'))}" data-search="{escape(group_search_text(group))}" data-tuning-area-id="{escape(str(group.get('id') or ''))}" data-tuning-area-label="{escape(group_label(group))}" data-tuning-area-family="{escape(group_display_family(group))}" data-tuning-area-safety="{escape(str(group.get('safety_tier') or 'unknown'))}" data-tuning-area-description="{escape(str(group.get('description') or 'No description.'))}" data-tuning-area-config="{escape(str(group.get('config_path') or 'n/a'))}" data-knobs-tuned="{escape('|'.join(group_knobs(group)))}">
               <strong>{escape(group_label(group))}</strong>
               <span>{escape(str(group.get('safety_tier') or 'unknown'))}</span>
             </button>"""
@@ -119,6 +119,7 @@ def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
       <div class="rail-section">
         <h2>Tuning Areas</h2>
         {''.join(group_items) or '<p class="empty">No tuning areas loaded.</p>'}
+        <p class="empty hidden" id="rail-empty-state">No tuning areas match this family.</p>
       </div>
     </aside>"""
 
@@ -748,20 +749,7 @@ def render_sources(sources: dict[str, str | None]) -> str:
 
 def render_group_card(group: dict[str, Any]) -> str:
     gate = "requires opt-in" if group.get("requires_opt_in") else "no extra opt-in"
-    search_text = " ".join(
-        dedupe_strings(
-            [
-                group_label(group),
-                group_display_family(group),
-                str(group.get("id") or ""),
-                str(group.get("family") or ""),
-                str(group.get("safety_tier") or ""),
-                str(group.get("description") or ""),
-                str(group.get("command_kind") or ""),
-                str(group.get("config_path") or ""),
-            ]
-        )
-    ).lower()
+    search_text = group_search_text(group)
     knobs = group_knobs(group)
     return f"""
     <article class="group-card {escape(str(group.get('safety_tier') or 'unknown'))}" data-family="{escape(str(group.get('family') or 'unknown'))}" data-search="{escape(search_text)}" data-tuning-area-id="{escape(str(group.get('id') or ''))}">
@@ -775,6 +763,23 @@ def render_group_card(group: dict[str, Any]) -> str:
         <div><dt>Config</dt><dd><code>{escape(str(group.get('config_path') or 'n/a'))}</code></dd></div>
       </dl>
     </article>"""
+
+
+def group_search_text(group: dict[str, Any]) -> str:
+    return " ".join(
+        dedupe_strings(
+            [
+                group_label(group),
+                group_display_family(group),
+                str(group.get("id") or ""),
+                str(group.get("family") or ""),
+                str(group.get("safety_tier") or ""),
+                str(group.get("description") or ""),
+                str(group.get("command_kind") or ""),
+                str(group.get("config_path") or ""),
+            ]
+        )
+    ).lower()
 
 
 def render_status_summary(status: dict[str, Any] | None) -> str:
@@ -1294,7 +1299,7 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .filter-bar { display: grid; gap: 8px; margin-bottom: 14px; }
 .filter-bar label { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 760; }
 .filter-bar input { width: 100%; min-height: 40px; color: var(--ink); background: rgba(3,8,16,.62); border: 1px solid rgba(55,216,255,.18); border-radius: 6px; padding: 9px 11px; }
-.hidden { display: none; }
+.hidden { display: none !important; }
 .group-card, .mini-card { padding: 14px; }
 .mini-card { display: grid; gap: 5px; width: 100%; min-height: auto; text-align: left; }
 .tuning-area-option.active { border-color: rgba(73,242,161,.72); background: rgba(73,242,161,.12); box-shadow: inset 0 0 0 1px rgba(73,242,161,.18); }
@@ -1403,18 +1408,31 @@ function setActiveTab(tab) {
 
 function applyGroupFilters() {
   const query = state.query.trim().toLowerCase();
-  let visible = 0;
-  document.querySelectorAll('.group-card').forEach((card) => {
+  let gridVisible = 0;
+  let railVisible = 0;
+  document.querySelectorAll('.group-card, .tuning-area-option').forEach((card) => {
     const familyMatch = state.family === 'all' || card.dataset.family === state.family;
     const queryMatch = !query || (card.dataset.search || '').includes(query);
-    const show = familyMatch && queryMatch;
+    const railItem = card.classList.contains('tuning-area-option');
+    const show = familyMatch && (railItem || queryMatch);
     card.classList.toggle('hidden', !show);
-    if (show) visible += 1;
+    if (show && railItem) railVisible += 1;
+    if (show && !railItem) gridVisible += 1;
   });
   const count = document.getElementById('visible-group-count');
-  if (count) count.textContent = String(visible);
+  if (count) count.textContent = String(gridVisible);
   const empty = document.getElementById('group-empty-state');
-  if (empty) empty.classList.toggle('hidden', visible !== 0);
+  if (empty) empty.classList.toggle('hidden', gridVisible !== 0);
+  const railEmpty = document.getElementById('rail-empty-state');
+  if (railEmpty) railEmpty.classList.toggle('hidden', railVisible !== 0);
+  syncSelectedTuningArea();
+}
+
+function syncSelectedTuningArea() {
+  const active = document.querySelector('.tuning-area-option.active');
+  if (active && !active.classList.contains('hidden')) return;
+  const firstVisible = Array.from(document.querySelectorAll('.tuning-area-option')).find((item) => !item.classList.contains('hidden'));
+  if (firstVisible) selectTuningArea(firstVisible);
 }
 
 document.querySelectorAll('[data-tab-target]').forEach((button) => {
@@ -1450,7 +1468,9 @@ function selectTuningArea(button) {
   const labelTarget = document.getElementById('selected-tuning-area-label');
   const descriptionTarget = document.getElementById('selected-tuning-area-description');
   const knobsTarget = document.getElementById('selected-knobs-tuned');
+  const autoFlowTarget = document.getElementById('auto-flow-selected-area');
   if (labelTarget) labelTarget.textContent = label;
+  if (autoFlowTarget) autoFlowTarget.textContent = label;
   if (descriptionTarget) descriptionTarget.textContent = description;
   if (knobsTarget) {
     knobsTarget.innerHTML = '';

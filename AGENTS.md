@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/052-automatic-pipeline-progress-ux/plan.md
+specs/053-family-filter-tuning-area-selection/plan.md
 <!-- SPECKIT END -->

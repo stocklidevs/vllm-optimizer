@@ -342,6 +342,50 @@ def test_web_cockpit_renders_selectable_tuning_areas() -> None:
     assert "Rerun Interactive" not in html
 
 
+def test_web_cockpit_family_filters_left_rail_and_grid() -> None:
+    html = render_web_cockpit(
+        catalog={
+            "groups": [
+                {
+                    "id": "safe-a",
+                    "display_label": "Safe A",
+                    "display_family": "Safe vLLM",
+                    "family": "safe-vllm",
+                    "safety_tier": "safe-session",
+                    "requires_opt_in": False,
+                    "description": "Safe sweep.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/safe-a.json",
+                    "knobs_tuned": ["gpu_memory_utilization"],
+                },
+                {
+                    "id": "risky-b",
+                    "display_label": "Risky B",
+                    "display_family": "Risky Session Flags",
+                    "family": "risky-session",
+                    "safety_tier": "risky-session",
+                    "requires_opt_in": True,
+                    "description": "Risky sweep.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/risky-b.json",
+                    "knobs_tuned": ["risky_vllm_flags"],
+                },
+            ]
+        }
+    )
+
+    assert 'class="mini-card tuning-area-option safe-session"' in html
+    assert 'data-family="safe-vllm"' in html
+    assert 'data-family="risky-session"' in html
+    assert 'id="rail-empty-state"' in html
+    assert "document.querySelectorAll('.group-card, .tuning-area-option')" in html
+    assert "function syncSelectedTuningArea()" in html
+    assert "selectTuningArea(firstVisible)" in html
+    assert 'id="auto-flow-selected-area"' in html
+    assert "autoFlowTarget.textContent = label" in html
+    assert ".hidden { display: none !important; }" in html
+
+
 def test_web_cockpit_renders_automatic_pipeline_progress() -> None:
     html = render_web_cockpit(
         catalog={

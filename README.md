@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.1-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -87,8 +87,8 @@ The project is spec-driven with SpecKit and currently supports:
 - A standalone high-tech `web-cockpit` interface that combines tuning areas,
   pipeline stages, execution status, report summaries, safety gates, and
   disabled future controller controls from deterministic artifacts.
-- Local-only `web-cockpit` interactions for tab switching, knob family filters,
-  search, visible group counts, and no-match empty states.
+- Local-only `web-cockpit` interactions for tab switching, tuning-area family
+  filters, search, visible group counts, and no-match empty states.
 - Rich `web-cockpit` report visuals for recommendation detail, candidate
   throughput and latency bars, failure summaries, rationale, and next actions.
 - Local run browser indexes for optimizer artifacts, with a cockpit Runs tab
@@ -110,6 +110,8 @@ The project is spec-driven with SpecKit and currently supports:
   panel, active command shell, and clearer locked safety states.
 - User-facing tuning-area labels, visible knobs-tuned metadata, and left-rail
   selection for the cockpit.
+- Family filters that update both the left-rail tuning-area selector and the
+  detailed Tuning Areas tab.
 - Automatic pipeline progress UX that treats Plan, Preview, Run, Report, and
   Confirm as internal stages, while keeping live execution and promotion gates
   explicit.
@@ -305,6 +307,7 @@ interrupts the user for real gates such as live GX10 execution, risky/session
 opt-in, and promotion. Tuning areas, pipeline stages, safety gates, status,
 report summaries, and run indexes are loaded from deterministic artifacts. The
 left rail lets you select a tuning area and see the actual knobs being tuned,
+and family filters update that same selector rather than only the detail tab,
 while internal experiment history terms such as rerun stay out of user-facing
 labels. Controller buttons call the local server when served by
 `cockpit-server`, or copy deterministic CLI commands when opened as static
