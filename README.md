@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.49.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -110,6 +110,9 @@ The project is spec-driven with SpecKit and currently supports:
   panel, active command shell, and clearer locked safety states.
 - User-facing tuning-area labels, visible knobs-tuned metadata, and left-rail
   selection for the cockpit.
+- Automatic pipeline progress UX that treats Plan, Preview, Run, Report, and
+  Confirm as internal stages, while keeping live execution and promotion gates
+  explicit.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -296,18 +299,19 @@ starts the active cockpit at `http://127.0.0.1:8787`. Optional flags can overrid
 the sweep, config, output directory, host, and port.
 
 `web-cockpit` is the combined web interface. It presents a guided
-mission-control workflow for Plan, Preview, Run, Report, Confirm, and Promote,
-with a Next Action panel, active command shell, progress feedback, safety gates,
-and secondary tabs for detailed inspection. Tuning areas, pipeline stages,
-safety gates, status, report summaries, and run indexes are loaded from
-deterministic artifacts. The left rail lets you select a tuning area and see
-the actual knobs being tuned, while internal experiment history terms such as
-rerun stay out of user-facing labels. Controller buttons call the local server
-when served by `cockpit-server`, or copy deterministic CLI commands when opened
-as static HTML. Browser-side execution and promotion remain explicitly gated.
-This implementation intentionally uses no npm packages. If a future spec adds
-npm, dependency versions must be pinned, vulnerability-reviewed, and installed
-with `npm ci`.
+mission-control workflow with one primary optimization flow and automatic
+pipeline progress for Plan, Preview, Run, Report, and Confirm. The cockpit only
+interrupts the user for real gates such as live GX10 execution, risky/session
+opt-in, and promotion. Tuning areas, pipeline stages, safety gates, status,
+report summaries, and run indexes are loaded from deterministic artifacts. The
+left rail lets you select a tuning area and see the actual knobs being tuned,
+while internal experiment history terms such as rerun stay out of user-facing
+labels. Controller buttons call the local server when served by
+`cockpit-server`, or copy deterministic CLI commands when opened as static
+HTML. Browser-side execution and promotion remain explicitly gated. This
+implementation intentionally uses no npm packages. If a future spec adds npm,
+dependency versions must be pinned, vulnerability-reviewed, and installed with
+`npm ci`.
 
 Smoke serve:
 

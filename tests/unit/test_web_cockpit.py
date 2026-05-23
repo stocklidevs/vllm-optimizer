@@ -342,6 +342,60 @@ def test_web_cockpit_renders_selectable_tuning_areas() -> None:
     assert "Rerun Interactive" not in html
 
 
+def test_web_cockpit_renders_automatic_pipeline_progress() -> None:
+    html = render_web_cockpit(
+        catalog={
+            "groups": [
+                {
+                    "id": "qwen-concurrency-c1",
+                    "display_label": "Concurrency - 1 Request",
+                    "display_family": "Concurrency",
+                    "family": "concurrency",
+                    "safety_tier": "safe-session",
+                    "requires_opt_in": False,
+                    "description": "Explore concurrency.",
+                    "command_kind": "sweep",
+                    "config_path": "config/sweeps/qwen-concurrency-saturation-c1.json",
+                    "knobs_tuned": ["request_concurrency", "max_num_seqs"],
+                }
+            ]
+        },
+        manifest={
+            "group": {"id": "qwen-concurrency-c1", "display_label": "Concurrency - 1 Request"},
+            "stages": [
+                {"name": "plan", "command_hint": "uv run vllm-optimizer optimize-workload --mode plan"},
+                {"name": "preview", "command_hint": "uv run vllm-optimizer optimize-workload --mode preview"},
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer optimize-workload --mode run",
+                    "remote": True,
+                    "required_gates": ["--confirm-live-run"],
+                },
+                {"name": "report", "command_hint": "uv run vllm-optimizer optimize-workload --mode report"},
+                {"name": "confirm", "command_hint": "uv run vllm-optimizer optimize-workload --mode confirm"},
+                {"name": "promote", "command_hint": "uv run vllm-optimizer promote-confirmed-profile"},
+            ],
+            "promotion": {"automatic": False, "required_gate": "--allow-promotion"},
+        },
+        status={
+            "overall_status": "running",
+            "trial_counts": {"completed": 2, "failed": 0, "total": 5},
+        },
+    )
+
+    assert "Start Optimization" in html
+    assert "Automatic Pipeline Progress" in html
+    assert "Overall progress" in html
+    assert "Running trial 2 of 5" in html
+    assert 'data-pipeline-stage="plan"' in html
+    assert 'data-pipeline-stage="preview"' in html
+    assert 'data-pipeline-stage="run"' in html
+    assert "Manual gate" in html
+    assert "Live GX10 execution" in html
+    assert "--confirm-live-run" in html
+    assert "Promotion remains manual" in html
+
+
 def test_web_cockpit_renders_promotion_workflow() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},

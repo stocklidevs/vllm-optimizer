@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.50.0 - 2026-05-23
+
+- Added an automatic pipeline progress panel to `web-cockpit` with one primary
+  Start Optimization flow.
+- Reframed Plan, Preview, Run, Report, and Confirm as internal stages while
+  preserving explicit live execution and promotion gates.
+- Added per-stage status rows and an overall progress bar derived from existing
+  status/report artifacts.
+
 ## 0.49.0 - 2026-05-18
 
 - Added user-facing tuning-area labels and knobs-tuned metadata to the knob

@@ -72,6 +72,7 @@ def render_web_cockpit(
             render_left_rail(families, groups),
             '<section class="workspace">',
             render_hero(groups, status, report),
+            render_automatic_pipeline_panel(groups, manifest, status, report),
             render_workflow(manifest, status, report),
             render_tabs(),
             render_overview(groups, manifest, status, report),
@@ -323,6 +324,87 @@ def render_runs(run_index: dict[str, Any] | None) -> str:
       </div>
       {content}
     </section>"""
+
+
+def render_automatic_pipeline_panel(
+    groups: list[dict[str, Any]],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    progress = pipeline_progress(status, report)
+    rows = "".join(render_pipeline_progress_stage(stage, status, report) for stage in WORKFLOW_STEPS)
+    gates = render_human_gate_summary(manifest)
+    selected = selected_group_label(groups, manifest)
+    command = controller_commands(manifest).get("run", controller_commands(manifest).get("plan", ""))
+    return f"""
+    <section class="auto-pipeline-panel">
+      <div class="auto-flow-card">
+        <p class="eyebrow">Primary Flow</p>
+        <h2>Start Optimization</h2>
+        <p>Select a tuning area, review the generated plan, then let the cockpit advance through automatic stages until a real human decision is needed.</p>
+        <dl>
+          <div><dt>Tuning area</dt><dd id="auto-flow-selected-area">{escape(selected)}</dd></div>
+          <div><dt>User decisions</dt><dd>Live run confirmation and promotion remain explicit.</dd></div>
+        </dl>
+        <button type="button" class="primary-action" data-controller-action="run" data-controller-endpoint="/api/controller/run" data-controller-command="{escape(command)}">Start Optimization</button>
+      </div>
+      <div class="pipeline-progress-card">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">Execution Pipeline</p>
+            <h2>Automatic Pipeline Progress</h2>
+          </div>
+          <span class="step-pill">{progress}%</span>
+        </div>
+        <div class="progress-track overall-progress" aria-label="Overall progress">
+          <div class="progress-bar" style="width:{progress}%"></div>
+        </div>
+        <p class="progress-caption">{escape(pipeline_caption(status, report))}</p>
+        <div class="pipeline-stage-list">{rows}</div>
+      </div>
+      <div class="human-gates-card">
+        <p class="eyebrow">Next Decision</p>
+        <h2>Human Gates</h2>
+        {gates}
+      </div>
+    </section>"""
+
+
+def render_pipeline_progress_stage(
+    stage: dict[str, Any],
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    action = str(stage["action"])
+    state = pipeline_stage_state(action, status, report)
+    detail = pipeline_stage_detail(action, status, report)
+    return f"""
+      <article class="pipeline-stage {escape(state)}" data-pipeline-stage="{escape(action)}">
+        <span>{escape(state.title())}</span>
+        <strong>{escape(stage['label'])}</strong>
+        <small>{escape(detail)}</small>
+      </article>"""
+
+
+def render_human_gate_summary(manifest: dict[str, Any] | None) -> str:
+    gates = []
+    for stage in _list_of_dicts((manifest or {}).get("stages")):
+        if stage.get("remote"):
+            gates.append(("Live GX10 execution", "--confirm-live-run"))
+        for gate in stage.get("required_gates") or []:
+            gates.append(("Safety opt-in", str(gate)))
+    promotion = manifest.get("promotion", {}) if isinstance((manifest or {}).get("promotion"), dict) else {}
+    gates.append(("Promotion remains manual", str(promotion.get("required_gate") or "--allow-promotion")))
+    unique: list[tuple[str, str]] = []
+    for gate in gates:
+        if gate not in unique:
+            unique.append(gate)
+    items = "".join(
+        f"<li><strong>{escape(label)}</strong><code>{escape(flag)}</code></li>"
+        for label, flag in unique
+    )
+    return f'<ul class="gate-list"><li><strong>Manual gate</strong><code>Only when needed</code></li>{items}</ul>'
 
 
 def render_guided_step_workspace(
@@ -851,6 +933,69 @@ def current_workflow_action(status: dict[str, Any] | None, report: dict[str, Any
     return "plan"
 
 
+def pipeline_progress(status: dict[str, Any] | None, report: dict[str, Any] | None) -> int:
+    if report is not None:
+        recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
+        if str(recommendation.get("status") or "").lower() in {"confirmed", "promotable", "promoted"}:
+            return 84
+        return 72
+    if status is not None:
+        overall = str(status.get("overall_status") or "").lower()
+        if overall in {"completed", "complete", "succeeded", "success"}:
+            return 64
+        if overall in {"running", "cancel-requested", "failed"}:
+            trial_counts = status.get("trial_counts", {}) if isinstance(status.get("trial_counts"), dict) else {}
+            completed = _number(trial_counts.get("completed")) or 0
+            total = _number(trial_counts.get("total")) or 0
+            trial_progress = (completed / total) if total else 0
+            return int(32 + (trial_progress * 28))
+    return 8
+
+
+def pipeline_caption(status: dict[str, Any] | None, report: dict[str, Any] | None) -> str:
+    if report is not None:
+        return "Report is available. Confirmation or promotion may be the next real decision."
+    if status is not None:
+        overall = str(status.get("overall_status") or "").lower()
+        trial_counts = status.get("trial_counts", {}) if isinstance(status.get("trial_counts"), dict) else {}
+        completed = trial_counts.get("completed", 0)
+        total = trial_counts.get("total", 0)
+        if overall in {"running", "cancel-requested", "failed"}:
+            return f"Running trial {completed} of {total}"
+        if overall in {"completed", "complete", "succeeded", "success"}:
+            return "Run complete. Reporting can be generated automatically."
+    return "Ready to generate a plan and preview safety before execution."
+
+
+def pipeline_stage_state(action: str, status: dict[str, Any] | None, report: dict[str, Any] | None) -> str:
+    current = current_workflow_action(status, report)
+    if action == "promote":
+        return "manual gate"
+    if workflow_index(action) < workflow_index(current):
+        return "complete"
+    if action == current:
+        if action in {"run", "report", "confirm"}:
+            return "running" if status is not None or report is not None else "waiting"
+        return "automatic"
+    return "waiting"
+
+
+def pipeline_stage_detail(action: str, status: dict[str, Any] | None, report: dict[str, Any] | None) -> str:
+    if action == "plan":
+        return "Creates the deterministic blueprint."
+    if action == "preview":
+        return "Validates commands and safety gates automatically."
+    if action == "run":
+        return pipeline_caption(status, report) if status is not None else "Starts only after live-run confirmation."
+    if action == "report":
+        return "Ranks artifacts and explains the recommendation."
+    if action == "confirm":
+        return "Repeats checks when stability is required."
+    if action == "promote":
+        return "Promotion remains manual and explicitly gated."
+    return "Waiting for prior stages."
+
+
 def workflow_locked_label(action: str, manifest: dict[str, Any] | None) -> str:
     if action == "promote":
         promotion = manifest.get("promotion", {}) if isinstance((manifest or {}).get("promotion"), dict) else {}
@@ -1107,6 +1252,22 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .guided-grid { display: grid; grid-template-columns: minmax(220px, .95fr) minmax(260px, 1fr) minmax(260px, .9fr); gap: 14px; margin-bottom: 16px; }
 .selected-group-card, .active-step-card, .command-shell { border: 1px solid rgba(55,216,255,.18); border-radius: 8px; background: rgba(3,8,16,.34); padding: 16px; }
 .selected-group-card h2, .active-step-card h2, .command-shell h2 { font-size: 22px; line-height: 1.2; }
+.auto-pipeline-panel { display: grid; grid-template-columns: minmax(230px, .85fr) minmax(320px, 1.25fr) minmax(220px, .8fr); gap: 14px; margin-bottom: 16px; }
+.auto-flow-card, .pipeline-progress-card, .human-gates-card { border: 1px solid rgba(55,216,255,.2); border-radius: 8px; background: rgba(3,8,16,.36); padding: 16px; }
+.auto-flow-card h2, .pipeline-progress-card h2, .human-gates-card h2 { font-size: 22px; line-height: 1.2; }
+.auto-flow-card dl { margin-bottom: 14px; }
+.compact-heading { align-items: center; margin-bottom: 10px; }
+.overall-progress { margin-bottom: 10px; }
+.progress-caption { margin-bottom: 13px; }
+.pipeline-stage-list { display: grid; gap: 8px; }
+.pipeline-stage { display: grid; grid-template-columns: 88px minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px; align-items: center; border: 1px solid rgba(55,216,255,.13); border-radius: 8px; background: rgba(15,29,47,.44); padding: 10px; }
+.pipeline-stage span { color: var(--muted); text-transform: uppercase; font-size: 11px; font-weight: 850; }
+.pipeline-stage.complete span { color: var(--green); }
+.pipeline-stage.running span, .pipeline-stage.automatic span { color: var(--cyan); }
+.pipeline-stage.manual.gate span, .pipeline-stage.manual span { color: var(--amber); }
+.pipeline-stage small { color: var(--muted); overflow-wrap: anywhere; }
+.gate-list { display: grid; gap: 10px; padding: 0; margin: 14px 0 0; list-style: none; }
+.gate-list li { display: grid; gap: 6px; border: 1px solid rgba(240,198,91,.22); border-radius: 8px; padding: 10px; background: rgba(240,198,91,.05); }
 .fact-list { display: grid; gap: 8px; padding: 0; margin: 14px 0; list-style: none; }
 .fact-list li { position: relative; min-height: 28px; padding: 7px 9px 7px 32px; border: 1px solid rgba(73,242,161,.16); border-radius: 8px; background: rgba(73,242,161,.06); }
 .fact-list li::before { content: "✓"; position: absolute; left: 10px; color: var(--green); font-weight: 900; }
@@ -1197,7 +1358,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .workflow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .workflow-step:nth-child(3)::after { display: none; }
-  .guided-grid { grid-template-columns: 1fr; }
+  .guided-grid, .auto-pipeline-panel { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
 }
 @media (max-width: 1180px) {
@@ -1212,7 +1373,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .workflow-steps { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
   .workflow-heading { align-items: flex-start; flex-direction: column; }
   .workflow-step { justify-items: start; text-align: left; grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 76px; }

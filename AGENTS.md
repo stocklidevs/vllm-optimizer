@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/051-tuning-area-selection-labels/plan.md
+specs/052-automatic-pipeline-progress-ux/plan.md
 <!-- SPECKIT END -->
