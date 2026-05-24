@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.2 - 2026-05-24
+
+- Fixed the cockpit close-history flow so future `Load Report` and
+  `Review Report` actions become visible and clickable again after a fresh run.
+- Switched cockpit action buttons to delegated click handling so dynamic
+  controller/tab transitions remain wired after page load.
+- Added regression coverage for report loading after closing old run history.
+
 ## 0.53.1 - 2026-05-24
 
 - Added a cockpit escape hatch for loaded report history so old runs can be

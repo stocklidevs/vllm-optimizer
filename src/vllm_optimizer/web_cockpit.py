@@ -3410,12 +3410,7 @@ function updateNextActionFromJob(job) {
     facts.innerHTML = '<li>Uses completed artifacts</li><li>No remote execution</li><li>Explains the winner</li>';
   }
   if (button) {
-    button.textContent = 'Load Report';
-    button.dataset.controllerAction = 'report';
-    button.dataset.controllerEndpoint = '/api/controller/report';
-    button.dataset.controllerCommand = reportCommand;
-    button.disabled = false;
-    delete button.dataset.tabJump;
+    configureControllerButton(button, 'report', '/api/controller/report', reportCommand, 'Load Report');
   }
 }
 
@@ -3498,6 +3493,7 @@ function setRunningOptimizationAction() {
   if (button) {
     button.textContent = 'Optimization Running';
     button.disabled = true;
+    button.classList.remove('hidden');
     delete button.dataset.controllerAction;
     delete button.dataset.controllerEndpoint;
     delete button.dataset.controllerCommand;
@@ -3517,13 +3513,7 @@ function setReviewReportAction() {
     facts.innerHTML = '<li>Report generated</li><li>Review recommendation</li><li>Confirm only after review</li>';
   }
   if (button) {
-    button.textContent = 'Review Report';
-    button.disabled = false;
-    button.dataset.tabJump = 'reports';
-    button.dataset.refreshTab = 'true';
-    delete button.dataset.controllerAction;
-    delete button.dataset.controllerEndpoint;
-    delete button.dataset.controllerCommand;
+    configureTabJumpButton(button, 'reports', 'Review Report', true);
   }
 }
 
@@ -3548,7 +3538,9 @@ function closeLoadedRunHistory() {
   const nextHeadline = document.getElementById('next-action-headline');
   const nextDescription = document.getElementById('next-action-description');
   const nextFacts = document.getElementById('next-action-facts');
+  const nextButton = document.getElementById('next-action-button');
   const controllerFeedback = document.getElementById('controller-feedback');
+  const runCommand = commandForAction('run');
   if (progressBar) progressBar.style.width = '8%';
   if (progressLabel) progressLabel.textContent = '8%';
   if (caption) caption.textContent = 'Loaded run closed. Ready to start a new optimization.';
@@ -3563,6 +3555,7 @@ function closeLoadedRunHistory() {
     ].map((text) => '<li>' + text + '</li>').join('');
   }
   if (controllerFeedback) controllerFeedback.textContent = 'Loaded run closed. Start New Optimization is ready.';
+  configureControllerButton(nextButton, 'run', '/api/controller/run', runCommand, 'Start Optimization');
   renderOperationResult({
     action: 'history',
     status: 'closed',
@@ -3578,6 +3571,40 @@ function closeLoadedRunHistory() {
 function commandForAction(action) {
   const source = document.querySelector('[data-controller-action="' + action + '"][data-controller-command]');
   return source ? source.dataset.controllerCommand || '' : '';
+}
+
+function configureControllerButton(button, action, endpoint, command, label) {
+  if (!button) return;
+  button.textContent = label;
+  button.disabled = false;
+  button.classList.remove('hidden');
+  button.dataset.controllerAction = action;
+  button.dataset.controllerEndpoint = endpoint;
+  button.dataset.controllerCommand = command || '';
+  delete button.dataset.tabJump;
+  delete button.dataset.refreshTab;
+}
+
+function configureTabJumpButton(button, tab, label, refresh) {
+  if (!button) return;
+  button.textContent = label;
+  button.disabled = false;
+  button.classList.remove('hidden');
+  button.dataset.tabJump = tab;
+  button.dataset.refreshTab = refresh ? 'true' : 'false';
+  delete button.dataset.controllerAction;
+  delete button.dataset.controllerEndpoint;
+  delete button.dataset.controllerCommand;
+}
+
+function runTabJumpButton(button) {
+  if (button.dataset.refreshTab === 'true') {
+    openDetailPanel(button.dataset.tabJump);
+    safeSessionSet('cockpit-tab-after-reload', button.dataset.tabJump);
+    window.setTimeout(() => window.location.reload(), 50);
+    return;
+  }
+  openDetailPanel(button.dataset.tabJump);
 }
 
 function pipelineCaptionForCompleted(completed) {
@@ -3638,21 +3665,15 @@ async function cancelControllerJob() {
   }
 }
 
-document.querySelectorAll('[data-controller-command]').forEach((button) => {
-  button.addEventListener('click', () => runControllerAction(button));
-});
-
-document.querySelectorAll('[data-tab-jump]').forEach((button) => {
-  if (button.dataset.controllerCommand) return;
-  button.addEventListener('click', () => {
-    if (button.dataset.refreshTab === 'true') {
-      openDetailPanel(button.dataset.tabJump);
-      safeSessionSet('cockpit-tab-after-reload', button.dataset.tabJump);
-      window.setTimeout(() => window.location.reload(), 50);
-      return;
-    }
-    openDetailPanel(button.dataset.tabJump);
-  });
+document.addEventListener('click', (event) => {
+  if (!event.target || !event.target.closest) return;
+  const controllerButton = event.target.closest('[data-controller-command]');
+  if (controllerButton) {
+    runControllerAction(controllerButton);
+    return;
+  }
+  const tabButton = event.target.closest('[data-tab-jump]');
+  if (tabButton) runTabJumpButton(tabButton);
 });
 
 document.querySelectorAll('.tuning-area-option').forEach((button, index) => {

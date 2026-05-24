@@ -227,7 +227,7 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "cockpit-tab-after-reload" in html
     assert "function safeSessionSet" in html
     assert "function safeSessionGet" in html
-    assert "document.querySelectorAll('[data-tab-jump]')" in html
+    assert "event.target.closest('[data-tab-jump]')" in html
     assert "completed_stages" in html
     assert "live-execution-title" in html
     assert "live-execution-elapsed" in html
@@ -547,6 +547,31 @@ def test_web_cockpit_loaded_report_can_be_closed_or_replaced_with_new_run() -> N
     assert "command-report-state" in html
     assert "Start a fresh optimization from the selected model, target, and tuning area." in html
     assert "Loaded run closed. Start New Optimization is ready." in html
+
+
+def test_web_cockpit_loaded_history_close_keeps_future_report_loading_available() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "stages": [
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer cockpit-run --confirm-live-run",
+                },
+                {
+                    "name": "report",
+                    "command_hint": "uv run vllm-optimizer cockpit-report",
+                },
+            ]
+        },
+        report={"recommendation": {"status": "requires-confirmation", "candidate_id": "candidate-fast"}},
+    )
+
+    assert "configureControllerButton(button, 'report', '/api/controller/report', reportCommand, 'Load Report')" in html
+    assert "configureControllerButton(nextButton, 'run', '/api/controller/run', runCommand, 'Start Optimization')" in html
+    assert "button.classList.remove('hidden')" in html
+    assert "event.target.closest('[data-controller-command]')" in html
+    assert "event.target.closest('[data-tab-jump]')" in html
 
 
 def test_web_cockpit_tab_jump_false_does_not_reload() -> None:
