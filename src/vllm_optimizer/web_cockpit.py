@@ -372,8 +372,8 @@ def render_reporting(report: dict[str, Any] | None, manifest: dict[str, Any] | N
         content = f"""
         {render_recommendation_detail(report)}
         {render_report_next_steps(report, manifest)}
-        {render_metric_visualizer(candidates if isinstance(candidates, dict) else {})}
-        {render_failure_summary(candidates if isinstance(candidates, dict) else {})}"""
+        {render_metric_visualizer(candidates)}
+        {render_failure_summary(candidates)}"""
     return f"""
     <section class="panel tab-panel" id="reports" data-tab-panel="reports">
       <div class="section-heading">
@@ -781,7 +781,7 @@ def render_recommendation_detail(report: dict[str, Any]) -> str:
     </div>"""
 
 
-def render_metric_visualizer(candidates: dict[str, Any]) -> str:
+def render_metric_visualizer(candidates: Any) -> str:
     rows = _candidate_metric_rows(candidates)
     if not rows:
         return '<div class="report-card"><p class="empty">No candidate metrics available.</p></div>'
@@ -838,7 +838,7 @@ def render_metric_visualizer(candidates: dict[str, Any]) -> str:
     </div>"""
 
 
-def render_failure_summary(candidates: dict[str, Any]) -> str:
+def render_failure_summary(candidates: Any) -> str:
     rows = _candidate_metric_rows(candidates)
     if not rows:
         return ""
@@ -1415,9 +1415,22 @@ def _list_of_strings(value: Any) -> list[str]:
     return [str(item) for item in value]
 
 
-def _candidate_metric_rows(candidates: dict[str, Any]) -> list[dict[str, Any]]:
+def _candidate_metric_rows(candidates: Any) -> list[dict[str, Any]]:
     rows = []
-    for candidate_id, candidate in candidates.items():
+    if isinstance(candidates, dict):
+        candidate_items = candidates.items()
+    elif isinstance(candidates, list):
+        candidate_items = (
+            (
+                str(candidate.get("candidate_id") or candidate.get("id") or candidate.get("name") or f"candidate-{index + 1}"),
+                candidate,
+            )
+            for index, candidate in enumerate(candidates)
+            if isinstance(candidate, dict)
+        )
+    else:
+        candidate_items = []
+    for candidate_id, candidate in candidate_items:
         if not isinstance(candidate, dict):
             continue
         metrics = candidate.get("metrics", {}) if isinstance(candidate.get("metrics"), dict) else {}
@@ -1437,7 +1450,7 @@ def _candidate_metric_rows(candidates: dict[str, Any]) -> list[dict[str, Any]]:
 
 def report_outcome_summary(report: dict[str, Any] | None) -> dict[str, Any]:
     recommendation = report.get("recommendation", {}) if isinstance((report or {}).get("recommendation"), dict) else {}
-    candidates = report.get("candidates", {}) if isinstance((report or {}).get("candidates"), dict) else {}
+    candidates = report.get("candidates", {}) if isinstance(report, dict) else {}
     rows = _candidate_metric_rows(candidates)
     baseline = next((row for row in rows if row["baseline"]), None)
     if baseline is None and rows:

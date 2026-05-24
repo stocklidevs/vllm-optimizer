@@ -268,6 +268,43 @@ def test_web_cockpit_renders_premium_analytics_empty_state() -> None:
     assert "baseline comparison, latency/throughput position" in html
 
 
+def test_web_cockpit_renders_candidate_list_reports() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        report={
+            "recommendation": {
+                "status": "requires-confirmation",
+                "objective": "throughput",
+                "candidate_id": "candidate-list-fast",
+            },
+            "candidates": [
+                {
+                    "candidate_id": "candidate-list-baseline",
+                    "is_baseline": True,
+                    "metrics": {
+                        "aggregate_tokens_per_second": 50.0,
+                        "mean_latency_ms": 1200.0,
+                        "failure_rate": 0.0,
+                    },
+                },
+                {
+                    "candidate_id": "candidate-list-fast",
+                    "recommendable": True,
+                    "metrics": {
+                        "aggregate_tokens_per_second": 75.0,
+                        "mean_latency_ms": 900.0,
+                        "failure_rate": 0.0,
+                    },
+                },
+            ],
+        },
+    )
+
+    assert "candidate-list-fast" in html
+    assert "+50.0%" in html
+    assert "Performance Evidence" in html
+
+
 def test_web_cockpit_renders_run_browser_tab() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},

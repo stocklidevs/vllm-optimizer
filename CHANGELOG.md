@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.51.1 - 2026-05-24
+
+- Fixed cockpit rendering for report artifacts whose `candidates` payload is a
+  list instead of a mapping.
+- Kept both overview analytics and Reports-tab visualizations populated for
+  list-shaped candidate artifacts.
+
 ## 0.51.0 - 2026-05-24
 
 - Added a premium cockpit analytics overview with a decision strip for selected
