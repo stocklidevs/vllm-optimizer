@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.53.0 - 2026-05-24
+
+- Rebuilt the web cockpit around an objective-first command center with model,
+  target, selected recipe, primary action, live progress, and decision-story
+  panels.
+- Moved micro-tweaks, tuning areas, command hints, reports, runs, sources, and
+  promotion gates into a collapsed advanced recipe drawer.
+- Preserved active controller hooks, progress reset behavior, target/profile
+  selection, report review, and static command-copy fallback while replacing the
+  old left/right rail default layout.
+
 ## 0.52.1 - 2026-05-24
 
 - Fixed Start Optimization reset behavior so the visible pipeline percentage

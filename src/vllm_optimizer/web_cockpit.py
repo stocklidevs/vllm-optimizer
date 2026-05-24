@@ -69,28 +69,12 @@ def render_web_cockpit(
             "<head>",
             '  <meta charset="utf-8">',
             '  <meta name="viewport" content="width=device-width, initial-scale=1">',
-            "  <title>vLLM Mission Control</title>",
+            "  <title>vLLM Command Center</title>",
             f"  <style>{CSS}</style>",
             "</head>",
             "<body>",
-            '<main class="cockpit">',
-            render_left_rail(families, groups),
-            '<section class="workspace">',
-            render_hero(groups, status, report),
-            render_decision_strip(groups, manifest, status, report),
-            render_model_objective_panel(profiles or []),
-            render_automatic_pipeline_panel(groups, manifest, status, report),
-            render_workflow(manifest, status, report),
-            render_tabs(),
-            render_overview(groups, manifest, status, report),
-            render_pipeline(manifest),
-            render_runs(run_index),
-            render_reporting(report, manifest),
-            render_promotion_workflow(report, manifest),
-            render_how_to_use(),
-            render_sources(sources or {}),
-            "</section>",
-            render_right_rail(manifest, status, report),
+            '<main class="objective-cockpit">',
+            render_objective_command_center(groups, families, manifest, status, report, run_index, profiles or [], sources or {}),
             f"<script>{JS}</script>",
             "</main>",
             "</body>",
@@ -98,6 +82,321 @@ def render_web_cockpit(
             "",
         ]
     )
+
+
+def render_objective_command_center(
+    groups: list[dict[str, Any]],
+    families: list[str],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+    run_index: dict[str, Any] | None,
+    profiles: list[dict[str, Any]],
+    sources: dict[str, str | None],
+) -> str:
+    return f"""
+    {render_command_topbar(status, report)}
+    <section class="command-hero" aria-label="Objective command center">
+      <div class="command-hero-copy">
+        <h1>Optimize for the outcome you care about.</h1>
+        <p>Pick the model, choose the objective, start the safe automatic run, then review the decision story. The tuning recipe is still there when you want to inspect every knob.</p>
+      </div>
+      {render_command_decision_card(report)}
+    </section>
+    {render_command_setup(groups, manifest, status, report, profiles)}
+    {render_command_operations(groups, manifest, status, report)}
+    {render_command_report_story(report)}
+    {render_advanced_command_center(groups, families, manifest, status, report, run_index, sources)}
+    """
+
+
+def render_command_topbar(status: dict[str, Any] | None, report: dict[str, Any] | None) -> str:
+    overall = str((status or {}).get("overall_status") or "idle")
+    report_state = "report loaded" if report is not None else "no report"
+    return f"""
+    <header class="command-topbar">
+      <div class="command-brand">
+        <span class="command-orb" aria-hidden="true"></span>
+        <div>
+          <strong>vLLM Command Center</strong>
+          <small>Deterministic GX10 optimizer</small>
+        </div>
+      </div>
+      <div class="command-status-strip" aria-label="Loaded artifact state">
+        <span>{escape(overall)}</span>
+        <span>{escape(report_state)}</span>
+        <span>local controller ready</span>
+      </div>
+    </header>"""
+
+
+def render_command_decision_card(report: dict[str, Any] | None) -> str:
+    summary = report_outcome_summary(report)
+    return f"""
+      <aside class="decision-story-card">
+        <span>Current recommendation</span>
+        <strong><code>{escape(summary['winner_id'])}</code></strong>
+        <dl>
+          <div><dt>Lift</dt><dd class="{escape(summary['delta_class'])}">{escape(summary['improvement'])}</dd></div>
+          <div><dt>Status</dt><dd>{escape(summary['decision'])}</dd></div>
+        </dl>
+        <p>{escape(summary['winner_detail'])}</p>
+      </aside>"""
+
+
+def render_command_setup(
+    groups: list[dict[str, Any]],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+    profiles: list[dict[str, Any]],
+) -> str:
+    profile_cards = "".join(render_profile_card(profile, index == 0) for index, profile in enumerate(profiles))
+    if not profile_cards:
+        profile_cards = """
+        <article class="profile-card empty-profile">
+          <span>No profiles loaded</span>
+          <strong>Add --profile PROFILE.json</strong>
+          <small>The optimizer can still run, but the page cannot show model context.</small>
+        </article>"""
+    target_cards = "".join(render_target_card(target, index == 0) for index, target in enumerate(OPTIMIZATION_TARGETS))
+    selected = selected_group_label(groups, manifest)
+    description = selected_group_description(groups, manifest) or "The optimizer chooses candidates from the deterministic recipe."
+    primary = primary_cockpit_action(current_workflow_action(status, report))
+    return f"""
+    <section class="command-setup-grid" aria-label="Optimization setup">
+      <article class="command-panel model-panel">
+        <div class="command-section-head">
+          <span>Model/Profile</span>
+          <strong>Which model are we tuning?</strong>
+        </div>
+        <div class="profile-strip">{profile_cards}</div>
+      </article>
+      <article class="command-panel objective-panel">
+        <div class="command-section-head">
+          <span>Optimization Target</span>
+          <strong>Best tweak for...</strong>
+        </div>
+        <div class="target-grid">{target_cards}</div>
+        <div class="selected-objective-summary">
+          <span>Selected</span>
+          <strong id="selected-objective-label">Balanced</strong>
+          <small id="selected-objective-description">Blend throughput, latency, failure rate, and safety.</small>
+        </div>
+      </article>
+      <article class="command-panel recipe-panel">
+        <div class="command-section-head">
+          <span>Selected Tuning Area</span>
+          <strong id="selected-tuning-area-label">{escape(selected)}</strong>
+        </div>
+        <p id="selected-tuning-area-description">{escape(description)}</p>
+        <dl class="recipe-facts">
+          <div><dt>Target</dt><dd id="auto-flow-selected-target">Balanced</dd></div>
+          <div><dt>Tuning area</dt><dd id="auto-flow-selected-area">{escape(selected)}</dd></div>
+        </dl>
+        <div class="knobs-tuned-panel compact-knobs">
+          <strong>Included knobs</strong>
+          <ul id="selected-knobs-tuned">{render_selected_knob_items(groups, manifest)}</ul>
+        </div>
+        <div class="recipe-action">
+          {render_primary_action_button(primary, manifest)}
+        </div>
+      </article>
+    </section>"""
+
+
+def render_command_operations(
+    groups: list[dict[str, Any]],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    action = current_workflow_action(status, report)
+    primary = primary_cockpit_action(action)
+    progress = pipeline_progress(status, report)
+    rows = "".join(render_pipeline_progress_stage(stage, status, report) for stage in WORKFLOW_STEPS)
+    facts = "".join(f"<li>{escape(item)}</li>" for item in primary["facts"])
+    return f"""
+    <section class="command-runway" aria-label="Optimization execution">
+      <article class="command-panel primary-command-card">
+        <div class="command-section-head">
+          <span>Next action</span>
+          <strong id="next-action-headline">{escape(primary['headline'])}</strong>
+        </div>
+        <p id="next-action-description">{escape(primary['description'])}</p>
+        <ul id="next-action-facts" class="fact-list compact">{facts}</ul>
+        {render_primary_action_button(primary, manifest, button_id="next-action-button")}
+        <p id="controller-feedback" class="controller-feedback" aria-live="polite">Ready to run the selected objective from the cockpit server.</p>
+      </article>
+      <article class="command-panel progress-command-card">
+        <div class="command-section-head progress-head">
+          <span>Execution Pipeline</span>
+          <em>Automatic Pipeline Progress</em>
+          <strong id="pipeline-overall-progress-label">{progress}%</strong>
+        </div>
+        <div class="progress-track overall-progress" aria-label="Overall progress">
+          <div id="pipeline-overall-progress-bar" class="progress-bar" style="width:{progress}%"></div>
+        </div>
+        <p id="pipeline-caption" class="progress-caption">{escape(pipeline_caption(status, report))}</p>
+        <div class="command-stage-list">{rows}</div>
+        <div class="command-gates">{render_human_gate_summary(manifest)}</div>
+      </article>
+      <article class="command-panel live-command-card">
+        <div class="command-section-head">
+          <span>Live execution</span>
+          <strong>Operation Monitor</strong>
+        </div>
+        {render_live_execution_summary(status)}
+        {render_operation_result_panel()}
+      </article>
+    </section>"""
+
+
+def render_command_report_story(report: dict[str, Any] | None) -> str:
+    summary = report_outcome_summary(report)
+    rows = _candidate_metric_rows(report.get("candidates", {}) if isinstance(report, dict) else {})
+    winner = summary.get("winner_row")
+    baseline = summary.get("baseline_row")
+    best_failure = _fmt_pct(winner["failure_rate"]) if isinstance(winner, dict) else "n/a"
+    baseline_tps = _fmt(baseline["throughput"]) if isinstance(baseline, dict) else "n/a"
+    winner_tps = _fmt(winner["throughput"]) if isinstance(winner, dict) else "n/a"
+    return f"""
+    <section class="decision-story" aria-label="Decision story">
+      <div class="story-heading">
+        <h2>Decision Story</h2>
+        <p>Baseline, winner, confidence, and next action from the loaded canonical report.</p>
+      </div>
+      <div class="story-grid">
+        <article>
+          <span>Baseline</span>
+          <strong>{escape(baseline_tps)} tok/s</strong>
+          <small>{escape(summary['baseline_detail'])}</small>
+        </article>
+        <article class="winner-story">
+          <span>Winner</span>
+          <strong>{escape(winner_tps)} tok/s</strong>
+          <small><code>{escape(summary['winner_id'])}</code></small>
+        </article>
+        <article>
+          <span>Improvement</span>
+          <strong class="{escape(summary['delta_class'])}">{escape(summary['improvement'])}</strong>
+          <small>{escape(summary['decision_detail'])}</small>
+        </article>
+        <article>
+          <span>Risk</span>
+          <strong>{escape(best_failure)}</strong>
+          <small>{escape(str(len(rows)))} candidates in report</small>
+        </article>
+      </div>
+    </section>"""
+
+
+def render_advanced_command_center(
+    groups: list[dict[str, Any]],
+    families: list[str],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+    run_index: dict[str, Any] | None,
+    sources: dict[str, str | None],
+) -> str:
+    return f"""
+    <section class="advanced-command-center" aria-label="Advanced optimizer details">
+      <details class="advanced-shell" id="advanced-cockpit-details">
+        <summary>
+          <span>Advanced tuning recipe</span>
+          <strong>Show knobs, commands, artifacts, runs, and gates</strong>
+        </summary>
+        <div class="advanced-layout">
+          <aside class="advanced-rail">
+            {render_family_filter_controls(families)}
+            {render_tuning_area_options(groups)}
+          </aside>
+          <div class="advanced-workspace">
+            {render_tabs()}
+            {render_advanced_summary_panel(manifest, status, report)}
+            {render_advanced_tuning_panel(groups)}
+            {render_pipeline(manifest)}
+            {render_runs(run_index)}
+            {render_performance_evidence(report)}
+            {render_reporting(report, manifest)}
+            {render_promotion_workflow(report, manifest)}
+            {render_how_to_use()}
+            {render_sources(sources)}
+          </div>
+        </div>
+      </details>
+    </section>"""
+
+
+def render_advanced_summary_panel(
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    return f"""
+    <section class="panel tab-panel active" id="overview" data-tab-panel="overview">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Advanced Overview</p>
+          <h2>Artifact status and controller commands</h2>
+        </div>
+        <p>Use this view when you want the exact deterministic inputs behind the objective flow.</p>
+      </div>
+      <div class="flow-context">
+        {render_status_summary(status)}
+        {render_report_summary(report)}
+      </div>
+      {render_disabled_actions(manifest)}
+    </section>"""
+
+
+def render_advanced_tuning_panel(groups: list[dict[str, Any]]) -> str:
+    return f"""
+    <section class="panel tab-panel" id="knobs" data-tab-panel="knobs">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Tuning Areas</p>
+          <h2>Advanced recipe controls</h2>
+        </div>
+        <p><span id="visible-group-count">{len(groups)}</span> of {len(groups)} tuning areas visible from the deterministic catalog.</p>
+      </div>
+      <div class="filter-bar">
+        <label for="knob-search">Search tuning areas</label>
+        <input id="knob-search" type="search" placeholder="Search by name, family, safety, or config">
+      </div>
+      <div class="group-grid">{''.join(render_group_card(group) for group in groups) or '<p class="empty">No tuning areas loaded.</p>'}</div>
+      <p class="empty hidden" id="group-empty-state">No tuning areas match the current filter.</p>
+    </section>"""
+
+
+def render_family_filter_controls(families: list[str]) -> str:
+    family_items = "".join(
+        f'<button type="button" data-family-filter="{escape(family)}">{escape(family)}</button>' for family in families
+    ) or '<span class="empty">No families</span>'
+    return f"""
+    <nav class="family-nav advanced-family-nav" aria-label="Tuning area family filters">
+      <button type="button" class="active" data-family-filter="all">All families</button>
+      {family_items}
+    </nav>"""
+
+
+def render_tuning_area_options(groups: list[dict[str, Any]]) -> str:
+    group_items = []
+    for group in groups:
+        group_items.append(
+            f"""
+            <button type="button" class="mini-card tuning-area-option {escape(str(group.get('safety_tier') or 'unknown'))}" data-family="{escape(str(group.get('family') or 'unknown'))}" data-search="{escape(group_search_text(group))}" data-tuning-area-id="{escape(str(group.get('id') or ''))}" data-tuning-area-label="{escape(group_label(group))}" data-tuning-area-family="{escape(group_display_family(group))}" data-tuning-area-safety="{escape(str(group.get('safety_tier') or 'unknown'))}" data-tuning-area-description="{escape(str(group.get('description') or 'No description.'))}" data-tuning-area-config="{escape(str(group.get('config_path') or 'n/a'))}" data-knobs-tuned="{escape('|'.join(group_knobs(group)))}">
+              <strong>{escape(group_label(group))}</strong>
+              <span>{escape(str(group.get('safety_tier') or 'unknown'))}</span>
+            </button>"""
+        )
+    return f"""
+    <div class="rail-section advanced-recipe-list">
+      <h2>Tuning Areas</h2>
+      {''.join(group_items) or '<p class="empty">No tuning areas loaded.</p>'}
+      <p class="empty hidden" id="rail-empty-state">No tuning areas match this family.</p>
+    </div>"""
 
 
 def render_left_rail(families: list[str], groups: list[dict[str, Any]]) -> str:
@@ -2173,6 +2472,508 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .workflow-step small { grid-column: 2; }
   .workflow-step::after { display: none; }
 }
+
+/* Objective command center redesign */
+.objective-cockpit,
+.objective-cockpit * {
+  letter-spacing: 0;
+}
+.objective-cockpit {
+  position: relative;
+  width: min(1680px, calc(100vw - 40px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 26px 0 46px;
+}
+.objective-cockpit::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(69, 242, 155, .12), transparent 26%),
+    radial-gradient(circle at 76% 2%, rgba(158, 156, 255, .12), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,.04), transparent 26%);
+  z-index: -1;
+}
+.command-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+.command-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.command-brand strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1.1;
+}
+.command-brand small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+.command-orb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(from 180deg, var(--green), var(--cyan), var(--violet), var(--green));
+  box-shadow: 0 0 24px rgba(69, 242, 155, .4);
+}
+.command-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.command-status-strip span {
+  padding: 8px 11px;
+  border: 1px solid rgba(141, 221, 255, .2);
+  border-radius: 999px;
+  color: rgba(237, 248, 255, .82);
+  background: rgba(255,255,255,.045);
+  font-size: 12px;
+  font-weight: 750;
+}
+.command-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 390px);
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+.command-hero-copy {
+  position: relative;
+  overflow: hidden;
+  min-height: 252px;
+  padding: 30px;
+  border: 1px solid rgba(99, 226, 255, .2);
+  border-radius: 18px;
+  background:
+    linear-gradient(120deg, rgba(9, 24, 43, .92), rgba(4, 9, 18, .92)),
+    linear-gradient(90deg, rgba(69, 242, 155, .08), rgba(34, 215, 255, .04));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.command-hero-copy::after {
+  content: "";
+  position: absolute;
+  right: 28px;
+  bottom: 22px;
+  width: min(42%, 440px);
+  height: 132px;
+  border: 1px solid rgba(69, 242, 155, .2);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(69, 242, 155, .75) 0 68%, rgba(255,255,255,.12) 68%),
+    linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08));
+  background-size: 100% 12px, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: 0 24px, 0 0;
+  opacity: .46;
+}
+.command-hero h1 {
+  position: relative;
+  max-width: 870px;
+  margin: 0;
+  font-size: clamp(40px, 4.7vw, 68px);
+  line-height: .96;
+  z-index: 1;
+}
+.command-hero p {
+  position: relative;
+  max-width: 760px;
+  margin: 20px 0 0;
+  color: rgba(237, 248, 255, .74);
+  font-size: 18px;
+  line-height: 1.58;
+  z-index: 1;
+}
+.decision-story-card,
+.command-panel,
+.decision-story,
+.advanced-shell {
+  border: 1px solid rgba(99, 226, 255, .19);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), transparent 32%),
+    rgba(5, 14, 27, .82);
+  box-shadow: 0 22px 70px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.decision-story-card {
+  display: grid;
+  align-content: space-between;
+  min-height: 252px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 80% 12%, rgba(69, 242, 155, .16), transparent 38%),
+    linear-gradient(180deg, rgba(12, 30, 49, .95), rgba(5, 12, 24, .95));
+}
+.decision-story-card span,
+.command-section-head span,
+.story-grid span {
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.decision-story-card > strong {
+  display: block;
+  margin: 18px 0;
+  font-size: 28px;
+  line-height: 1.08;
+}
+.decision-story-card code,
+.story-grid code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.decision-story-card dl,
+.recipe-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.decision-story-card dt,
+.recipe-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.decision-story-card dd,
+.recipe-facts dd {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-weight: 850;
+}
+.command-setup-grid,
+.command-runway {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.command-setup-grid {
+  grid-template-columns: minmax(260px, .8fr) minmax(380px, 1.15fr) minmax(300px, .8fr);
+}
+.command-runway {
+  grid-template-columns: minmax(300px, .76fr) minmax(420px, 1.1fr) minmax(320px, .86fr);
+}
+.command-panel {
+  min-width: 0;
+  padding: 18px;
+}
+.command-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.command-section-head strong {
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.16;
+  text-align: right;
+}
+.model-panel .profile-strip {
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: 1fr;
+}
+.objective-panel .target-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.objective-cockpit .profile-card,
+.objective-cockpit .target-card {
+  min-height: 116px;
+  border-radius: 12px;
+  background: rgba(13, 29, 48, .72);
+}
+.objective-cockpit .profile-card.active,
+.objective-cockpit .target-card.active {
+  border-color: rgba(69, 242, 155, .74);
+  box-shadow: inset 0 0 0 1px rgba(69, 242, 155, .18), 0 12px 34px rgba(69, 242, 155, .08);
+}
+.selected-objective-summary {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(69, 242, 155, .18);
+  border-radius: 12px;
+  background: rgba(69, 242, 155, .06);
+}
+.selected-objective-summary span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.selected-objective-summary strong {
+  font-size: 18px;
+}
+.selected-objective-summary small {
+  color: var(--muted);
+}
+.recipe-panel p {
+  color: var(--muted);
+  line-height: 1.48;
+}
+.compact-knobs {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(141, 221, 255, .14);
+}
+.compact-knobs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 0;
+  margin: 10px 0 0;
+  list-style: none;
+}
+.compact-knobs li {
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: rgba(237,248,255,.86);
+  background: rgba(255,255,255,.07);
+  font-size: 12px;
+}
+.recipe-action {
+  margin-top: 16px;
+}
+.primary-command-card {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(69, 242, 155, .13), transparent 34%),
+    linear-gradient(180deg, rgba(12, 30, 49, .95), rgba(5, 12, 24, .95));
+}
+.objective-cockpit .primary-action {
+  border-radius: 12px;
+  background: linear-gradient(100deg, #1bc7ff, #5264ff 54%, #45f29b);
+  box-shadow: 0 18px 42px rgba(34, 215, 255, .18);
+}
+.progress-head strong {
+  min-width: 66px;
+  text-align: right;
+}
+.progress-head em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+  margin-left: auto;
+}
+.command-stage-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.command-gates {
+  margin-top: 14px;
+}
+.command-gates .gate-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.command-gates .gate-list li {
+  margin: 0;
+}
+.command-stage-list .pipeline-stage {
+  grid-template-columns: 82px minmax(0, .92fr) minmax(0, 1.35fr);
+  border-radius: 12px;
+}
+.live-command-card .live-execution {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.live-command-card .operation-result {
+  margin-top: 16px;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid rgba(141, 221, 255, .14);
+  background: transparent;
+  box-shadow: none;
+}
+.live-command-card .operation-result .section-heading {
+  align-items: center;
+}
+.live-command-card .explain-grid {
+  grid-template-columns: 1fr;
+}
+.decision-story {
+  margin-bottom: 16px;
+  padding: 20px;
+}
+.story-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.story-heading h2 {
+  font-size: 30px;
+}
+.story-heading p {
+  max-width: 620px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.story-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.story-grid article {
+  min-height: 132px;
+  padding: 16px;
+  border: 1px solid rgba(141, 221, 255, .15);
+  border-radius: 14px;
+  background: rgba(255,255,255,.045);
+}
+.story-grid strong {
+  display: block;
+  margin: 12px 0 8px;
+  font-size: 26px;
+  line-height: 1.05;
+}
+.story-grid small {
+  color: var(--muted);
+}
+.winner-story {
+  border-color: rgba(69, 242, 155, .45) !important;
+  background: rgba(69, 242, 155, .08) !important;
+}
+.advanced-command-center {
+  margin-top: 18px;
+}
+.advanced-shell {
+  overflow: hidden;
+}
+.advanced-shell > summary {
+  display: grid;
+  grid-template-columns: minmax(0, .4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 20px;
+  cursor: pointer;
+  list-style: none;
+}
+.advanced-shell > summary::-webkit-details-marker {
+  display: none;
+}
+.advanced-shell > summary span {
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.advanced-shell > summary strong {
+  font-size: 20px;
+}
+.advanced-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  padding: 0 20px 20px;
+}
+.advanced-rail {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+.advanced-workspace {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.advanced-family-nav,
+.advanced-recipe-list {
+  border: 1px solid rgba(141, 221, 255, .14);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+.advanced-recipe-list {
+  max-height: 520px;
+  overflow: auto;
+}
+.advanced-recipe-list .mini-card {
+  width: 100%;
+}
+.advanced-workspace .tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  backdrop-filter: blur(12px);
+}
+.advanced-workspace .decision-strip,
+.advanced-workspace .workflow-band {
+  display: none;
+}
+@media (max-width: 1280px) {
+  .command-setup-grid,
+  .command-runway,
+  .command-hero {
+    grid-template-columns: 1fr;
+  }
+  .decision-story-card,
+  .command-hero-copy {
+    min-height: auto;
+  }
+  .story-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .objective-cockpit {
+    width: min(100% - 24px, 1680px);
+    padding-top: 18px;
+  }
+  .command-topbar,
+  .story-heading,
+  .command-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .command-section-head strong {
+    text-align: left;
+  }
+  .command-status-strip {
+    justify-content: flex-start;
+  }
+  .command-hero-copy {
+    padding: 24px;
+  }
+  .command-hero h1 {
+    font-size: 42px;
+  }
+  .command-hero-copy::after {
+    display: none;
+  }
+  .objective-panel .target-grid,
+  .story-grid,
+  .decision-story-card dl,
+  .recipe-facts,
+  .advanced-layout {
+    grid-template-columns: 1fr;
+  }
+  .command-stage-list .pipeline-stage {
+    grid-template-columns: 1fr;
+  }
+  .command-gates .gate-list {
+    grid-template-columns: 1fr;
+  }
+  .advanced-shell > summary {
+    grid-template-columns: 1fr;
+  }
+}
 """
 
 JS = """
@@ -2192,6 +2993,16 @@ function setActiveTab(tab) {
   document.querySelectorAll('[data-tab-panel]').forEach((panel) => {
     panel.classList.toggle('active', panel.dataset.tabPanel === tab);
   });
+}
+
+function openDetailPanel(tab) {
+  const details = document.getElementById('advanced-cockpit-details') || document.querySelector('.advanced-shell');
+  if (details) details.open = true;
+  setActiveTab(tab);
+  const panel = document.querySelector('[data-tab-panel="' + tab + '"]');
+  if (panel) {
+    window.setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
+  }
 }
 
 function safeSessionSet(key, value) {
@@ -2257,7 +3068,7 @@ document.querySelectorAll('[data-family-filter]').forEach((button) => {
     document.querySelectorAll('[data-family-filter]').forEach((item) => {
       item.classList.toggle('active', item === button);
     });
-    setActiveTab('knobs');
+    openDetailPanel('knobs');
     applyGroupFilters();
   });
 });
@@ -2343,12 +3154,12 @@ async function copyControllerCommand(button) {
 async function runControllerAction(button) {
   if (button.dataset.tabJump) {
     if (button.dataset.refreshTab === 'true') {
-      setActiveTab(button.dataset.tabJump);
+      openDetailPanel(button.dataset.tabJump);
       safeSessionSet('cockpit-tab-after-reload', button.dataset.tabJump);
       window.setTimeout(() => window.location.reload(), 50);
       return;
     }
-    setActiveTab(button.dataset.tabJump);
+    openDetailPanel(button.dataset.tabJump);
     return;
   }
   const endpoint = button.dataset.controllerEndpoint || '';
@@ -2713,12 +3524,12 @@ document.querySelectorAll('[data-tab-jump]').forEach((button) => {
   if (button.dataset.controllerCommand) return;
   button.addEventListener('click', () => {
     if (button.dataset.refreshTab === 'true') {
-      setActiveTab(button.dataset.tabJump);
+      openDetailPanel(button.dataset.tabJump);
       safeSessionSet('cockpit-tab-after-reload', button.dataset.tabJump);
       window.setTimeout(() => window.location.reload(), 50);
       return;
     }
-    setActiveTab(button.dataset.tabJump);
+    openDetailPanel(button.dataset.tabJump);
   });
 });
 
@@ -2745,7 +3556,7 @@ if (cancelButton) {
 const tabAfterReload = safeSessionGet('cockpit-tab-after-reload');
 if (tabAfterReload) {
   safeSessionRemove('cockpit-tab-after-reload');
-  setActiveTab(tabAfterReload);
+  openDetailPanel(tabAfterReload);
 }
 
 applyGroupFilters();

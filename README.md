@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.52.1-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.53.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -127,6 +127,9 @@ The project is spec-driven with SpecKit and currently supports:
   heatmap rendered from canonical report artifacts.
 - Model/profile selection and local optimization target selection for
   Performance, Stability, Tool Use, and Balanced cockpit workflows.
+- An objective-first cockpit command center that replaces the old left/right
+  rail default with model, target, recipe, primary action, progress, and
+  decision-story panels while hiding micro-tweaks in an advanced recipe drawer.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -312,37 +315,30 @@ generates the knob catalog, selected sweep control manifest, and run index, then
 starts the active cockpit at `http://127.0.0.1:8787`. Optional flags can override
 the sweep, config, output directory, host, and port.
 
-`web-cockpit` is the combined web interface. It presents a guided
-mission-control workflow with one primary `Start Optimization` action and
-automatic pipeline progress for Plan, Preview, Run, Report, and Confirm. Plan
-is treated as an internal traceable stage, not the main user choice. The
-cockpit only interrupts the user for real gates such as live GX10 execution,
-risky/session opt-in, and promotion. Tuning areas, pipeline stages, safety
-gates, status, report summaries, and run indexes are loaded from deterministic
-artifacts. The
-left rail lets you select a tuning area and see the actual knobs being tuned,
-and family filters update that same selector rather than only the detail tab,
-while internal experiment history terms such as rerun stay out of user-facing
-labels. The right rail focuses on the next action and live execution status,
-including active job progress and elapsed time while the controller is running.
-When a run completes, the visible pipeline advances from the completed job
-summary and the next action changes to `Load Report` so the user has a clear
-local follow-up. After report generation, `Review Report` reloads the active
-cockpit into the Reports tab so the freshly generated artifact is visible. The
-overview also includes an end-to-end flow map so Start Optimization, Load
-Report, Review Report, Confirmation gate, and Promotion gate read as one
-continuous operation instead of separate mystery panels.
-The command shell carries controller feedback next to the command being run.
-Controller buttons call the local server when served by `cockpit-server`, or
-copy deterministic CLI commands when opened as static HTML. Browser-side
-execution and promotion remain explicitly gated, and unsupported confirmation
-or promotion stages are rendered as review/gate actions rather than active
-server calls. Starting a new optimization from a report-loaded dashboard clears
-the previous progress and completed-stage state immediately, then advances to
-`Load Report` when the new run completes. The Reports tab also shows a
-continuation path with review, confirmation, and promotion-gate options. The
-runtime cockpit remains dependency-free; Playwright is pinned as a dev-only UI
-QA dependency, installed with `npm ci`, and checked with `npm audit`.
+`web-cockpit` is the combined web interface. It now opens as an objective
+command center: choose the model/profile, choose the optimization target,
+review the selected recipe, and use one clear primary action. Automatic Plan,
+Preview, Run, Report, and Confirm stages are shown as progress and provenance,
+not as the main navigation model. The cockpit only interrupts the user for real
+gates such as live GX10 execution, risky/session opt-in, and promotion.
+
+Micro-tweaks are still available for power users. The advanced recipe drawer
+exposes tuning areas, family filters, search, exact command hints, pipeline
+artifacts, reports, run indexes, source paths, and promotion gates. Controller
+buttons call the local server when served by `cockpit-server`, or copy
+deterministic CLI commands when opened as static HTML. Browser-side execution
+and promotion remain explicitly gated, and unsupported confirmation or
+promotion stages are rendered as review/gate actions rather than active server
+calls.
+
+Reports read as a decision story: baseline, winner, improvement, risk, and the
+next safe action. Starting a new optimization from a report-loaded dashboard
+clears the previous progress and completed-stage state immediately, then
+advances to `Load Report` when the new run completes. After report generation,
+`Review Report` opens the advanced Reports view so the freshly generated
+artifact is visible. The runtime cockpit remains dependency-free; Playwright is
+pinned as a dev-only UI QA dependency, installed with `npm ci`, and checked
+with `npm audit`.
 
 Smoke serve:
 

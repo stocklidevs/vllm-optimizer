@@ -54,7 +54,8 @@ def test_web_cockpit_renders_knobs_pipeline_status_and_report() -> None:
         },
     )
 
-    assert "vLLM Mission Control" in html
+    assert "vLLM Command Center" in html
+    assert "Optimize for the outcome you care about." in html
     assert "Prefix Prefill Tool JSON" in html
     assert "--allow-risky-session-flags" in html
     assert "--allow-promotion" in html
@@ -71,6 +72,7 @@ def test_web_cockpit_renders_empty_states_for_optional_artifacts() -> None:
     assert "No canonical report loaded" in html
     assert "Optimization Target" in html
     assert "Model/Profile" in html
+    assert "Advanced tuning recipe" in html
 
 
 def test_web_cockpit_includes_local_interaction_hooks() -> None:
@@ -115,6 +117,7 @@ def test_web_cockpit_includes_local_interaction_hooks() -> None:
     assert 'id="selected-objective-label"' in html
     assert 'id="auto-flow-selected-target"' in html
     assert "data-controller-command" in html
+    assert "function openDetailPanel" in html
 
 
 def test_web_cockpit_renders_model_profile_selector() -> None:
@@ -268,9 +271,9 @@ def test_web_cockpit_renders_report_visuals() -> None:
     )
 
     assert "Recommendation detail" in html
-    assert "Decision Strip" in html
-    assert "Current Winner" in html
-    assert "Improvement vs Baseline" in html
+    assert "Decision Story" in html
+    assert "Current recommendation" in html
+    assert "Improvement" in html
     assert "Performance Evidence" in html
     assert "Baseline vs Winner" in html
     assert "Latency / Throughput" in html
@@ -295,8 +298,8 @@ def test_web_cockpit_renders_report_visuals() -> None:
 def test_web_cockpit_renders_premium_analytics_empty_state() -> None:
     html = render_web_cockpit(catalog={"groups": []}, report=None)
 
-    assert "Decision Strip" in html
-    assert "Current Winner" in html
+    assert "Decision Story" in html
+    assert "Current recommendation" in html
     assert "Awaiting data" in html
     assert "Performance Evidence" in html
     assert "Waiting for report data" in html
@@ -401,22 +404,21 @@ def test_web_cockpit_renders_guided_mission_workflow() -> None:
         },
     )
 
-    assert "Optimization Workflow" in html
-    assert 'class="workflow-step active"' in html
-    assert 'data-workflow-step="plan"' in html
-    assert 'data-workflow-step="promote"' in html
-    assert "Locked (--allow-promotion)" in html
-    assert "Step 1 of 6" in html
-    assert "Next Action" in html
+    assert "vLLM Command Center" in html
+    assert 'class="objective-cockpit"' in html
+    assert "Automatic Pipeline Progress" in html
+    assert 'data-pipeline-stage="plan"' in html
+    assert 'data-pipeline-stage="promote"' in html
+    assert "Show knobs, commands, artifacts, runs, and gates" in html
+    assert "Next action" in html
     assert "Start Optimization" in html
     assert "No execution" in html
     assert "Plans automatically" in html
     assert "Stops at real gates" in html
-    assert "Controller command shell" in html
-    assert "What happens next?" in html
+    assert "Artifact status and controller commands" in html
 
 
-def test_web_cockpit_right_rail_omits_deprecated_panels() -> None:
+def test_web_cockpit_omits_old_right_rail_and_deprecated_panels() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},
         manifest={
@@ -431,15 +433,13 @@ def test_web_cockpit_right_rail_omits_deprecated_panels() -> None:
         },
     )
 
-    right_rail = html.split('<aside class="right-rail">', 1)[1].split("</aside>", 1)[0]
-
-    assert "Next Action" in right_rail
-    assert "Execution" in right_rail
-    assert "Safety Gates" not in right_rail
-    assert "<h2>Controller</h2>" not in right_rail
-    assert "--allow-promotion" not in right_rail
+    assert '<aside class="right-rail">' not in html
+    assert "Next action" in html
+    assert "Live execution" in html
+    assert "Safety Gates" not in html
+    assert "<h2>Controller</h2>" not in html
     assert 'id="controller-feedback"' in html
-    assert "Controller command shell" in html
+    assert "Artifact status and controller commands" in html
 
 
 def test_web_cockpit_uses_start_optimization_as_primary_cta() -> None:
@@ -462,15 +462,14 @@ def test_web_cockpit_uses_start_optimization_as_primary_cta() -> None:
         },
     )
 
-    right_rail = html.split('<aside class="right-rail">', 1)[1].split("</aside>", 1)[0]
-
-    assert "Start Optimization" in right_rail
-    assert "Generate Plan" not in right_rail
-    assert 'data-controller-action="run"' in right_rail
-    assert 'data-controller-command="uv run vllm-optimizer cockpit-run --confirm-live-run"' in right_rail
-    assert "Runs plan and preview first" in right_rail
+    assert '<aside class="right-rail">' not in html
+    assert "Start Optimization" in html
+    assert 'id="next-action-button"' in html
+    assert 'data-controller-action="run"' in html
+    assert 'data-controller-command="uv run vllm-optimizer cockpit-run --confirm-live-run"' in html
+    assert "Runs plan and preview first" in html
     assert 'data-pipeline-stage="plan"' in html
-    assert "<strong>Generate Plan</strong>" in html
+    assert "Automatic Pipeline Progress" in html
 
 
 def test_web_cockpit_overview_explains_end_to_end_flow() -> None:
@@ -482,13 +481,13 @@ def test_web_cockpit_overview_explains_end_to_end_flow() -> None:
         },
     )
 
-    assert "End-to-End Flow" in html
-    assert 'data-flow-step="run"' in html
-    assert 'data-flow-step="report"' in html
+    assert "Automatic Pipeline Progress" in html
+    assert 'data-pipeline-stage="run"' in html
+    assert 'data-pipeline-stage="report"' in html
     assert "Start Optimization" in html
     assert "Load Report" in html
-    assert "Confirmation gate" in html
-    assert "Promotion gate" in html
+    assert "Confirm Candidate" in html
+    assert "Promote Profile" in html
     assert "Run complete. Reporting can be generated automatically." in html
 
 
@@ -503,19 +502,14 @@ def test_web_cockpit_report_ready_primary_action_reviews_report_not_confirm_endp
             }
         },
     )
-    right_rail = html.split('<aside class="right-rail">', 1)[1].split("</aside>", 1)[0]
-    active_step = html.split('<article class="active-step-card">', 1)[1].split("</article>", 1)[0]
-    command_shell = html.split('<article class="command-shell">', 1)[1].split("</article>", 1)[0]
+    primary_card = html.split('<article class="command-panel primary-command-card">', 1)[1].split("</article>", 1)[0]
 
-    assert "Review Report" in right_rail
-    assert "Loaded Artifact State" in html
-    assert ">Loaded<" in html
-    assert ">Review<" in html
+    assert "Review Report" in primary_card
+    assert "Decision Story" in html
     assert "Report review" in html
-    assert 'data-tab-jump="reports"' in right_rail
-    assert 'data-controller-action="confirm"' not in right_rail
-    assert 'data-controller-endpoint="/api/controller/confirm"' not in active_step
-    assert 'data-controller-endpoint="/api/controller/confirm"' not in command_shell
+    assert 'data-tab-jump="reports"' in primary_card
+    assert 'data-controller-action="confirm"' not in primary_card
+    assert 'data-controller-endpoint="/api/controller/confirm"' not in primary_card
     assert "No unsupported endpoint" in html
 
 
@@ -562,7 +556,7 @@ def test_web_cockpit_renders_selectable_tuning_areas() -> None:
 
     assert "Tuning Areas" in html
     assert "Selected Tuning Area" in html
-    assert "Knobs tuned" in html
+    assert "Included knobs" in html
     assert "FP8 KV Cache - Interactive Coding" in html
     assert "Concurrency - 8 Requests" in html
     assert 'data-tuning-area-id="qwen-fp8-rerun-interactive"' in html

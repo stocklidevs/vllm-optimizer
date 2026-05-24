@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/062-model-objective-selection/plan.md
+specs/063-objective-command-center-cockpit/plan.md
 <!-- SPECKIT END -->
