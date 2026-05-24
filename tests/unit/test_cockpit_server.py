@@ -8,6 +8,7 @@ from vllm_optimizer.cockpit_server import (
     CockpitServerError,
     CockpitJobStore,
     handle_controller_action,
+    render_active_cockpit,
 )
 
 
@@ -86,6 +87,30 @@ def test_cockpit_server_report_action_writes_report_artifacts(tmp_path: Path) ->
     assert result["remote_execution"] is False
     assert result["pipeline_summary"]["mode"] == "report"
     assert result["artifacts"]["report_json"].endswith("report.json")
+
+
+def test_active_cockpit_loads_generated_report_from_out_dir(tmp_path: Path) -> None:
+    out_dir = tmp_path / "active-report"
+    out_dir.mkdir()
+    (out_dir / "report.json").write_text(
+        """{
+          "source": {"label": "generated-report"},
+          "recommendation": {"status": "ready", "objective": "balanced", "candidate_id": "winner"},
+          "candidates": {}
+        }""",
+        encoding="utf-8",
+    )
+
+    html = render_active_cockpit(
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            out_dir=out_dir,
+        )
+    )
+
+    assert "ready" in html
+    assert "winner" in html
+    assert "Recommendation detail" in html
 
 
 def test_cockpit_server_rejects_unknown_action(tmp_path: Path) -> None:

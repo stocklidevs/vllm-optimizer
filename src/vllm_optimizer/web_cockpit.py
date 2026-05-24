@@ -1540,6 +1540,15 @@ async function copyControllerCommand(button) {
 }
 
 async function runControllerAction(button) {
+  if (button.dataset.tabJump) {
+    if (button.dataset.refreshTab) {
+      window.sessionStorage.setItem('cockpit-tab-after-reload', button.dataset.tabJump);
+      window.location.reload();
+      return;
+    }
+    setActiveTab(button.dataset.tabJump);
+    return;
+  }
   const endpoint = button.dataset.controllerEndpoint || '';
   const action = button.dataset.controllerAction || 'action';
   const feedback = document.getElementById('controller-feedback');
@@ -1685,7 +1694,11 @@ function updateNextActionFromJob(job) {
   if (completed.length === 0 && job.action === 'run' && job.status === 'completed') {
     completed = ['plan', 'preview', 'run'];
   }
-  if (!completed.includes('run') || completed.includes('report')) return;
+  if (completed.includes('report')) {
+    setReviewReportAction();
+    return;
+  }
+  if (!completed.includes('run')) return;
   const headline = document.getElementById('next-action-headline');
   const description = document.getElementById('next-action-description');
   const facts = document.getElementById('next-action-facts');
@@ -1701,6 +1714,27 @@ function updateNextActionFromJob(job) {
     button.dataset.controllerAction = 'report';
     button.dataset.controllerEndpoint = '/api/controller/report';
     button.dataset.controllerCommand = reportCommand;
+    delete button.dataset.tabJump;
+  }
+}
+
+function setReviewReportAction() {
+  const headline = document.getElementById('next-action-headline');
+  const description = document.getElementById('next-action-description');
+  const facts = document.getElementById('next-action-facts');
+  const button = document.getElementById('next-action-button');
+  if (headline) headline.textContent = 'Review Report';
+  if (description) description.textContent = 'The report is ready. Open the Reports view to review the recommendation, metrics, and failures.';
+  if (facts) {
+    facts.innerHTML = '<li>Report generated</li><li>Review recommendation</li><li>Confirm only after review</li>';
+  }
+  if (button) {
+    button.textContent = 'Review Report';
+    button.dataset.tabJump = 'reports';
+    button.dataset.refreshTab = 'true';
+    delete button.dataset.controllerAction;
+    delete button.dataset.controllerEndpoint;
+    delete button.dataset.controllerCommand;
   }
 }
 
@@ -1779,6 +1813,12 @@ document.querySelectorAll('.tuning-area-option').forEach((button, index) => {
 const cancelButton = document.getElementById('operation-cancel');
 if (cancelButton) {
   cancelButton.addEventListener('click', cancelControllerJob);
+}
+
+const tabAfterReload = window.sessionStorage.getItem('cockpit-tab-after-reload');
+if (tabAfterReload) {
+  window.sessionStorage.removeItem('cockpit-tab-after-reload');
+  setActiveTab(tabAfterReload);
 }
 
 applyGroupFilters();

@@ -178,6 +178,10 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "function renderOperationResult" in html
     assert "function updatePipelineFromJob" in html
     assert "function updateNextActionFromJob" in html
+    assert "Review Report" in html
+    assert "tabJump" in html
+    assert "refreshTab" in html
+    assert "cockpit-tab-after-reload" in html
     assert "completed_stages" in html
     assert "live-execution-title" in html
     assert "live-execution-elapsed" in html

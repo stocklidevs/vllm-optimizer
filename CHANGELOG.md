@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.6 - 2026-05-23
+
+- Added a `Review Report` next action after report generation.
+- Active cockpit rendering now auto-loads generated `out_dir/report.json`
+  artifacts and can reload directly into the Reports tab.
+
 ## 0.50.5 - 2026-05-23
 
 - Synced the cockpit pipeline progress with completed controller job results so

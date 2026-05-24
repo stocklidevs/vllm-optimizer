@@ -365,7 +365,7 @@ def render_active_cockpit(config: CockpitServerConfig) -> str:
     catalog = _read_json_or_empty(config.catalog_path, {"groups": []})
     manifest = _read_optional_json(config.manifest_path)
     status = _read_optional_json(config.status_path)
-    report = _read_optional_json(config.report_path)
+    report = _read_optional_json(config.report_path) or _read_optional_json(config.out_dir / "report.json")
     run_index = _read_optional_json(config.run_index_path)
     return render_web_cockpit(
         catalog,

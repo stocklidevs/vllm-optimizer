@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/057-completed-run-pipeline-sync/plan.md
+specs/058-review-report-action/plan.md
 <!-- SPECKIT END -->
