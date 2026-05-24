@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.52.1 - 2026-05-24
+
+- Fixed Start Optimization reset behavior so the visible pipeline percentage
+  badge resets along with the progress bar when a new run begins from a loaded
+  artifact state.
+
 ## 0.52.0 - 2026-05-24
 
 - Added model/profile selection to the web cockpit, with static and active

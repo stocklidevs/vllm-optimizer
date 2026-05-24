@@ -555,7 +555,7 @@ def render_automatic_pipeline_panel(
             <p class="eyebrow">Execution Pipeline</p>
             <h2>Automatic Pipeline Progress</h2>
           </div>
-          <span class="step-pill">{progress}%</span>
+          <span id="pipeline-overall-progress-label" class="step-pill">{progress}%</span>
         </div>
         <div class="progress-track overall-progress" aria-label="Overall progress">
           <div id="pipeline-overall-progress-bar" class="progress-bar" style="width:{progress}%"></div>
@@ -2490,8 +2490,10 @@ function updatePipelineFromJob(job) {
   const lastStage = stageOrder[Math.max(0, highest - 1)] || 'plan';
   const progress = progressByStage[lastStage] || 8;
   const progressBar = document.getElementById('pipeline-overall-progress-bar');
+  const progressLabel = document.getElementById('pipeline-overall-progress-label');
   const caption = document.getElementById('pipeline-caption');
   if (progressBar) progressBar.style.width = progress + '%';
+  if (progressLabel) progressLabel.textContent = progress + '%';
   if (caption) caption.textContent = pipelineCaptionForCompleted(normalized);
   updateWorkflowBand(normalized, nextStage);
   updateFlowMap(normalized, nextStage);
@@ -2552,8 +2554,10 @@ function resetWorkflowForNewOperation(action) {
   updateWorkflowBand([], 'plan');
   updateFlowMap([], 'plan');
   const progressBar = document.getElementById('pipeline-overall-progress-bar');
+  const progressLabel = document.getElementById('pipeline-overall-progress-label');
   const caption = document.getElementById('pipeline-caption');
   if (progressBar) progressBar.style.width = '8%';
+  if (progressLabel) progressLabel.textContent = '8%';
   if (caption) caption.textContent = 'Starting optimization. Prior run state has been cleared for this run.';
 }
 

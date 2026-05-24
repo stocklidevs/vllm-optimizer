@@ -200,6 +200,7 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "Operation Result" in html
     assert 'id="operation-progress-bar"' in html
     assert 'id="pipeline-overall-progress-bar"' in html
+    assert 'id="pipeline-overall-progress-label"' in html
     assert 'id="pipeline-caption"' in html
     assert 'id="next-action-headline"' in html
     assert 'id="next-action-button"' in html
@@ -215,6 +216,8 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "function setRunningOptimizationAction" in html
     assert "Prior run state has been cleared for this run" in html
     assert "Progress and stages now reflect this run" in html
+    assert "progressLabel.textContent = '8%'" in html
+    assert "progressLabel.textContent = progress + '%'" in html
     assert "Review Report" in html
     assert "tabJump" in html
     assert "refreshTab" in html
