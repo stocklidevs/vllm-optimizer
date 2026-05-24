@@ -78,7 +78,7 @@ def render_web_cockpit(
             render_overview(groups, manifest, status, report),
             render_pipeline(manifest),
             render_runs(run_index),
-            render_reporting(report),
+            render_reporting(report, manifest),
             render_promotion_workflow(report, manifest),
             render_how_to_use(),
             render_sources(sources or {}),
@@ -261,13 +261,18 @@ def render_pipeline(manifest: dict[str, Any] | None) -> str:
     </section>"""
 
 
-def render_reporting(report: dict[str, Any] | None) -> str:
+def render_reporting(report: dict[str, Any] | None, manifest: dict[str, Any] | None = None) -> str:
     if report is None:
-        content = '<p class="empty">No canonical report loaded.</p>'
+        content = """
+        <div class="report-card">
+          <p class="empty">No canonical report loaded.</p>
+          <p>After an optimization run finishes, use <strong>Load Report</strong> to generate the decision artifact.</p>
+        </div>"""
     else:
         candidates = report.get("candidates", {})
         content = f"""
         {render_recommendation_detail(report)}
+        {render_report_next_steps(report, manifest)}
         {render_metric_visualizer(candidates if isinstance(candidates, dict) else {})}
         {render_failure_summary(candidates if isinstance(candidates, dict) else {})}"""
     return f"""
@@ -281,6 +286,40 @@ def render_reporting(report: dict[str, Any] | None) -> str:
       </div>
       {content}
     </section>"""
+
+
+def render_report_next_steps(report: dict[str, Any], manifest: dict[str, Any] | None) -> str:
+    recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
+    status = str(recommendation.get("status") or "unknown")
+    candidate = str(recommendation.get("candidate_id") or "no candidate")
+    commands = controller_commands(manifest)
+    confirm_command = commands.get("confirm", "uv run vllm-optimizer optimize-workload --mode confirm --sweep SWEEP_JSON --out ARTIFACT_DIR")
+    return f"""
+    <div class="report-card report-next-steps">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="eyebrow">Continue From Report</p>
+          <h3>Decision path</h3>
+        </div>
+        <p>{escape(status)} / <code>{escape(candidate)}</code></p>
+      </div>
+      <div class="decision-grid">
+        <article>
+          <strong>1. Review evidence</strong>
+          <small>Use the metrics, rationale, failures, and next actions below before touching the GX10 again.</small>
+        </article>
+        <article>
+          <strong>2. Confirmation gate</strong>
+          <small>Run repeated confirmation only when the report makes a candidate worth validating.</small>
+          <code>{escape(confirm_command)}</code>
+        </article>
+        <article>
+          <strong>3. Promotion gate</strong>
+          <small>Promotion remains disabled until confirmation is accepted and the explicit gate is provided.</small>
+          <button type="button" data-tab-jump="promotion" data-refresh-tab="false">Open Promotion Gate</button>
+        </article>
+      </div>
+    </div>"""
 
 
 def render_runs(run_index: dict[str, Any] | None) -> str:
@@ -1494,6 +1533,9 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .recommendation-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 16px; }
 .report-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .report-lists h4 { margin: 0 0 8px; }
+.decision-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.decision-grid article { display: grid; gap: 8px; align-content: start; border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(15,29,47,.44); padding: 12px; }
+.decision-grid code { display: block; overflow-wrap: anywhere; }
 .metric-visuals { display: grid; gap: 12px; margin-bottom: 16px; }
 .metric-row { border: 1px solid rgba(55,216,255,.12); border-radius: 8px; padding: 12px; background: rgba(15,29,47,.58); }
 .metric-row-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
@@ -1540,7 +1582,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context, .decision-grid { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
   .workflow-heading { align-items: flex-start; flex-direction: column; }
   .workflow-step { justify-items: start; text-align: left; grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 76px; }
@@ -1672,9 +1714,10 @@ async function copyControllerCommand(button) {
 
 async function runControllerAction(button) {
   if (button.dataset.tabJump) {
-    if (button.dataset.refreshTab) {
+    if (button.dataset.refreshTab === 'true') {
+      setActiveTab(button.dataset.tabJump);
       window.sessionStorage.setItem('cockpit-tab-after-reload', button.dataset.tabJump);
-      window.location.reload();
+      window.setTimeout(() => window.location.reload(), 50);
       return;
     }
     setActiveTab(button.dataset.tabJump);
@@ -1707,6 +1750,7 @@ async function runControllerAction(button) {
       next_step: 'Watch the progress bar.'
     }
   });
+  resetWorkflowForNewOperation(action);
   if (feedback) feedback.textContent = 'Running ' + action + '...';
   try {
     const response = await fetch(endpoint, {
@@ -1780,6 +1824,10 @@ function renderOperationResult(job) {
 function updatePipelineFromJob(job) {
   const summary = job.pipeline_summary || (job.result && job.result.pipeline_summary) || {};
   let completed = Array.isArray(summary.completed_stages) ? summary.completed_stages : [];
+  if (completed.length === 0 && job.action === 'run' && ['running', 'cancel-requested'].includes(job.status)) {
+    resetWorkflowForNewOperation('run');
+    return;
+  }
   if (completed.length === 0 && job.action === 'run' && job.status === 'completed') {
     completed = ['plan', 'preview', 'run'];
   }
@@ -1817,11 +1865,17 @@ function updatePipelineFromJob(job) {
   const caption = document.getElementById('pipeline-caption');
   if (progressBar) progressBar.style.width = progress + '%';
   if (caption) caption.textContent = pipelineCaptionForCompleted(normalized);
+  updateWorkflowBand(normalized, nextStage);
+  updateFlowMap(normalized, nextStage);
 }
 
 function updateNextActionFromJob(job) {
   const summary = job.pipeline_summary || (job.result && job.result.pipeline_summary) || {};
   let completed = Array.isArray(summary.completed_stages) ? summary.completed_stages : [];
+  if (job.action === 'run' && ['running', 'cancel-requested'].includes(job.status)) {
+    setRunningOptimizationAction();
+    return;
+  }
   if (completed.length === 0 && job.action === 'run' && job.status === 'completed') {
     completed = ['plan', 'preview', 'run'];
   }
@@ -1845,7 +1899,93 @@ function updateNextActionFromJob(job) {
     button.dataset.controllerAction = 'report';
     button.dataset.controllerEndpoint = '/api/controller/report';
     button.dataset.controllerCommand = reportCommand;
+    button.disabled = false;
     delete button.dataset.tabJump;
+  }
+}
+
+function resetWorkflowForNewOperation(action) {
+  if (action !== 'run') return;
+  document.querySelectorAll('[data-pipeline-stage]').forEach((item) => {
+    const stage = item.dataset.pipelineStage;
+    const state = item.querySelector('span');
+    item.classList.remove('complete', 'running', 'automatic', 'manual', 'gate', 'waiting');
+    if (stage === 'plan') {
+      item.classList.add('automatic');
+      if (state) state.textContent = 'Next';
+    } else if (stage === 'promote') {
+      item.classList.add('manual', 'gate');
+      if (state) state.textContent = 'Manual Gate';
+    } else {
+      item.classList.add('waiting');
+      if (state) state.textContent = 'Waiting';
+    }
+  });
+  updateWorkflowBand([], 'plan');
+  updateFlowMap([], 'plan');
+  const progressBar = document.getElementById('pipeline-overall-progress-bar');
+  const caption = document.getElementById('pipeline-caption');
+  if (progressBar) progressBar.style.width = '8%';
+  if (caption) caption.textContent = 'Starting optimization. Prior run state has been cleared for this run.';
+}
+
+function updateWorkflowBand(completed, nextStage) {
+  document.querySelectorAll('[data-workflow-step]').forEach((item) => {
+    const stage = item.dataset.workflowStep;
+    const label = item.querySelector('small');
+    item.classList.remove('complete', 'active', 'locked');
+    if (completed.includes(stage)) {
+      item.classList.add('complete');
+      if (label) label.textContent = 'Done';
+    } else if (stage === nextStage) {
+      item.classList.add('active');
+      if (label) label.textContent = 'Ready';
+    } else {
+      item.classList.add('locked');
+      if (label) label.textContent = stage === 'promote' ? 'Manual Gate' : 'Locked';
+    }
+  });
+}
+
+function updateFlowMap(completed, nextStage) {
+  document.querySelectorAll('[data-flow-step]').forEach((item) => {
+    const stage = item.dataset.flowStep;
+    const label = item.querySelector('span');
+    item.classList.remove('complete', 'current', 'gate', 'waiting');
+    if (completed.includes(stage)) {
+      item.classList.add('complete');
+      if (label) label.textContent = 'Done';
+    } else if (stage === nextStage) {
+      item.classList.add('current');
+      if (label) label.textContent = stage === 'confirm' ? 'Review' : 'Current';
+    } else if (['confirm', 'promote'].includes(stage)) {
+      item.classList.add('gate');
+      if (label) label.textContent = 'Gate';
+    } else {
+      item.classList.add('waiting');
+      if (label) label.textContent = 'Waiting';
+    }
+  });
+}
+
+function setRunningOptimizationAction() {
+  const headline = document.getElementById('next-action-headline');
+  const description = document.getElementById('next-action-description');
+  const facts = document.getElementById('next-action-facts');
+  const button = document.getElementById('next-action-button');
+  if (headline) headline.textContent = 'Optimization Running';
+  if (description) description.textContent = 'The new run is active. Progress and stages now reflect this run, not the previous report.';
+  if (facts) {
+    facts.innerHTML = '<li>Fresh run state</li><li>Progress reset</li><li>Cancel available below</li>';
+  }
+  if (button) {
+    button.textContent = 'Optimization Running';
+    button.disabled = true;
+    delete button.dataset.controllerAction;
+    delete button.dataset.controllerEndpoint;
+    delete button.dataset.controllerCommand;
+    delete button.dataset.tabJump;
+    delete button.dataset.refreshTab;
   }
 }
 
@@ -1861,6 +2001,7 @@ function setReviewReportAction() {
   }
   if (button) {
     button.textContent = 'Review Report';
+    button.disabled = false;
     button.dataset.tabJump = 'reports';
     button.dataset.refreshTab = 'true';
     delete button.dataset.controllerAction;
@@ -1940,8 +2081,9 @@ document.querySelectorAll('[data-tab-jump]').forEach((button) => {
   if (button.dataset.controllerCommand) return;
   button.addEventListener('click', () => {
     if (button.dataset.refreshTab === 'true') {
+      setActiveTab(button.dataset.tabJump);
       window.sessionStorage.setItem('cockpit-tab-after-reload', button.dataset.tabJump);
-      window.location.reload();
+      window.setTimeout(() => window.location.reload(), 50);
       return;
     }
     setActiveTab(button.dataset.tabJump);

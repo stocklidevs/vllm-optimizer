@@ -178,6 +178,10 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "function renderOperationResult" in html
     assert "function updatePipelineFromJob" in html
     assert "function updateNextActionFromJob" in html
+    assert "function resetWorkflowForNewOperation" in html
+    assert "function setRunningOptimizationAction" in html
+    assert "Prior run state has been cleared for this run" in html
+    assert "Progress and stages now reflect this run" in html
     assert "Review Report" in html
     assert "tabJump" in html
     assert "refreshTab" in html
@@ -228,6 +232,11 @@ def test_web_cockpit_renders_report_visuals() -> None:
     assert "Recommendation detail" in html
     assert "Metric visualizer" in html
     assert "Failure summary" in html
+    assert "Continue From Report" in html
+    assert "Decision path" in html
+    assert "Confirmation gate" in html
+    assert "Open Promotion Gate" in html
+    assert "optimize-workload --mode confirm" in html
     assert "candidate-fast" in html
     assert "candidate-risky" in html
     assert "data-report-bar=\"throughput\"" in html
@@ -409,6 +418,13 @@ def test_web_cockpit_report_ready_primary_action_reviews_report_not_confirm_endp
     assert 'data-controller-endpoint="/api/controller/confirm"' not in active_step
     assert 'data-controller-endpoint="/api/controller/confirm"' not in command_shell
     assert "No unsupported endpoint" in html
+
+
+def test_web_cockpit_tab_jump_false_does_not_reload() -> None:
+    html = render_web_cockpit(catalog={"groups": []}, report={"recommendation": {}, "candidates": {}})
+
+    assert 'data-tab-jump="promotion" data-refresh-tab="false"' in html
+    assert "button.dataset.refreshTab === 'true'" in html
 
 
 def test_web_cockpit_renders_selectable_tuning_areas() -> None:

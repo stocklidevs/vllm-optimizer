@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/059-end-to-end-cockpit-dashboard/plan.md
+specs/060-cockpit-active-flow-reset/plan.md
 <!-- SPECKIT END -->

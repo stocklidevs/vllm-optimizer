@@ -65,7 +65,7 @@ wheels = [
 
 [[package]]
 name = "vllm-optimizer"
-version = "0.50.7"
+version = "0.50.8"
 source = { editable = "." }
 
 [package.dev-dependencies]

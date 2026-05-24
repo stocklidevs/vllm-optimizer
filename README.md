@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.7-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.8-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -118,6 +118,9 @@ The project is spec-driven with SpecKit and currently supports:
 - End-to-end cockpit flow mapping that shows runnable actions, report review,
   and manual confirmation/promotion gates without presenting unsupported gated
   stages as active server calls.
+- Active cockpit state reset when Start Optimization begins from a report-loaded
+  dashboard, plus Reports-tab continuation cards for confirmation and promotion
+  gates.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -328,10 +331,12 @@ Controller buttons call the local server when served by `cockpit-server`, or
 copy deterministic CLI commands when opened as static HTML. Browser-side
 execution and promotion remain explicitly gated, and unsupported confirmation
 or promotion stages are rendered as review/gate actions rather than active
-server calls. This
-implementation intentionally uses no npm packages. If a future spec adds npm,
-dependency versions must be pinned, vulnerability-reviewed, and installed with
-`npm ci`.
+server calls. Starting a new optimization from a report-loaded dashboard clears
+the previous progress and completed-stage state immediately, then advances to
+`Load Report` when the new run completes. The Reports tab also shows a
+continuation path with review, confirmation, and promotion-gate options. The
+runtime cockpit remains dependency-free; Playwright is pinned as a dev-only UI
+QA dependency, installed with `npm ci`, and checked with `npm audit`.
 
 Smoke serve:
 

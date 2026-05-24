@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.50.8 - 2026-05-24
+
+- Added pinned Playwright UI validation support with `npm ci` installation and
+  npm audit verification.
+- Reset cockpit progress, workflow, and flow-map state when Start Optimization
+  begins from a report-loaded dashboard.
+- Added Reports-tab continuation cards for review, confirmation, and promotion
+  gates.
+- Fixed false tab-refresh handling so non-refresh tab jumps do not reload.
+
 ## 0.50.7 - 2026-05-23
 
 - Added an end-to-end cockpit flow map that explains the operational journey

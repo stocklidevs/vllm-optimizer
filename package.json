@@ -1,0 +1,8 @@
+{
+  "name": "vllm-optimizer-ui-qa",
+  "private": true,
+  "version": "0.0.0",
+  "devDependencies": {
+    "playwright": "1.60.0"
+  }
+}
