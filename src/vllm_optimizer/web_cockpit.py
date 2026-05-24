@@ -19,6 +19,7 @@ def write_web_cockpit(
     status_path: Path | None = None,
     report_path: Path | None = None,
     run_index_path: Path | None = None,
+    profile_paths: list[Path] | tuple[Path, ...] | None = None,
 ) -> dict[str, str]:
     if not catalog_path.exists():
         raise WebCockpitError(f"catalog path does not exist: {catalog_path}")
@@ -27,18 +28,21 @@ def write_web_cockpit(
     status = _read_optional(status_path, "status")
     report = _read_optional(report_path, "report")
     run_index = _read_optional(run_index_path, "run index")
+    profiles = read_profile_summaries(profile_paths or [])
     html = render_web_cockpit(
         catalog,
         manifest=manifest,
         status=status,
         report=report,
         run_index=run_index,
+        profiles=profiles,
         sources={
             "catalog": catalog_path.as_posix(),
             "manifest": manifest_path.as_posix() if manifest_path else None,
             "status": status_path.as_posix() if status_path else None,
             "report": report_path.as_posix() if report_path else None,
             "run_index": run_index_path.as_posix() if run_index_path else None,
+            "profiles": ", ".join(path.as_posix() for path in profile_paths or []) or None,
         },
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,6 +57,7 @@ def render_web_cockpit(
     status: dict[str, Any] | None = None,
     report: dict[str, Any] | None = None,
     run_index: dict[str, Any] | None = None,
+    profiles: list[dict[str, Any]] | None = None,
     sources: dict[str, str | None] | None = None,
 ) -> str:
     groups = _list_of_dicts(catalog.get("groups"))
@@ -73,6 +78,7 @@ def render_web_cockpit(
             '<section class="workspace">',
             render_hero(groups, status, report),
             render_decision_strip(groups, manifest, status, report),
+            render_model_objective_panel(profiles or []),
             render_automatic_pipeline_panel(groups, manifest, status, report),
             render_workflow(manifest, status, report),
             render_tabs(),
@@ -258,12 +264,74 @@ def render_decision_strip(
           <strong>{escape(summary['decision'])}</strong>
           <small>{escape(summary['decision_detail'])}</small>
         </article>
+        <article class="decision-cell target">
+          <span>Optimization Target</span>
+          <strong id="selected-objective-label">Balanced</strong>
+          <small id="selected-objective-description">Blend throughput, latency, failure rate, and safety.</small>
+        </article>
         <article class="decision-cell next">
           <span>Next Safe Action</span>
           <strong>{escape(primary['label'])}</strong>
           <small>{escape(primary['next'])}</small>
         </article>
       </section>"""
+
+
+def render_model_objective_panel(profiles: list[dict[str, Any]]) -> str:
+    profile_cards = "".join(render_profile_card(profile, index == 0) for index, profile in enumerate(profiles))
+    if not profile_cards:
+        profile_cards = """
+          <article class="profile-card empty-profile">
+            <span>No profiles loaded</span>
+            <strong>Add --profile PROFILE.json</strong>
+            <small>The cockpit can still run, but model selection is not available for this page.</small>
+          </article>"""
+    target_cards = "".join(render_target_card(target, index == 0) for index, target in enumerate(OPTIMIZATION_TARGETS))
+    return f"""
+      <section class="model-objective-panel" aria-label="Model and optimization target selection">
+        <div class="model-selector">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">Model Selection</p>
+              <h2>Model/Profile</h2>
+            </div>
+            <p>Profiles define model identity, parser settings, and promoted serve knobs.</p>
+          </div>
+          <div class="profile-strip">{profile_cards}</div>
+        </div>
+        <div class="target-selector">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">Optimization Target</p>
+              <h2>Best tweak for...</h2>
+            </div>
+            <p>This selection is local UI state until target-aware scoring is wired into planning.</p>
+          </div>
+          <div class="target-grid">{target_cards}</div>
+        </div>
+      </section>"""
+
+
+def render_profile_card(profile: dict[str, Any], active: bool) -> str:
+    optional = profile.get("optional_flags", {}) if isinstance(profile.get("optional_flags"), dict) else {}
+    knob_summary = ", ".join(f"{key}={value}" for key, value in sorted(optional.items())) or "base serve flags"
+    return f"""
+          <button type="button" class="profile-card {'active' if active else ''}" data-profile-card data-profile-id="{escape(str(profile.get('profile_id') or 'profile'))}">
+            <span>{escape(str(profile.get('role') or 'Profile'))}</span>
+            <strong>{escape(str(profile.get('profile_id') or 'unknown-profile'))}</strong>
+            <small>{escape(str(profile.get('served_model_name') or profile.get('model') or 'unknown model'))}</small>
+            <code>{escape(str(profile.get('path') or 'n/a'))}</code>
+            <em>{escape(str(profile.get('tool_call_parser') or 'no parser'))} / {escape(knob_summary)}</em>
+          </button>"""
+
+
+def render_target_card(target: dict[str, str], active: bool) -> str:
+    return f"""
+          <button type="button" class="target-card {'active' if active else ''}" data-objective-target="{escape(target['id'])}" data-target-label="{escape(target['label'])}" data-target-description="{escape(target['description'])}">
+            <span>{escape(target['label'])}</span>
+            <strong>{escape(target['headline'])}</strong>
+            <small>{escape(target['description'])}</small>
+          </button>"""
 
 
 def render_performance_evidence(report: dict[str, Any] | None) -> str:
@@ -476,6 +544,7 @@ def render_automatic_pipeline_panel(
         <p>Select a tuning area, review the generated plan, then let the cockpit advance through automatic stages until a real human decision is needed.</p>
         <dl>
           <div><dt>Tuning area</dt><dd id="auto-flow-selected-area">{escape(selected)}</dd></div>
+          <div><dt>Optimization target</dt><dd id="auto-flow-selected-target">Balanced</dd></div>
           <div><dt>User decisions</dt><dd>Live run confirmation and promotion remain explicit.</dd></div>
         </dl>
         <button type="button" class="primary-action" data-controller-action="run" data-controller-endpoint="/api/controller/run" data-controller-command="{escape(command)}">Start Optimization</button>
@@ -1313,6 +1382,42 @@ def selected_group(groups: list[dict[str, Any]], manifest: dict[str, Any] | None
     return groups[0] if groups else {}
 
 
+def read_profile_summaries(profile_paths: list[Path] | tuple[Path, ...]) -> list[dict[str, Any]]:
+    summaries = []
+    for path in profile_paths:
+        if not path.exists():
+            continue
+        data = read_json(path)
+        if isinstance(data, dict):
+            summaries.append(profile_summary(data, path))
+    return summaries
+
+
+def profile_summary(data: dict[str, Any], path: Path) -> dict[str, Any]:
+    promotion = data.get("promotion", {}) if isinstance(data.get("promotion"), dict) else {}
+    confirmation = promotion.get("confirmation", {}) if isinstance(promotion.get("confirmation"), dict) else {}
+    decision = confirmation.get("decision", {}) if isinstance(confirmation.get("decision"), dict) else {}
+    role = "Promoted" if promotion else "Base"
+    if str(data.get("profile_id") or "").endswith("recommended"):
+        role = "Recommended"
+    if "concurrent" in str(data.get("profile_id") or ""):
+        role = "Confirmed Concurrent"
+    return {
+        "path": path.as_posix(),
+        "profile_id": data.get("profile_id"),
+        "model": data.get("model"),
+        "served_model_name": data.get("served_model_name"),
+        "tool_call_parser": data.get("tool_call_parser"),
+        "enable_auto_tool_choice": data.get("enable_auto_tool_choice"),
+        "gpu_memory_utilization": data.get("gpu_memory_utilization"),
+        "max_model_len": data.get("max_model_len"),
+        "performance_mode": data.get("performance_mode"),
+        "optional_flags": data.get("optional_flags", {}),
+        "role": role,
+        "promotion_status": decision.get("status"),
+    }
+
+
 def group_label(group: dict[str, Any]) -> str:
     return str(group.get("display_label") or group.get("label") or group.get("id") or "Unnamed tuning area")
 
@@ -1405,6 +1510,34 @@ def metric_tile(label: str, value: Any, suffix: str) -> str:
       <strong>{escape(str(value))}</strong>
       <small>{escape(suffix)}</small>
     </article>"""
+
+
+OPTIMIZATION_TARGETS = [
+    {
+        "id": "balanced",
+        "label": "Balanced",
+        "headline": "Default recommendation",
+        "description": "Blend throughput, latency, failure rate, and safety.",
+    },
+    {
+        "id": "performance",
+        "label": "Performance",
+        "headline": "Max useful speed",
+        "description": "Prefer higher tokens/sec and lower latency.",
+    },
+    {
+        "id": "stability",
+        "label": "Stability",
+        "headline": "Lowest operational risk",
+        "description": "Penalize failures, variance, and fragile candidates.",
+    },
+    {
+        "id": "tool_use",
+        "label": "Tool Use",
+        "headline": "Structured-output reliability",
+        "description": "Foundation for future parser and JSON correctness scoring.",
+    },
+]
 
 
 def _read_optional(path: Path | None, label: str) -> dict[str, Any] | None:
@@ -1729,7 +1862,7 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .flow-context .summary-block, .flow-context .empty { border: 1px solid rgba(55,216,255,.12); border-radius: 8px; background: rgba(15,29,47,.32); padding: 12px; margin: 0; }
 .decision-strip {
   display: grid;
-  grid-template-columns: 1.25fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1fr .9fr .9fr .9fr 1fr;
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -1772,9 +1905,71 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .decision-cell.selected { border-left: 2px solid var(--cyan); }
 .decision-cell.winner { border-left: 2px solid var(--green); }
 .decision-cell.improvement { border-left: 2px solid var(--amber); }
+.decision-cell.target { border-left: 2px solid var(--violet); }
 .delta-positive { color: var(--green); }
 .delta-negative { color: var(--red); }
 .delta-neutral { color: var(--amber); }
+.model-objective-panel {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.05fr) minmax(360px, .95fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.model-selector,
+.target-selector {
+  padding: 16px;
+  border: 1px solid rgba(34,215,255,.18);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.032), transparent 32%),
+    rgba(4,10,18,.74);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 14px 38px rgba(0,0,0,.22);
+}
+.profile-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+.profile-card,
+.target-card {
+  display: grid;
+  gap: 7px;
+  min-height: 140px;
+  width: 100%;
+  padding: 13px;
+  text-align: left;
+  border: 1px solid rgba(55,216,255,.14);
+  border-radius: 6px;
+  background: rgba(7,17,31,.66);
+}
+.profile-card.active,
+.target-card.active {
+  border-color: rgba(73,242,161,.6);
+  background: rgba(73,242,161,.09);
+  box-shadow: inset 0 0 0 1px rgba(73,242,161,.16);
+}
+.profile-card span,
+.target-card span {
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.profile-card strong,
+.target-card strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.profile-card small,
+.target-card small,
+.profile-card em {
+  color: var(--muted);
+  font-style: normal;
+}
+.profile-card code { display: inline-block; overflow-wrap: anywhere; }
+.target-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .evidence-panel {
   margin-bottom: 16px;
   padding: 16px;
@@ -1954,6 +2149,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .flow-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .decision-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .model-objective-panel { grid-template-columns: 1fr; }
   .workflow-step:nth-child(3)::after { display: none; }
   .guided-grid, .auto-pipeline-panel { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
@@ -1970,7 +2166,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context, .decision-grid, .decision-strip, .evidence-grid { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context, .decision-grid, .decision-strip, .evidence-grid, .model-objective-panel, .target-grid { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
   .workflow-heading { align-items: flex-start; flex-direction: column; }
   .workflow-step { justify-items: start; text-align: left; grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 76px; }
@@ -2102,6 +2298,26 @@ function selectTuningArea(button) {
       });
     }
   }
+}
+
+function selectObjectiveTarget(button) {
+  const label = button.dataset.targetLabel || 'Balanced';
+  const description = button.dataset.targetDescription || 'Blend throughput, latency, failure rate, and safety.';
+  document.querySelectorAll('[data-objective-target]').forEach((item) => {
+    item.classList.toggle('active', item === button);
+  });
+  const labelTarget = document.getElementById('selected-objective-label');
+  const descriptionTarget = document.getElementById('selected-objective-description');
+  const flowTarget = document.getElementById('auto-flow-selected-target');
+  if (labelTarget) labelTarget.textContent = label;
+  if (descriptionTarget) descriptionTarget.textContent = description;
+  if (flowTarget) flowTarget.textContent = label;
+}
+
+function selectProfileCard(button) {
+  document.querySelectorAll('[data-profile-card]').forEach((item) => {
+    item.classList.toggle('active', item === button);
+  });
 }
 
 async function copyControllerCommand(button) {
@@ -2504,6 +2720,16 @@ document.querySelectorAll('[data-tab-jump]').forEach((button) => {
 
 document.querySelectorAll('.tuning-area-option').forEach((button, index) => {
   button.addEventListener('click', () => selectTuningArea(button));
+  if (index === 0) button.classList.add('active');
+});
+
+document.querySelectorAll('[data-objective-target]').forEach((button, index) => {
+  button.addEventListener('click', () => selectObjectiveTarget(button));
+  if (index === 0) selectObjectiveTarget(button);
+});
+
+document.querySelectorAll('[data-profile-card]').forEach((button, index) => {
+  button.addEventListener('click', () => selectProfileCard(button));
   if (index === 0) button.classList.add('active');
 });
 

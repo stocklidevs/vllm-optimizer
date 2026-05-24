@@ -13,7 +13,7 @@ from typing import Any, Callable
 from .artifacts import write_json
 from .cockpit_controller import CockpitPreviewRequest, CockpitRunRequest, run_cockpit_live, run_cockpit_preview
 from .optimizer_pipeline import OptimizerPipelineRequest, run_optimizer_pipeline
-from .web_cockpit import render_web_cockpit
+from .web_cockpit import read_profile_summaries, render_web_cockpit
 
 
 class CockpitServerError(ValueError):
@@ -30,6 +30,7 @@ class CockpitServerConfig:
     status_path: Path | None = None
     report_path: Path | None = None
     run_index_path: Path | None = None
+    profile_paths: tuple[Path, ...] = ()
     allow_risky_session_flags: bool = False
     timeout_seconds: int = 1200
     continue_on_failure: bool = False
@@ -367,18 +368,21 @@ def render_active_cockpit(config: CockpitServerConfig) -> str:
     status = _read_optional_json(config.status_path)
     report = _read_optional_json(config.report_path) or _read_optional_json(config.out_dir / "report.json")
     run_index = _read_optional_json(config.run_index_path)
+    profiles = read_profile_summaries(config.profile_paths)
     return render_web_cockpit(
         catalog,
         manifest=manifest,
         status=status,
         report=report,
         run_index=run_index,
+        profiles=profiles,
         sources={
             "catalog": _source(config.catalog_path),
             "manifest": _source(config.manifest_path),
             "status": _source(config.status_path),
             "report": _source(config.report_path),
             "run_index": _source(config.run_index_path),
+            "profiles": ", ".join(path.as_posix() for path in config.profile_paths) or None,
             "server": "active localhost controller",
         },
     )

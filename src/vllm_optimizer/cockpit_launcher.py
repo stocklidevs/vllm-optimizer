@@ -24,6 +24,7 @@ class CockpitLaunchRequest:
     catalog_path: Path = Path("artifacts/catalog/knob-groups.json")
     manifest_path: Path | None = None
     run_index_path: Path = Path("artifacts/catalog/run-index.json")
+    profile_paths: tuple[Path, ...] = ()
     host: str = "127.0.0.1"
     port: int = 8787
     allow_risky_session_flags: bool = False
@@ -49,6 +50,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
     if not sweep_path.exists():
         raise CockpitLaunchError(f"sweep path does not exist: {sweep_path}")
     config_path = request.config_path or default_config_path()
+    profile_paths = request.profile_paths or default_profile_paths()
     group_id = sweep_path.stem
     manifest_path = request.manifest_path or Path("artifacts/catalog") / f"{group_id}-control.json"
 
@@ -65,6 +67,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
         catalog_path=request.catalog_path,
         manifest_path=manifest_path,
         run_index_path=request.run_index_path,
+        profile_paths=profile_paths,
         allow_risky_session_flags=request.allow_risky_session_flags,
         timeout_seconds=request.timeout_seconds,
         continue_on_failure=request.continue_on_failure,
@@ -80,6 +83,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
         "catalog_path": request.catalog_path.as_posix(),
         "manifest_path": manifest_path.as_posix(),
         "run_index_path": request.run_index_path.as_posix(),
+        "profile_paths": [path.as_posix() for path in profile_paths],
         "server_config": server_config,
     }
 
@@ -89,3 +93,12 @@ def default_config_path() -> Path:
     if local.exists():
         return local
     return Path("config/gx10.example.json")
+
+
+def default_profile_paths() -> tuple[Path, ...]:
+    candidates = [
+        Path("config/profiles/qwen3-coder-next-awq-concurrent-recommended.json"),
+        Path("config/profiles/qwen3-coder-next-awq-recommended.json"),
+        Path("config/profiles/qwen3-coder-next-awq.json"),
+    ]
+    return tuple(path for path in candidates if path.exists())

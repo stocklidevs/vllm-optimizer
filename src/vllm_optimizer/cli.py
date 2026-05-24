@@ -320,6 +320,7 @@ def build_parser() -> argparse.ArgumentParser:
     web_cockpit_parser.add_argument("--status", type=Path)
     web_cockpit_parser.add_argument("--report", type=Path)
     web_cockpit_parser.add_argument("--run-index", type=Path)
+    web_cockpit_parser.add_argument("--profile", action="append", type=Path, default=[])
     web_cockpit_parser.add_argument("--out", required=True, type=Path)
     web_cockpit_parser.set_defaults(func=cmd_web_cockpit)
 
@@ -406,6 +407,7 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_server_parser.add_argument("--status", type=Path)
     cockpit_server_parser.add_argument("--report", type=Path)
     cockpit_server_parser.add_argument("--run-index", type=Path)
+    cockpit_server_parser.add_argument("--profile", action="append", type=Path, default=[])
     cockpit_server_parser.add_argument("--timeout-seconds", type=int, default=1200)
     cockpit_server_parser.add_argument("--continue-on-failure", action="store_true")
     cockpit_server_parser.add_argument("--allow-risky-session-flags", action="store_true")
@@ -424,6 +426,7 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_launch_parser.add_argument("--catalog", type=Path, default=Path("artifacts/catalog/knob-groups.json"))
     cockpit_launch_parser.add_argument("--manifest", type=Path)
     cockpit_launch_parser.add_argument("--run-index", type=Path, default=Path("artifacts/catalog/run-index.json"))
+    cockpit_launch_parser.add_argument("--profile", action="append", type=Path, default=[])
     cockpit_launch_parser.add_argument("--timeout-seconds", type=int, default=1200)
     cockpit_launch_parser.add_argument("--continue-on-failure", action="store_true")
     cockpit_launch_parser.add_argument("--allow-risky-session-flags", action="store_true")
@@ -816,6 +819,7 @@ def cmd_web_cockpit(args: argparse.Namespace) -> int:
         status_path=args.status,
         report_path=args.report,
         run_index_path=args.run_index,
+        profile_paths=args.profile,
     )
     print(result["html_path"])
     return 0
@@ -900,6 +904,7 @@ def cmd_cockpit_server(args: argparse.Namespace) -> int:
             status_path=args.status,
             report_path=args.report,
             run_index_path=args.run_index,
+            profile_paths=tuple(args.profile),
             allow_risky_session_flags=args.allow_risky_session_flags,
             timeout_seconds=args.timeout_seconds,
             continue_on_failure=args.continue_on_failure,
@@ -923,6 +928,7 @@ def cmd_cockpit_launch(args: argparse.Namespace) -> int:
             catalog_path=args.catalog,
             manifest_path=args.manifest,
             run_index_path=args.run_index,
+            profile_paths=tuple(args.profile),
             host=args.host,
             port=args.port,
             allow_risky_session_flags=args.allow_risky_session_flags,

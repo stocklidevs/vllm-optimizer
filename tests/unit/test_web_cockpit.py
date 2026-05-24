@@ -69,6 +69,8 @@ def test_web_cockpit_renders_empty_states_for_optional_artifacts() -> None:
     assert "No pipeline manifest loaded" in html
     assert "No execution status loaded" in html
     assert "No canonical report loaded" in html
+    assert "Optimization Target" in html
+    assert "Model/Profile" in html
 
 
 def test_web_cockpit_includes_local_interaction_hooks() -> None:
@@ -108,7 +110,38 @@ def test_web_cockpit_includes_local_interaction_hooks() -> None:
     assert 'id="visible-group-count"' in html
     assert 'id="group-empty-state"' in html
     assert "function applyGroupFilters()" in html
+    assert "function selectObjectiveTarget" in html
+    assert "function selectProfileCard" in html
+    assert 'id="selected-objective-label"' in html
+    assert 'id="auto-flow-selected-target"' in html
     assert "data-controller-command" in html
+
+
+def test_web_cockpit_renders_model_profile_selector() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        profiles=[
+            {
+                "path": "config/profiles/model-a.json",
+                "profile_id": "model-a-recommended",
+                "model": "org/model-a",
+                "served_model_name": "Model A",
+                "tool_call_parser": "qwen3_coder",
+                "optional_flags": {"max_num_seqs": 16},
+                "role": "Recommended",
+            }
+        ],
+    )
+
+    assert "Model/Profile" in html
+    assert "model-a-recommended" in html
+    assert "Model A" in html
+    assert "qwen3_coder" in html
+    assert "max_num_seqs=16" in html
+    assert 'data-profile-card' in html
+    assert 'data-objective-target="performance"' in html
+    assert 'data-objective-target="stability"' in html
+    assert 'data-objective-target="tool_use"' in html
 
 
 def test_web_cockpit_controller_buttons_copy_commands() -> None:

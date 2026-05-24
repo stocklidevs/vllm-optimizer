@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.52.0 - 2026-05-24
+
+- Added model/profile selection to the web cockpit, with static and active
+  cockpit entrypoints accepting `--profile PROFILE.json`.
+- Added local cockpit optimization target cards for Balanced, Performance,
+  Stability, and Tool Use.
+- Wired selected target state into the decision strip and primary flow while
+  preserving existing optimizer ranking semantics for future target-aware
+  scoring work.
+
 ## 0.51.2 - 2026-05-24
 
 - Clarified first-open cockpit state when existing status/report artifacts are

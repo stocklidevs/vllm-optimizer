@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.51.2-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.52.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -125,6 +125,8 @@ The project is spec-driven with SpecKit and currently supports:
 - Premium cockpit analytics with an outcome-first decision strip, baseline vs
   winner comparison, latency/throughput map, stability band, and failure
   heatmap rendered from canonical report artifacts.
+- Model/profile selection and local optimization target selection for
+  Performance, Stability, Tool Use, and Balanced cockpit workflows.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -233,7 +235,7 @@ uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-prefix-prefill-
 uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-live --confirm-live-run
 uv run vllm-optimizer cockpit-launch
 uv run vllm-optimizer cockpit-server --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-active --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --run-index artifacts/catalog/run-index.json
-uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --out artifacts/cockpit/index.html
+uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --profile config/profiles/qwen3-coder-next-awq-recommended.json --out artifacts/cockpit/index.html
 ```
 
 Pipeline boundaries:
