@@ -72,6 +72,7 @@ def render_web_cockpit(
             render_left_rail(families, groups),
             '<section class="workspace">',
             render_hero(groups, status, report),
+            render_decision_strip(groups, manifest, status, report),
             render_automatic_pipeline_panel(groups, manifest, status, report),
             render_workflow(manifest, status, report),
             render_tabs(),
@@ -201,6 +202,7 @@ def render_overview(
 ) -> str:
     return f"""
     <section class="panel tab-panel active" id="overview" data-tab-panel="overview">
+      {render_performance_evidence(report)}
       {render_guided_step_workspace(groups, manifest, status, report)}
       {render_end_to_end_flow_map(status, report)}
       {render_operation_result_panel()}
@@ -221,6 +223,103 @@ def render_overview(
       <div class="group-grid">{''.join(render_group_card(group) for group in groups) or '<p class="empty">No tuning areas loaded.</p>'}</div>
       <p class="empty hidden" id="group-empty-state">No tuning areas match the current filter.</p>
     </section>"""
+
+
+def render_decision_strip(
+    groups: list[dict[str, Any]],
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> str:
+    summary = report_outcome_summary(report)
+    action = current_workflow_action(status, report)
+    primary = primary_cockpit_action(action)
+    selected = selected_group_label(groups, manifest)
+    return f"""
+      <section class="decision-strip" aria-label="Decision Strip">
+        <article class="decision-cell selected">
+          <span>Selected Workload</span>
+          <strong>{escape(selected)}</strong>
+          <small>{escape(selected_group_description(groups, manifest) or "Catalog-driven tuning area.")}</small>
+        </article>
+        <article class="decision-cell winner">
+          <span>Current Winner</span>
+          <strong><code>{escape(summary['winner_id'])}</code></strong>
+          <small>{escape(summary['winner_detail'])}</small>
+        </article>
+        <article class="decision-cell improvement">
+          <span>Improvement vs Baseline</span>
+          <strong class="{escape(summary['delta_class'])}">{escape(summary['improvement'])}</strong>
+          <small>{escape(summary['baseline_detail'])}</small>
+        </article>
+        <article class="decision-cell safety">
+          <span>Safety Decision</span>
+          <strong>{escape(summary['decision'])}</strong>
+          <small>{escape(summary['decision_detail'])}</small>
+        </article>
+        <article class="decision-cell next">
+          <span>Next Safe Action</span>
+          <strong>{escape(primary['label'])}</strong>
+          <small>{escape(primary['next'])}</small>
+        </article>
+      </section>"""
+
+
+def render_performance_evidence(report: dict[str, Any] | None) -> str:
+    rows = _candidate_metric_rows(report.get("candidates", {}) if isinstance(report, dict) else {})
+    if not rows:
+        return """
+      <section class="evidence-panel" aria-label="Performance Evidence">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">Performance Evidence</p>
+            <h2>Waiting for report data</h2>
+          </div>
+          <p>No canonical report loaded yet.</p>
+        </div>
+        <div class="evidence-empty">
+          <strong>No report yet</strong>
+          <p>Run or load a report to populate baseline comparison, latency/throughput position, stability context, and failure heatmap.</p>
+        </div>
+      </section>"""
+    summary = report_outcome_summary(report)
+    baseline = summary["baseline_row"]
+    winner = summary["winner_row"]
+    max_tps = max((row["throughput"] or 0 for row in rows), default=0) or 1
+    max_latency = max((row["latency"] or 0 for row in rows), default=0) or 1
+    bar_rows = render_evidence_bar("Baseline", baseline, max_tps) + render_evidence_bar("Winner", winner, max_tps)
+    scatter_dots = "".join(render_scatter_dot(row, max_tps, max_latency, summary["winner_id"]) for row in rows)
+    stability_rows = "".join(render_stability_row(row) for row in rows)
+    heatmap_cells = "".join(render_heatmap_cell(row) for row in rows)
+    return f"""
+      <section class="evidence-panel" aria-label="Performance Evidence">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">Performance Evidence</p>
+            <h2>Report-backed performance map</h2>
+          </div>
+          <p>Canonical report metrics rendered as decision evidence; winner selection still belongs to the report artifact.</p>
+        </div>
+        <div class="evidence-grid">
+          <article class="chart-card bar-comparison">
+            <div class="chart-head"><strong>Baseline vs Winner</strong><span>tokens/sec</span></div>
+            <div class="comparison-bars">{bar_rows}</div>
+          </article>
+          <article class="chart-card">
+            <div class="chart-head"><strong>Latency / Throughput</strong><span>higher and left is better</span></div>
+            <div class="scatter-plot" data-chart="latency-throughput">{scatter_dots}</div>
+            <div class="axis-row"><span>lower latency</span><span>higher throughput</span></div>
+          </article>
+          <article class="chart-card">
+            <div class="chart-head"><strong>Stability Band</strong><span>failure context</span></div>
+            <div class="stability-list">{stability_rows}</div>
+          </article>
+          <article class="chart-card">
+            <div class="chart-head"><strong>Failure Heatmap</strong><span>candidate risk</span></div>
+            <div class="failure-heatmap">{heatmap_cells}</div>
+          </article>
+        </div>
+      </section>"""
 
 
 def render_pipeline(manifest: dict[str, Any] | None) -> str:
@@ -1336,6 +1435,129 @@ def _candidate_metric_rows(candidates: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda row: (not row["recommendable"], row["candidate_id"]))
 
 
+def report_outcome_summary(report: dict[str, Any] | None) -> dict[str, Any]:
+    recommendation = report.get("recommendation", {}) if isinstance((report or {}).get("recommendation"), dict) else {}
+    candidates = report.get("candidates", {}) if isinstance((report or {}).get("candidates"), dict) else {}
+    rows = _candidate_metric_rows(candidates)
+    baseline = next((row for row in rows if row["baseline"]), None)
+    if baseline is None and rows:
+        baseline = rows[0]
+    recommended_id = str(recommendation.get("candidate_id") or "")
+    winner = next((row for row in rows if row["candidate_id"] == recommended_id), None)
+    if winner is None:
+        winner = max(
+            (row for row in rows if row["recommendable"]),
+            key=lambda row: row["throughput"] or 0,
+            default=max(rows, key=lambda row: row["throughput"] or 0, default=None),
+        )
+    decision = str(recommendation.get("status") or ("no report" if not rows else "not ranked"))
+    objective = str(recommendation.get("objective") or "n/a")
+    if winner is None:
+        return {
+            "winner_id": "No report",
+            "winner_detail": "Load a canonical report to see the recommended candidate.",
+            "baseline_detail": "Baseline unavailable until report data is loaded.",
+            "improvement": "Awaiting data",
+            "delta_class": "delta-neutral",
+            "decision": decision,
+            "decision_detail": "No report decision has been loaded.",
+            "baseline_row": None,
+            "winner_row": None,
+        }
+    improvement = "Baseline n/a"
+    delta_class = "delta-neutral"
+    if baseline and isinstance(baseline["throughput"], float | int) and isinstance(winner["throughput"], float | int):
+        delta = winner["throughput"] - baseline["throughput"]
+        if baseline["throughput"] > 0:
+            pct = delta / baseline["throughput"]
+            sign = "+" if pct >= 0 else ""
+            improvement = f"{sign}{pct:.1%}"
+        else:
+            sign = "+" if delta >= 0 else ""
+            improvement = f"{sign}{delta:.3f} tok/s"
+        delta_class = "delta-positive" if delta >= 0 else "delta-negative"
+    winner_detail = f"{_fmt(winner['throughput'])} tok/s, {_fmt(winner['latency'])} ms latency"
+    baseline_detail = (
+        f"Baseline {baseline['candidate_id']}: {_fmt(baseline['throughput'])} tok/s"
+        if baseline
+        else "Baseline candidate not present in report."
+    )
+    return {
+        "winner_id": winner["candidate_id"],
+        "winner_detail": winner_detail,
+        "baseline_detail": baseline_detail,
+        "improvement": improvement,
+        "delta_class": delta_class,
+        "decision": decision,
+        "decision_detail": f"Objective {objective}; confirmation and promotion stay gated.",
+        "baseline_row": baseline,
+        "winner_row": winner,
+    }
+
+
+def render_evidence_bar(label: str, row: dict[str, Any] | None, max_tps: float) -> str:
+    if row is None:
+        return f"""
+          <div class="comparison-row empty-row">
+            <span>{escape(label)}</span>
+            <div class="evidence-bar-track"><div class="evidence-bar" style="width:0%"></div></div>
+            <strong>n/a</strong>
+          </div>"""
+    width = _bar_width(row["throughput"], max_tps)
+    return f"""
+          <div class="comparison-row">
+            <span>{escape(label)}</span>
+            <div class="evidence-bar-track"><div class="evidence-bar" style="width:{width:.3f}%"></div></div>
+            <strong>{escape(_fmt(row['throughput']))}</strong>
+            <small><code>{escape(row['candidate_id'])}</code></small>
+          </div>"""
+
+
+def render_scatter_dot(row: dict[str, Any], max_tps: float, max_latency: float, winner_id: str) -> str:
+    throughput = row["throughput"] or 0
+    latency = row["latency"] or max_latency
+    left = max(6.0, min(94.0, (throughput / max_tps) * 88.0 + 6.0))
+    bottom = max(6.0, min(94.0, 100.0 - ((latency / max_latency) * 88.0 + 6.0)))
+    classes = "scatter-dot"
+    if row["candidate_id"] == winner_id:
+        classes += " winner"
+    if row["baseline"]:
+        classes += " baseline"
+    if not row["recommendable"]:
+        classes += " excluded"
+    return (
+        f'<span class="{escape(classes)}" style="left:{left:.3f}%; bottom:{bottom:.3f}%" '
+        f'title="{escape(row["candidate_id"])}: {escape(_fmt(throughput))} tok/s, {escape(_fmt(latency))} ms"></span>'
+    )
+
+
+def render_stability_row(row: dict[str, Any]) -> str:
+    failure = row["failure_rate"] or 0.0
+    stability = max(0.0, min(1.0, 1.0 - failure))
+    return f"""
+          <div class="stability-row">
+            <span><code>{escape(row['candidate_id'])}</code></span>
+            <div class="stability-track"><div style="width:{stability * 100:.3f}%"></div></div>
+            <strong>{escape(_fmt_pct(failure))}</strong>
+          </div>"""
+
+
+def render_heatmap_cell(row: dict[str, Any]) -> str:
+    failure = row["failure_rate"] or 0.0
+    level = "low"
+    if failure >= 0.2:
+        level = "high"
+    elif failure > 0:
+        level = "medium"
+    if not row["recommendable"]:
+        level += " excluded"
+    return f"""
+          <div class="heat-cell {escape(level)}" title="{escape(row['candidate_id'])}: {escape(_fmt_pct(failure))}">
+            <strong>{escape(_fmt_pct(failure))}</strong>
+            <span>{escape(row['candidate_id'])}</span>
+          </div>"""
+
+
 def _number(value: Any) -> float | None:
     return float(value) if isinstance(value, int | float) else None
 
@@ -1367,17 +1589,19 @@ HELP_TEXT = {
 CSS = """
 :root {
   color-scheme: dark;
-  --bg: #050912;
-  --panel: #0b1422;
-  --panel-2: #0f1d2f;
-  --ink: #e7f4ff;
-  --muted: #8da4bb;
-  --line: #24435f;
-  --cyan: #37d8ff;
-  --green: #49f2a1;
-  --amber: #f0c65b;
+  --bg: #04080d;
+  --panel: #09131f;
+  --panel-2: #0e1a29;
+  --metal: #172332;
+  --ink: #edf8ff;
+  --muted: #91a7bb;
+  --line: #21384f;
+  --cyan: #22d7ff;
+  --green: #45f29b;
+  --amber: #f1c45a;
   --red: #ff6b6b;
-  --violet: #a891ff;
+  --violet: #9e9cff;
+  --shadow: rgba(0, 0, 0, .44);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -1385,18 +1609,24 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(55, 216, 255, .16), transparent 34%),
-    linear-gradient(135deg, #050912 0%, #071321 58%, #0d1020 100%);
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,.014) 1px, transparent 1px),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, transparent 1px 9px),
+    radial-gradient(circle at 50% 0%, rgba(34, 215, 255, .14), transparent 36%),
+    linear-gradient(135deg, #04080d 0%, #06111d 56%, #0a0d16 100%);
+  background-size: 42px 42px, 42px 42px, auto, auto, auto;
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 .cockpit { display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px; gap: 16px; min-height: 100vh; padding: 16px; }
 .left-rail, .right-rail { position: sticky; top: 16px; align-self: start; display: grid; gap: 14px; max-height: calc(100vh - 32px); overflow: auto; }
 .brand, .rail-panel, .panel, .mini-card, .metric-tile, .group-card {
-  background: linear-gradient(180deg, rgba(15, 29, 47, .94), rgba(8, 16, 28, .94));
-  border: 1px solid rgba(55, 216, 255, .18);
-  border-radius: 8px;
-  box-shadow: 0 18px 52px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .04);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .035), transparent 32%),
+    linear-gradient(180deg, rgba(12, 24, 38, .96), rgba(5, 11, 20, .96));
+  border: 1px solid rgba(34, 215, 255, .17);
+  border-radius: 6px;
+  box-shadow: 0 18px 52px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, .055);
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 16px; }
 .brand strong { display: block; font-size: 20px; }
@@ -1412,7 +1642,7 @@ h2 { font-size: 20px; margin-bottom: 8px; }
 h3 { font-size: 18px; margin-bottom: 8px; }
 p, small, .empty { color: var(--muted); line-height: 1.5; }
 .workspace { display: grid; gap: 16px; min-width: 0; }
-.hero { min-height: 280px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .8fr); gap: 16px; align-items: stretch; padding: 24px; border: 1px solid rgba(55, 216, 255, .22); border-radius: 8px; background: linear-gradient(135deg, rgba(8, 18, 33, .92), rgba(13, 27, 47, .84)); }
+.hero { min-height: 240px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .8fr); gap: 16px; align-items: stretch; padding: 24px; border: 1px solid rgba(55, 216, 255, .22); border-radius: 6px; background: linear-gradient(135deg, rgba(8, 18, 33, .92), rgba(13, 27, 47, .84)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 22px 60px rgba(0,0,0,.32); }
 .hero-copy { max-width: 680px; }
 .eyebrow, .card-topline, dt { color: var(--cyan); font-size: 12px; text-transform: uppercase; font-weight: 760; }
 .hero-grid, .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -1423,7 +1653,7 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid rgba(55,216,255,.16); background: rgba(3, 8, 16, .5); border-radius: 8px; }
 .tabs button { color: var(--ink); padding: 9px 13px; border-radius: 6px; background: rgba(55, 216, 255, .08); border: 1px solid rgba(55, 216, 255, .12); cursor: pointer; }
 .tabs button.active { border-color: rgba(73, 242, 161, .55); background: rgba(73, 242, 161, .12); }
-.panel { padding: 20px; }
+.panel { padding: 18px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .workflow-band { padding: 18px 22px; border: 1px solid rgba(55, 216, 255, .22); border-radius: 8px; background: linear-gradient(135deg, rgba(7, 17, 31, .94), rgba(10, 22, 39, .88)); }
@@ -1471,6 +1701,136 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .flow-card.gate span, .flow-card.current.gate span { color: var(--amber); }
 .flow-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .flow-context .summary-block, .flow-context .empty { border: 1px solid rgba(55,216,255,.12); border-radius: 8px; background: rgba(15,29,47,.32); padding: 12px; margin: 0; }
+.decision-strip {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.decision-cell {
+  position: relative;
+  min-height: 132px;
+  padding: 15px;
+  border: 1px solid rgba(34,215,255,.18);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), transparent 38%),
+    linear-gradient(145deg, rgba(12,25,40,.88), rgba(4,10,18,.92));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 14px 38px rgba(0,0,0,.24);
+  overflow: hidden;
+}
+.decision-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(34,215,255,.08), transparent);
+  transform: translateX(-60%);
+  opacity: .45;
+  pointer-events: none;
+}
+.decision-cell span, .chart-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.decision-cell strong {
+  display: block;
+  margin: 12px 0 8px;
+  font-size: 20px;
+  line-height: 1.14;
+  overflow-wrap: anywhere;
+}
+.decision-cell small { display: block; color: var(--muted); }
+.decision-cell.selected { border-left: 2px solid var(--cyan); }
+.decision-cell.winner { border-left: 2px solid var(--green); }
+.decision-cell.improvement { border-left: 2px solid var(--amber); }
+.delta-positive { color: var(--green); }
+.delta-negative { color: var(--red); }
+.delta-neutral { color: var(--amber); }
+.evidence-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid rgba(34,215,255,.2);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), transparent 28%),
+    linear-gradient(145deg, rgba(7,18,31,.9), rgba(3,8,15,.92));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 18px 48px rgba(0,0,0,.28);
+}
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.chart-card {
+  min-height: 220px;
+  padding: 13px;
+  border: 1px solid rgba(55,216,255,.14);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.03), transparent),
+    rgba(5,12,22,.72);
+}
+.chart-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; margin-bottom: 12px; }
+.comparison-bars, .stability-list { display: grid; gap: 12px; }
+.comparison-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) 70px; gap: 8px; align-items: center; }
+.comparison-row small { grid-column: 2 / -1; color: var(--muted); }
+.evidence-bar-track, .stability-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(141,164,187,.16);
+  overflow: hidden;
+}
+.evidence-bar, .stability-track div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  box-shadow: 0 0 18px rgba(69,242,155,.22);
+}
+.scatter-plot {
+  position: relative;
+  height: 152px;
+  border: 1px solid rgba(55,216,255,.12);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(55,216,255,.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(55,216,255,.08) 1px, transparent 1px),
+    rgba(0,0,0,.18);
+  background-size: 25% 25%;
+}
+.scatter-dot {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--cyan);
+  border: 2px solid rgba(237,248,255,.9);
+  transform: translate(-50%, 50%);
+  box-shadow: 0 0 16px rgba(34,215,255,.46);
+}
+.scatter-dot.winner { width: 15px; height: 15px; background: var(--green); box-shadow: 0 0 20px rgba(69,242,155,.58); }
+.scatter-dot.baseline { background: var(--amber); }
+.scatter-dot.excluded { background: var(--red); }
+.axis-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.stability-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 1fr) 72px; gap: 8px; align-items: center; }
+.failure-heatmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }
+.heat-cell {
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(73,242,161,.22);
+  background: rgba(73,242,161,.09);
+}
+.heat-cell.medium { border-color: rgba(240,198,91,.35); background: rgba(240,198,91,.1); }
+.heat-cell.high, .heat-cell.excluded { border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.1); }
+.heat-cell strong { color: var(--ink); }
+.heat-cell span { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.evidence-empty { border: 1px dashed rgba(55,216,255,.25); border-radius: 6px; padding: 18px; background: rgba(3,8,16,.34); }
 .gate-list { display: grid; gap: 10px; padding: 0; margin: 14px 0 0; list-style: none; }
 .gate-list li { display: grid; gap: 6px; border: 1px solid rgba(240,198,91,.22); border-radius: 8px; padding: 10px; background: rgba(240,198,91,.05); }
 .fact-list { display: grid; gap: 8px; padding: 0; margin: 14px 0; list-style: none; }
@@ -1566,6 +1926,8 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .workflow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .flow-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .decision-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workflow-step:nth-child(3)::after { display: none; }
   .guided-grid, .auto-pipeline-panel { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
@@ -1582,7 +1944,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context, .decision-grid { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context, .decision-grid, .decision-strip, .evidence-grid { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
   .workflow-heading { align-items: flex-start; flex-direction: column; }
   .workflow-step { justify-items: start; text-align: left; grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 76px; }
@@ -1608,6 +1970,30 @@ function setActiveTab(tab) {
   document.querySelectorAll('[data-tab-panel]').forEach((panel) => {
     panel.classList.toggle('active', panel.dataset.tabPanel === tab);
   });
+}
+
+function safeSessionSet(key, value) {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch (_error) {
+    state[key] = value;
+  }
+}
+
+function safeSessionGet(key) {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch (_error) {
+    return state[key] || null;
+  }
+}
+
+function safeSessionRemove(key) {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch (_error) {
+    delete state[key];
+  }
 }
 
 function applyGroupFilters() {
@@ -1716,7 +2102,7 @@ async function runControllerAction(button) {
   if (button.dataset.tabJump) {
     if (button.dataset.refreshTab === 'true') {
       setActiveTab(button.dataset.tabJump);
-      window.sessionStorage.setItem('cockpit-tab-after-reload', button.dataset.tabJump);
+      safeSessionSet('cockpit-tab-after-reload', button.dataset.tabJump);
       window.setTimeout(() => window.location.reload(), 50);
       return;
     }
@@ -2082,7 +2468,7 @@ document.querySelectorAll('[data-tab-jump]').forEach((button) => {
   button.addEventListener('click', () => {
     if (button.dataset.refreshTab === 'true') {
       setActiveTab(button.dataset.tabJump);
-      window.sessionStorage.setItem('cockpit-tab-after-reload', button.dataset.tabJump);
+      safeSessionSet('cockpit-tab-after-reload', button.dataset.tabJump);
       window.setTimeout(() => window.location.reload(), 50);
       return;
     }
@@ -2100,9 +2486,9 @@ if (cancelButton) {
   cancelButton.addEventListener('click', cancelControllerJob);
 }
 
-const tabAfterReload = window.sessionStorage.getItem('cockpit-tab-after-reload');
+const tabAfterReload = safeSessionGet('cockpit-tab-after-reload');
 if (tabAfterReload) {
-  window.sessionStorage.removeItem('cockpit-tab-after-reload');
+  safeSessionRemove('cockpit-tab-after-reload');
   setActiveTab(tabAfterReload);
 }
 

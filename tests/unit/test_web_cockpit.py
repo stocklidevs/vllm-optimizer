@@ -186,6 +186,8 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "tabJump" in html
     assert "refreshTab" in html
     assert "cockpit-tab-after-reload" in html
+    assert "function safeSessionSet" in html
+    assert "function safeSessionGet" in html
     assert "document.querySelectorAll('[data-tab-jump]')" in html
     assert "completed_stages" in html
     assert "live-execution-title" in html
@@ -230,6 +232,14 @@ def test_web_cockpit_renders_report_visuals() -> None:
     )
 
     assert "Recommendation detail" in html
+    assert "Decision Strip" in html
+    assert "Current Winner" in html
+    assert "Improvement vs Baseline" in html
+    assert "Performance Evidence" in html
+    assert "Baseline vs Winner" in html
+    assert "Latency / Throughput" in html
+    assert "Stability Band" in html
+    assert "Failure Heatmap" in html
     assert "Metric visualizer" in html
     assert "Failure summary" in html
     assert "Continue From Report" in html
@@ -244,6 +254,18 @@ def test_web_cockpit_renders_report_visuals() -> None:
     assert "25.000%" in html
     assert "candidate has failed trials" in html
     assert "Run repeated A/B confirmation before promotion." in html
+
+
+def test_web_cockpit_renders_premium_analytics_empty_state() -> None:
+    html = render_web_cockpit(catalog={"groups": []}, report=None)
+
+    assert "Decision Strip" in html
+    assert "Current Winner" in html
+    assert "Awaiting data" in html
+    assert "Performance Evidence" in html
+    assert "Waiting for report data" in html
+    assert "No report yet" in html
+    assert "baseline comparison, latency/throughput position" in html
 
 
 def test_web_cockpit_renders_run_browser_tab() -> None:

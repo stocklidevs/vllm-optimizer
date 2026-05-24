@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.9-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.51.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -122,6 +122,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Active cockpit state reset when Start Optimization begins from a report-loaded
   dashboard, plus Reports-tab continuation cards for confirmation and promotion
   gates.
+- Premium cockpit analytics with an outcome-first decision strip, baseline vs
+  winner comparison, latency/throughput map, stability band, and failure
+  heatmap rendered from canonical report artifacts.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.

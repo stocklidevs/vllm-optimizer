@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.51.0 - 2026-05-24
+
+- Added a premium cockpit analytics overview with a decision strip for selected
+  workload, current winner, baseline improvement, safety decision, and next
+  safe action.
+- Added report-backed evidence charts for baseline vs winner throughput,
+  latency/throughput position, stability context, and candidate failure heatmap.
+- Upgraded the web cockpit visual system with graphite texture, restrained
+  glass layers, metal-like rails, and denser first-viewport hierarchy.
+
 ## 0.50.9 - 2026-05-24
 
 - Marked Spec 060 completed after the cockpit reset work was committed.
