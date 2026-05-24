@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.53.1 - 2026-05-24
+
+- Added a cockpit escape hatch for loaded report history so old runs can be
+  closed locally without deleting artifacts.
+- Kept `Start Optimization` visible when a loaded report is present, allowing a
+  fresh optimization to begin from the same dashboard session.
+- Reset the visible loaded-run progress copy when the old history is closed and
+  added regression coverage for the stuck previous-run state.
+
 ## 0.53.0 - 2026-05-24
 
 - Rebuilt the web cockpit around an objective-first command center with model,

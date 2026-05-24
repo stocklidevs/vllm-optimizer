@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.53.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.53.1-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -130,6 +130,8 @@ The project is spec-driven with SpecKit and currently supports:
 - An objective-first cockpit command center that replaces the old left/right
   rail default with model, target, recipe, primary action, progress, and
   decision-story panels while hiding micro-tweaks in an advanced recipe drawer.
+- Loaded cockpit run history can be closed locally, keeping old artifacts on
+  disk while revealing a fresh Start Optimization path for the next run.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -339,6 +341,11 @@ advances to `Load Report` when the new run completes. After report generation,
 artifact is visible. The runtime cockpit remains dependency-free; Playwright is
 pinned as a dev-only UI QA dependency, installed with `npm ci`, and checked
 with `npm audit`.
+
+If the cockpit opens on an older loaded report, use `Close Loaded Run` to hide
+that history in the current browser session and return the dashboard to a fresh
+ready state. This does not delete report, status, or run artifacts; it only
+prevents an old run from blocking the next `Start Optimization` action.
 
 Smoke serve:
 

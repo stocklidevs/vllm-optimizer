@@ -513,6 +513,42 @@ def test_web_cockpit_report_ready_primary_action_reviews_report_not_confirm_endp
     assert "No unsupported endpoint" in html
 
 
+def test_web_cockpit_loaded_report_can_be_closed_or_replaced_with_new_run() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "stages": [
+                {
+                    "name": "run",
+                    "command_hint": "uv run vllm-optimizer cockpit-run --confirm-live-run",
+                    "remote": True,
+                    "required_gates": ["--confirm-live-run"],
+                }
+            ]
+        },
+        report={
+            "recommendation": {
+                "status": "requires-confirmation",
+                "objective": "balanced",
+                "candidate_id": "candidate-fast",
+            }
+        },
+    )
+
+    assert "Loaded run history" in html
+    assert "Close Loaded Run" in html
+    assert 'data-loaded-run-action="close"' in html
+    assert "Start New Optimization" in html
+    assert 'data-controller-action="run"' in html
+    assert 'data-controller-endpoint="/api/controller/run"' in html
+    assert 'data-controller-command="uv run vllm-optimizer cockpit-run --confirm-live-run"' in html
+    assert "function closeLoadedRunHistory" in html
+    assert "Loaded run closed. Ready to start a new optimization." in html
+    assert "command-report-state" in html
+    assert "Start a fresh optimization from the selected model, target, and tuning area." in html
+    assert "Loaded run closed. Start New Optimization is ready." in html
+
+
 def test_web_cockpit_tab_jump_false_does_not_reload() -> None:
     html = render_web_cockpit(catalog={"groups": []}, report={"recommendation": {}, "candidates": {}})
 

@@ -72,7 +72,9 @@ def test_cli_web_cockpit_writes_standalone_html(tmp_path: Path) -> None:
 
     content = html.read_text(encoding="utf-8")
     assert "<!doctype html>" in content
-    assert "vLLM Mission Control" in content
+    assert "vLLM Command Center" in content
     assert "Safe Sweep" in content
     assert "Fixture Model" in content
     assert "Optimization Target" in content
+    assert "Loaded run history" in content
+    assert "Start New Optimization" in content

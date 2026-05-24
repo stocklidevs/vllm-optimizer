@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/063-objective-command-center-cockpit/plan.md
+specs/064-loaded-run-recovery/plan.md
 <!-- SPECKIT END -->

@@ -123,8 +123,8 @@ def render_command_topbar(status: dict[str, Any] | None, report: dict[str, Any] 
         </div>
       </div>
       <div class="command-status-strip" aria-label="Loaded artifact state">
-        <span>{escape(overall)}</span>
-        <span>{escape(report_state)}</span>
+        <span id="command-status-overall">{escape(overall)}</span>
+        <span id="command-report-state">{escape(report_state)}</span>
         <span>local controller ready</span>
       </div>
     </header>"""
@@ -133,7 +133,7 @@ def render_command_topbar(status: dict[str, Any] | None, report: dict[str, Any] 
 def render_command_decision_card(report: dict[str, Any] | None) -> str:
     summary = report_outcome_summary(report)
     return f"""
-      <aside class="decision-story-card">
+      <aside class="decision-story-card" data-loaded-history>
         <span>Current recommendation</span>
         <strong><code>{escape(summary['winner_id'])}</code></strong>
         <dl>
@@ -141,6 +141,15 @@ def render_command_decision_card(report: dict[str, Any] | None) -> str:
           <div><dt>Status</dt><dd>{escape(summary['decision'])}</dd></div>
         </dl>
         <p>{escape(summary['winner_detail'])}</p>
+      </aside>
+      <aside class="decision-story-card fresh-run-card hidden" data-fresh-run-state>
+        <span>Ready for a new run</span>
+        <strong>Fresh optimization</strong>
+        <dl>
+          <div><dt>Progress</dt><dd>0%</dd></div>
+          <div><dt>Status</dt><dd>idle</dd></div>
+        </dl>
+        <p>Loaded run history is closed locally. Start a new optimization when you are ready.</p>
       </aside>"""
 
 
@@ -201,6 +210,7 @@ def render_command_setup(
         <div class="recipe-action">
           {render_primary_action_button(primary, manifest)}
         </div>
+        {render_loaded_run_controls(manifest, status, report)}
       </article>
     </section>"""
 
@@ -226,6 +236,7 @@ def render_command_operations(
         <p id="next-action-description">{escape(primary['description'])}</p>
         <ul id="next-action-facts" class="fact-list compact">{facts}</ul>
         {render_primary_action_button(primary, manifest, button_id="next-action-button")}
+        {render_loaded_run_controls(manifest, status, report, compact=True)}
         <p id="controller-feedback" class="controller-feedback" aria-live="polite">Ready to run the selected objective from the cockpit server.</p>
       </article>
       <article class="command-panel progress-command-card">
@@ -261,7 +272,7 @@ def render_command_report_story(report: dict[str, Any] | None) -> str:
     baseline_tps = _fmt(baseline["throughput"]) if isinstance(baseline, dict) else "n/a"
     winner_tps = _fmt(winner["throughput"]) if isinstance(winner, dict) else "n/a"
     return f"""
-    <section class="decision-story" aria-label="Decision story">
+    <section class="decision-story" aria-label="Decision story" data-loaded-history>
       <div class="story-heading">
         <h2>Decision Story</h2>
         <p>Baseline, winner, confidence, and next action from the loaded canonical report.</p>
@@ -289,6 +300,27 @@ def render_command_report_story(report: dict[str, Any] | None) -> str:
         </article>
       </div>
     </section>"""
+
+
+def render_loaded_run_controls(
+    manifest: dict[str, Any] | None,
+    status: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+    *,
+    compact: bool = False,
+) -> str:
+    if not is_loaded_artifact_state(status, report):
+        return ""
+    command = controller_commands(manifest).get("run", controller_commands(manifest).get("plan", ""))
+    density = " compact" if compact else ""
+    return f"""
+    <div class="loaded-run-controls{density}">
+      <span>Loaded run history</span>
+      <div>
+        <button type="button" class="secondary-action" data-loaded-run-action="close">Close Loaded Run</button>
+        <button type="button" class="primary-action" data-controller-action="run" data-controller-endpoint="/api/controller/run" data-controller-command="{escape(command)}">Start New Optimization</button>
+      </div>
+    </div>"""
 
 
 def render_advanced_command_center(
@@ -2747,6 +2779,45 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .recipe-action {
   margin-top: 16px;
 }
+.loaded-run-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(141, 221, 255, .14);
+}
+.loaded-run-controls span {
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.loaded-run-controls div {
+  display: grid;
+  grid-template-columns: .82fr 1fr;
+  gap: 10px;
+}
+.loaded-run-controls.compact div {
+  grid-template-columns: 1fr;
+}
+.secondary-action {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(141, 221, 255, .25);
+  border-radius: 12px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, .055);
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.secondary-action:hover {
+  border-color: rgba(34, 215, 255, .55);
+  background: rgba(34, 215, 255, .09);
+}
+.fresh-run-card {
+  border-color: rgba(69, 242, 155, .35);
+}
 .primary-command-card {
   background:
     radial-gradient(circle at 12% 8%, rgba(69, 242, 155, .13), transparent 34%),
@@ -2968,6 +3039,9 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
     grid-template-columns: 1fr;
   }
   .command-gates .gate-list {
+    grid-template-columns: 1fr;
+  }
+  .loaded-run-controls div {
     grid-template-columns: 1fr;
   }
   .advanced-shell > summary {
@@ -3453,6 +3527,54 @@ function setReviewReportAction() {
   }
 }
 
+function closeLoadedRunHistory() {
+  document.querySelectorAll('[data-loaded-history]').forEach((item) => {
+    item.classList.add('hidden');
+  });
+  document.querySelectorAll('[data-fresh-run-state]').forEach((item) => {
+    item.classList.remove('hidden');
+  });
+  document.querySelectorAll('[data-tab-jump="reports"]').forEach((item) => {
+    item.classList.add('hidden');
+  });
+  document.querySelectorAll('[data-loaded-run-action="close"]').forEach((button) => {
+    button.disabled = true;
+    button.textContent = 'Loaded Run Closed';
+  });
+  const progressBar = document.getElementById('pipeline-overall-progress-bar');
+  const progressLabel = document.getElementById('pipeline-overall-progress-label');
+  const caption = document.getElementById('pipeline-caption');
+  const reportState = document.getElementById('command-report-state');
+  const nextHeadline = document.getElementById('next-action-headline');
+  const nextDescription = document.getElementById('next-action-description');
+  const nextFacts = document.getElementById('next-action-facts');
+  const controllerFeedback = document.getElementById('controller-feedback');
+  if (progressBar) progressBar.style.width = '8%';
+  if (progressLabel) progressLabel.textContent = '8%';
+  if (caption) caption.textContent = 'Loaded run closed. Ready to start a new optimization.';
+  if (reportState) reportState.textContent = 'history closed';
+  if (nextHeadline) nextHeadline.textContent = 'Start Optimization';
+  if (nextDescription) nextDescription.textContent = 'Start a fresh optimization from the selected model, target, and tuning area.';
+  if (nextFacts) {
+    nextFacts.innerHTML = [
+      'Old history hidden locally',
+      'No files deleted',
+      'Live run still requires confirmation'
+    ].map((text) => '<li>' + text + '</li>').join('');
+  }
+  if (controllerFeedback) controllerFeedback.textContent = 'Loaded run closed. Start New Optimization is ready.';
+  renderOperationResult({
+    action: 'history',
+    status: 'closed',
+    progress_percent: 0,
+    plain_summary: {
+      what_happened: 'Loaded run history was closed.',
+      what_it_means: 'The old report is hidden in this browser session. No files were deleted.',
+      next_step: 'Start New Optimization when you want a fresh run.'
+    }
+  });
+}
+
 function commandForAction(action) {
   const source = document.querySelector('[data-controller-action="' + action + '"][data-controller-command]');
   return source ? source.dataset.controllerCommand || '' : '';
@@ -3552,6 +3674,10 @@ const cancelButton = document.getElementById('operation-cancel');
 if (cancelButton) {
   cancelButton.addEventListener('click', cancelControllerJob);
 }
+
+document.querySelectorAll('[data-loaded-run-action="close"]').forEach((button) => {
+  button.addEventListener('click', closeLoadedRunHistory);
+});
 
 const tabAfterReload = safeSessionGet('cockpit-tab-after-reload');
 if (tabAfterReload) {
