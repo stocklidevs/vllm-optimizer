@@ -58,6 +58,36 @@ def test_cockpit_server_run_action_requires_confirmation(tmp_path: Path) -> None
         )
 
 
+def test_cockpit_server_report_action_writes_report_artifacts(tmp_path: Path) -> None:
+    out_dir = Path("artifacts") / "server-report-test" / tmp_path.name
+
+    def pipeline_runner(request):
+        return {
+            "mode": request.mode,
+            "completed_stages": ["plan", "preview", "report"],
+            "artifacts": {
+                "pipeline_summary": (request.out_dir / "pipeline-summary.json").as_posix(),
+                "report_json": (request.out_dir / "report.json").as_posix(),
+            },
+        }
+
+    result = handle_controller_action(
+        "report",
+        {},
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            out_dir=out_dir,
+        ),
+        pipeline_runner=pipeline_runner,
+    )
+
+    assert result["action"] == "report"
+    assert result["status"] == "completed"
+    assert result["remote_execution"] is False
+    assert result["pipeline_summary"]["mode"] == "report"
+    assert result["artifacts"]["report_json"].endswith("report.json")
+
+
 def test_cockpit_server_rejects_unknown_action(tmp_path: Path) -> None:
     with pytest.raises(CockpitServerError, match="unsupported controller action"):
         handle_controller_action(

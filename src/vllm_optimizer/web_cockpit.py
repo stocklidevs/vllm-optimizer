@@ -359,9 +359,9 @@ def render_automatic_pipeline_panel(
           <span class="step-pill">{progress}%</span>
         </div>
         <div class="progress-track overall-progress" aria-label="Overall progress">
-          <div class="progress-bar" style="width:{progress}%"></div>
+          <div id="pipeline-overall-progress-bar" class="progress-bar" style="width:{progress}%"></div>
         </div>
-        <p class="progress-caption">{escape(pipeline_caption(status, report))}</p>
+        <p id="pipeline-caption" class="progress-caption">{escape(pipeline_caption(status, report))}</p>
         <div class="pipeline-stage-list">{rows}</div>
       </div>
       <div class="human-gates-card">
@@ -729,10 +729,10 @@ def render_next_action_panel(
       <section class="rail-panel next-action-card">
         <p class="eyebrow">Next Action</p>
         <span class="step-pill">Step {workflow_index(action)} of {len(WORKFLOW_STEPS)}</span>
-        <h2>{escape(primary['headline'])}</h2>
-        <p>{escape(primary['description'])}</p>
-        <ul class="fact-list compact">{facts}</ul>
-        <button type="button" class="primary-action" data-controller-action="{escape(primary['action'])}" data-controller-endpoint="/api/controller/{escape(primary['action'])}" data-controller-command="{escape(command)}">{escape(primary['label'])}</button>
+        <h2 id="next-action-headline">{escape(primary['headline'])}</h2>
+        <p id="next-action-description">{escape(primary['description'])}</p>
+        <ul id="next-action-facts" class="fact-list compact">{facts}</ul>
+        <button id="next-action-button" type="button" class="primary-action" data-controller-action="{escape(primary['action'])}" data-controller-endpoint="/api/controller/{escape(primary['action'])}" data-controller-command="{escape(command)}">{escape(primary['label'])}</button>
         <div class="after-this">
           <strong>After this:</strong>
           <ul>{followups or '<li>Review the resulting artifacts.</li>'}</ul>
@@ -1629,10 +1629,92 @@ function renderOperationResult(job) {
   if (liveElapsed) liveElapsed.textContent = elapsed ? elapsed + 's elapsed' : 'Just started';
   if (liveBar) liveBar.style.width = progress + '%';
   if (liveSummary) liveSummary.textContent = summary.what_happened || 'Operation state updated.';
+  updatePipelineFromJob(job);
+  updateNextActionFromJob(job);
   if (cancel) {
     cancel.disabled = !job.job_id || !['running', 'cancel-requested'].includes(job.status);
     cancel.dataset.jobId = job.job_id || '';
   }
+}
+
+function updatePipelineFromJob(job) {
+  const summary = job.pipeline_summary || (job.result && job.result.pipeline_summary) || {};
+  let completed = Array.isArray(summary.completed_stages) ? summary.completed_stages : [];
+  if (completed.length === 0 && job.action === 'run' && job.status === 'completed') {
+    completed = ['plan', 'preview', 'run'];
+  }
+  if (completed.length === 0) return;
+  const stageOrder = ['plan', 'preview', 'run', 'report', 'confirm', 'promote'];
+  const normalized = completed.map((stage) => stage === 'confirmation-benchmarks' ? 'confirm' : stage);
+  let highest = 0;
+  normalized.forEach((stage) => {
+    const index = stageOrder.indexOf(stage);
+    if (index >= 0) highest = Math.max(highest, index + 1);
+  });
+  const nextStage = stageOrder[highest] || 'promote';
+  document.querySelectorAll('[data-pipeline-stage]').forEach((item) => {
+    const stage = item.dataset.pipelineStage;
+    const state = item.querySelector('span');
+    item.classList.remove('complete', 'running', 'automatic', 'manual', 'gate', 'waiting');
+    if (normalized.includes(stage)) {
+      item.classList.add('complete');
+      if (state) state.textContent = 'Complete';
+    } else if (stage === nextStage && stage !== 'promote') {
+      item.classList.add('automatic');
+      if (state) state.textContent = 'Next';
+    } else if (stage === 'promote') {
+      item.classList.add('manual', 'gate');
+      if (state) state.textContent = 'Manual Gate';
+    } else {
+      item.classList.add('waiting');
+      if (state) state.textContent = 'Waiting';
+    }
+  });
+  const progressByStage = { plan: 20, preview: 32, run: 64, report: 72, confirm: 84, promote: 92 };
+  const lastStage = stageOrder[Math.max(0, highest - 1)] || 'plan';
+  const progress = progressByStage[lastStage] || 8;
+  const progressBar = document.getElementById('pipeline-overall-progress-bar');
+  const caption = document.getElementById('pipeline-caption');
+  if (progressBar) progressBar.style.width = progress + '%';
+  if (caption) caption.textContent = pipelineCaptionForCompleted(normalized);
+}
+
+function updateNextActionFromJob(job) {
+  const summary = job.pipeline_summary || (job.result && job.result.pipeline_summary) || {};
+  let completed = Array.isArray(summary.completed_stages) ? summary.completed_stages : [];
+  if (completed.length === 0 && job.action === 'run' && job.status === 'completed') {
+    completed = ['plan', 'preview', 'run'];
+  }
+  if (!completed.includes('run') || completed.includes('report')) return;
+  const headline = document.getElementById('next-action-headline');
+  const description = document.getElementById('next-action-description');
+  const facts = document.getElementById('next-action-facts');
+  const button = document.getElementById('next-action-button');
+  const reportCommand = commandForAction('report');
+  if (headline) headline.textContent = 'Load Report';
+  if (description) description.textContent = 'Run artifacts are ready. Generate the report so the cockpit can rank candidates and explain the recommendation.';
+  if (facts) {
+    facts.innerHTML = '<li>Uses completed artifacts</li><li>No remote execution</li><li>Explains the winner</li>';
+  }
+  if (button) {
+    button.textContent = 'Load Report';
+    button.dataset.controllerAction = 'report';
+    button.dataset.controllerEndpoint = '/api/controller/report';
+    button.dataset.controllerCommand = reportCommand;
+  }
+}
+
+function commandForAction(action) {
+  const source = document.querySelector('[data-controller-action="' + action + '"][data-controller-command]');
+  return source ? source.dataset.controllerCommand || '' : '';
+}
+
+function pipelineCaptionForCompleted(completed) {
+  if (completed.includes('confirm')) return 'Confirmation is complete. Promotion remains the next manual gate.';
+  if (completed.includes('report')) return 'Report is available. Review the recommendation before confirmation or promotion.';
+  if (completed.includes('run')) return 'Run complete. Load Report is the next local step.';
+  if (completed.includes('preview')) return 'Preview complete. The run is ready for the live execution gate.';
+  return 'Plan complete. Preview safety before execution.';
 }
 
 function formatActionLabel(action) {

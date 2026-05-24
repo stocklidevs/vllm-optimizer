@@ -166,12 +166,19 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
 
     assert "Operation Result" in html
     assert 'id="operation-progress-bar"' in html
+    assert 'id="pipeline-overall-progress-bar"' in html
+    assert 'id="pipeline-caption"' in html
+    assert 'id="next-action-headline"' in html
+    assert 'id="next-action-button"' in html
     assert 'id="live-execution-progress-bar"' in html
     assert 'id="live-execution-title"' in html
     assert 'id="operation-cancel"' in html
     assert "I made the plan" in html
     assert "Click Preview to check if it is safe" in html
     assert "function renderOperationResult" in html
+    assert "function updatePipelineFromJob" in html
+    assert "function updateNextActionFromJob" in html
+    assert "completed_stages" in html
     assert "live-execution-title" in html
     assert "live-execution-elapsed" in html
     assert "async function pollControllerJob" in html

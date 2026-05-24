@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.5 - 2026-05-23
+
+- Synced the cockpit pipeline progress with completed controller job results so
+  finished runs no longer leave the pipeline at the initial 8% state.
+- Added a local `report` controller action and moved the next action to
+  `Load Report` after run completion.
+
 ## 0.50.4 - 2026-05-23
 
 - Added live right-rail execution feedback for active cockpit jobs, including

@@ -136,9 +136,12 @@ def handle_controller_action(
     action: str,
     payload: dict[str, Any],
     config: CockpitServerConfig,
+    *,
+    pipeline_runner: Callable[[OptimizerPipelineRequest], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    runner = pipeline_runner or run_optimizer_pipeline
     if action == "plan":
-        summary = run_optimizer_pipeline(
+        summary = runner(
             OptimizerPipelineRequest(
                 mode="plan",
                 sweep_path=config.sweep_path,
@@ -150,6 +153,25 @@ def handle_controller_action(
             "action": "plan",
             "status": "completed",
             "remote_execution": False,
+            "artifacts": summary["artifacts"],
+            "pipeline_summary": summary,
+        }
+        write_json(config.out_dir / "controller-result.json", result)
+        return result
+    if action == "report":
+        summary = runner(
+            OptimizerPipelineRequest(
+                mode="report",
+                sweep_path=config.sweep_path,
+                out_dir=config.out_dir,
+                allow_risky_session_flags=config.allow_risky_session_flags,
+            )
+        )
+        result = {
+            "action": "report",
+            "status": "completed",
+            "remote_execution": False,
+            "promotion": False,
             "artifacts": summary["artifacts"],
             "pipeline_summary": summary,
         }
@@ -238,7 +260,13 @@ def plain_summary(action: str, status: str, result: dict[str, Any] | None = None
         return {
             "what_happened": "The run finished.",
             "what_it_means": "The controller completed the remote-capable run request and wrote artifacts.",
-            "next_step": "Open Runs or generate a Report.",
+            "next_step": "Click Load Report to rank candidates and explain the recommendation.",
+        }
+    if action == "report":
+        return {
+            "what_happened": "The report is ready.",
+            "what_it_means": "The cockpit generated local report artifacts from the completed run.",
+            "next_step": "Review the report, then confirm the candidate if it looks good.",
         }
     return {
         "what_happened": f"{action.title()} finished.",

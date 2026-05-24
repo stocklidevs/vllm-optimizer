@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.4-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.5-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -313,6 +313,9 @@ and family filters update that same selector rather than only the detail tab,
 while internal experiment history terms such as rerun stay out of user-facing
 labels. The right rail focuses on the next action and live execution status,
 including active job progress and elapsed time while the controller is running.
+When a run completes, the visible pipeline advances from the completed job
+summary and the next action changes to `Load Report` so the user has a clear
+local follow-up.
 The command shell carries controller feedback next to the command being run.
 Controller buttons call the local server when served by `cockpit-server`, or
 copy deterministic CLI commands when opened as static HTML. Browser-side
