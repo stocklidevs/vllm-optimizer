@@ -1,6 +1,6 @@
 # Implementation Plan: Cockpit Active Flow Reset
 
-**Status**: Implementing
+**Status**: Completed
 
 ## Summary
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.9 - 2026-05-24
+
+- Marked Spec 060 completed after the cockpit reset work was committed.
+- Added a release-check guard that fails when a completed active SpecKit task
+  list still leaves `spec.md` or `plan.md` in Draft/Implementing status.
+- Extended release-check tests and docs coverage for SpecKit completion status.
+
 ## 0.50.8 - 2026-05-24
 
 - Added pinned Playwright UI validation support with `npm ci` installation and

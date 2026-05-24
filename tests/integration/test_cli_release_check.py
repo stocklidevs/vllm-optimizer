@@ -13,7 +13,9 @@ def test_cli_release_check_writes_json_and_markdown(tmp_path: Path) -> None:
     report = read_json(out)
     assert report["overall_status"] == "pass"
     assert any(check["id"] == "active-speckit-feature" for check in report["checks"])
+    assert any(check["id"] == "active-speckit-completion-status" for check in report["checks"])
 
     markdown = markdown_out.read_text(encoding="utf-8")
     assert "# vLLM Optimizer Release Check" in markdown
     assert "active-speckit-feature" in markdown
+    assert "active-speckit-completion-status" in markdown

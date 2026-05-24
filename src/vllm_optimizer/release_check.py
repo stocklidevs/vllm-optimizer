@@ -40,6 +40,7 @@ def build_release_check(root: Path) -> dict[str, Any]:
         check_version_metadata(root),
         check_readme_version_badge(root),
         check_active_speckit_feature(root),
+        check_active_speckit_completion_status(root),
         check_artifact_contracts_command(root),
         check_release_documentation(root),
         check_essential_files(root),
@@ -143,6 +144,71 @@ def check_active_speckit_feature(root: Path) -> ReleaseCheck:
             _paths(feature_path, *missing),
         )
     return ReleaseCheck("active-speckit-feature", "pass", "error", f"active feature is {feature_dir}", _paths(feature_path, *required))
+
+
+def check_active_speckit_completion_status(root: Path) -> ReleaseCheck:
+    feature_path = root / ".specify/feature.json"
+    try:
+        feature = json.loads(feature_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return ReleaseCheck(
+            "active-speckit-completion-status",
+            "fail",
+            "error",
+            f"could not read active feature: {exc}",
+            _paths(feature_path),
+        )
+    feature_dir = feature.get("feature_directory")
+    if not isinstance(feature_dir, str) or not feature_dir:
+        return ReleaseCheck(
+            "active-speckit-completion-status",
+            "fail",
+            "error",
+            "active feature_directory is missing",
+            _paths(feature_path),
+        )
+    spec_path = root / feature_dir / "spec.md"
+    plan_path = root / feature_dir / "plan.md"
+    tasks_path = root / feature_dir / "tasks.md"
+    missing = [path for path in (spec_path, plan_path, tasks_path) if not path.exists()]
+    if missing:
+        return ReleaseCheck(
+            "active-speckit-completion-status",
+            "fail",
+            "error",
+            "active SpecKit completion files are missing",
+            _paths(feature_path, *missing),
+        )
+    tasks = tasks_path.read_text(encoding="utf-8")
+    has_incomplete_tasks = bool(re.search(r"(?m)^- \[ \]", tasks))
+    if has_incomplete_tasks:
+        return ReleaseCheck(
+            "active-speckit-completion-status",
+            "pass",
+            "warning",
+            "active SpecKit feature still has incomplete tasks",
+            _paths(spec_path, plan_path, tasks_path),
+        )
+    stale_status_paths = [
+        path
+        for path in (spec_path, plan_path)
+        if re.search(r"(?im)^\*\*Status\*\*:\s*(Draft|Implementing)\s*$", path.read_text(encoding="utf-8"))
+    ]
+    if stale_status_paths:
+        return ReleaseCheck(
+            "active-speckit-completion-status",
+            "fail",
+            "error",
+            "completed active SpecKit feature still has Draft/Implementing status",
+            _paths(*stale_status_paths, tasks_path),
+        )
+    return ReleaseCheck(
+        "active-speckit-completion-status",
+        "pass",
+        "error",
+        "completed active SpecKit feature status is up to date",
+        _paths(spec_path, plan_path, tasks_path),
+    )
 
 
 def check_artifact_contracts_command(root: Path) -> ReleaseCheck:

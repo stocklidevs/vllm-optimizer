@@ -1,6 +1,6 @@
 # Feature Specification: Cockpit Active Flow Reset
 
-**Status**: Implementing
+**Status**: Completed
 
 **Created**: 2026-05-24
 

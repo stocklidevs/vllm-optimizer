@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from vllm_optimizer.release_check import build_release_check, render_release_check_markdown
+from vllm_optimizer.release_check import (
+    build_release_check,
+    check_active_speckit_completion_status,
+    render_release_check_markdown,
+)
 
 
 def test_release_check_passes_for_current_repository() -> None:
@@ -12,6 +16,7 @@ def test_release_check_passes_for_current_repository() -> None:
     assert checks["version-metadata"]["status"] == "pass"
     assert checks["readme-version-badge"]["status"] == "pass"
     assert checks["active-speckit-feature"]["status"] == "pass"
+    assert checks["active-speckit-completion-status"]["status"] == "pass"
     assert checks["artifact-contracts-command"]["status"] == "pass"
 
 
@@ -23,3 +28,21 @@ def test_release_check_markdown_summarizes_checks() -> None:
     assert "- Overall status: `pass`" in markdown
     assert "version-metadata" in markdown
 
+
+def test_release_check_fails_when_completed_active_spec_still_looks_in_progress(tmp_path: Path) -> None:
+    feature_dir = tmp_path / "specs/999-stale"
+    feature_dir.mkdir(parents=True)
+    specify_dir = tmp_path / ".specify"
+    specify_dir.mkdir()
+    (specify_dir / "feature.json").write_text(
+        '{"feature_directory":"specs/999-stale"}',
+        encoding="utf-8",
+    )
+    (feature_dir / "spec.md").write_text("**Status**: Implementing\n", encoding="utf-8")
+    (feature_dir / "plan.md").write_text("**Status**: Completed\n", encoding="utf-8")
+    (feature_dir / "tasks.md").write_text("- [x] Done\n", encoding="utf-8")
+
+    check = check_active_speckit_completion_status(tmp_path)
+
+    assert check.status == "fail"
+    assert "Draft/Implementing" in check.message

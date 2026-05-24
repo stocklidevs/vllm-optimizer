@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.8-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.9-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -83,7 +83,8 @@ The project is spec-driven with SpecKit and currently supports:
 - Release-facing artifact contract catalogs that document stable JSON fields,
   schema versions, producers, and dashboard consumers.
 - Local release readiness checks for package version consistency, active
-  SpecKit metadata, release docs, artifact contracts, and essential files.
+  SpecKit metadata, completed-spec status, release docs, artifact contracts,
+  and essential files.
 - A standalone high-tech `web-cockpit` interface that combines tuning areas,
   pipeline stages, execution status, report summaries, safety gates, and
   disabled future controller controls from deterministic artifacts.
