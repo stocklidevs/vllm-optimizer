@@ -164,15 +164,16 @@ def render_workflow(
 ) -> str:
     current = current_workflow_action(status, report)
     current_index = workflow_index(current)
+    loaded_state = is_loaded_artifact_state(status, report)
     steps = []
     for index, step in enumerate(WORKFLOW_STEPS, start=1):
         action = step["action"]
         if action == current:
             state = "active"
-            label = "Ready"
+            label = "Review" if loaded_state else "Ready"
         elif index < current_index:
             state = "complete"
-            label = "Done"
+            label = "Loaded" if loaded_state else "Done"
         else:
             state = "locked"
             label = workflow_locked_label(action, manifest)
@@ -187,7 +188,7 @@ def render_workflow(
     return f"""
     <section class="workflow-band" aria-label="Optimization workflow">
       <div class="workflow-heading">
-        <h2>Optimization Workflow</h2>
+        <h2>{'Loaded Artifact State' if loaded_state else 'Optimization Workflow'}</h2>
         <span>Step {current_index} of {len(WORKFLOW_STEPS)}</span>
       </div>
       <div class="workflow-steps">{''.join(steps)}</div>
@@ -1139,6 +1140,13 @@ def current_workflow_action(status: dict[str, Any] | None, report: dict[str, Any
     return "plan"
 
 
+def is_loaded_artifact_state(status: dict[str, Any] | None, report: dict[str, Any] | None) -> bool:
+    if report is None:
+        return False
+    overall = str((status or {}).get("overall_status") or (status or {}).get("overall_state") or "").lower()
+    return overall not in {"running", "cancel-requested"}
+
+
 def primary_cockpit_action(action: str) -> dict[str, Any]:
     if action in {"plan", "preview"}:
         return {
@@ -1229,6 +1237,8 @@ def pipeline_stage_state(action: str, status: dict[str, Any] | None, report: dic
     if workflow_index(action) < workflow_index(current):
         return "complete"
     if action == current:
+        if is_loaded_artifact_state(status, report):
+            return "review"
         if action in {"run", "report", "confirm"}:
             return "running" if status is not None or report is not None else "waiting"
         return "automatic"
@@ -1245,6 +1255,8 @@ def pipeline_stage_detail(action: str, status: dict[str, Any] | None, report: di
     if action == "report":
         return "Ranks artifacts and explains the recommendation."
     if action == "confirm":
+        if report is not None:
+            return "Report review: choose whether confirmation is still needed."
         return "Repeats checks when stability is required."
     if action == "promote":
         return "Promotion remains manual and explicitly gated."
@@ -1697,6 +1709,7 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .pipeline-stage { display: grid; grid-template-columns: 88px minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px; align-items: center; border: 1px solid rgba(55,216,255,.13); border-radius: 8px; background: rgba(15,29,47,.44); padding: 10px; }
 .pipeline-stage span { color: var(--muted); text-transform: uppercase; font-size: 11px; font-weight: 850; }
 .pipeline-stage.complete span { color: var(--green); }
+.pipeline-stage.review span,
 .pipeline-stage.running span, .pipeline-stage.automatic span { color: var(--cyan); }
 .pipeline-stage.manual.gate span, .pipeline-stage.manual span { color: var(--amber); }
 .pipeline-stage small { color: var(--muted); overflow-wrap: anywhere; }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.51.2 - 2026-05-24
+
+- Clarified first-open cockpit state when existing status/report artifacts are
+  loaded, labeling history as `Loaded Artifact State` instead of implying that
+  a fresh run has already completed.
+- Changed report-ready pipeline rows from running language to review language
+  when the page is only displaying loaded artifacts.
+
 ## 0.51.1 - 2026-05-24
 
 - Fixed cockpit rendering for report artifacts whose `candidates` payload is a

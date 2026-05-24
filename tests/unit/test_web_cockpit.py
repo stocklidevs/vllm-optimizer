@@ -472,6 +472,10 @@ def test_web_cockpit_report_ready_primary_action_reviews_report_not_confirm_endp
     command_shell = html.split('<article class="command-shell">', 1)[1].split("</article>", 1)[0]
 
     assert "Review Report" in right_rail
+    assert "Loaded Artifact State" in html
+    assert ">Loaded<" in html
+    assert ">Review<" in html
+    assert "Report review" in html
     assert 'data-tab-jump="reports"' in right_rail
     assert 'data-controller-action="confirm"' not in right_rail
     assert 'data-controller-endpoint="/api/controller/confirm"' not in active_step
