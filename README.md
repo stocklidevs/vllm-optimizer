@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.50.6-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.50.7-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -115,6 +115,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Automatic pipeline progress UX that treats Plan, Preview, Run, Report, and
   Confirm as internal stages, while keeping live execution and promotion gates
   explicit.
+- End-to-end cockpit flow mapping that shows runnable actions, report review,
+  and manual confirmation/promotion gates without presenting unsupported gated
+  stages as active server calls.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -316,11 +319,16 @@ including active job progress and elapsed time while the controller is running.
 When a run completes, the visible pipeline advances from the completed job
 summary and the next action changes to `Load Report` so the user has a clear
 local follow-up. After report generation, `Review Report` reloads the active
-cockpit into the Reports tab so the freshly generated artifact is visible.
+cockpit into the Reports tab so the freshly generated artifact is visible. The
+overview also includes an end-to-end flow map so Start Optimization, Load
+Report, Review Report, Confirmation gate, and Promotion gate read as one
+continuous operation instead of separate mystery panels.
 The command shell carries controller feedback next to the command being run.
 Controller buttons call the local server when served by `cockpit-server`, or
 copy deterministic CLI commands when opened as static HTML. Browser-side
-execution and promotion remain explicitly gated. This
+execution and promotion remain explicitly gated, and unsupported confirmation
+or promotion stages are rendered as review/gate actions rather than active
+server calls. This
 implementation intentionally uses no npm packages. If a future spec adds npm,
 dependency versions must be pinned, vulnerability-reviewed, and installed with
 `npm ci`.

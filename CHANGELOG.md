@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.50.7 - 2026-05-23
+
+- Added an end-to-end cockpit flow map that explains the operational journey
+  from Start Optimization through report review, confirmation, and promotion
+  gates.
+- Changed report-ready primary actions to open the Reports view instead of
+  exposing unsupported confirmation controller endpoints.
+- Disabled gated confirmation and promotion shell buttons so manual gates stay
+  visible without pretending they are runnable server calls.
+
 ## 0.50.6 - 2026-05-23
 
 - Added a `Review Report` next action after report generation.

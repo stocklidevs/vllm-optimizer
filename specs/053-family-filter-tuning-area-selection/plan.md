@@ -1,5 +1,7 @@
 # Implementation Plan: Family Filter Tuning Area Selection
 
+**Status**: Completed
+
 ## Summary
 
 Fix the cockpit family filter so it behaves like a real selector filter, not
@@ -19,4 +21,3 @@ only a tab-grid filter.
 - Focused web cockpit tests.
 - Full pytest suite.
 - Browser validation against generated cockpit HTML.
-

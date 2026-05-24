@@ -199,19 +199,10 @@ def render_overview(
     status: dict[str, Any] | None,
     report: dict[str, Any] | None,
 ) -> str:
-    risk_counts: dict[str, int] = {}
-    for group in groups:
-        tier = str(group.get("safety_tier") or "unknown")
-        risk_counts[tier] = risk_counts.get(tier, 0) + 1
-    chips = "".join(f"<span>{escape(tier)}: {count}</span>" for tier, count in sorted(risk_counts.items()))
     return f"""
     <section class="panel tab-panel active" id="overview" data-tab-panel="overview">
       {render_guided_step_workspace(groups, manifest, status, report)}
-      <div class="status-grid">
-        <div>{metric_tile("Safety tiers", len(risk_counts), "families")}{'<div class="chips">' + chips + '</div>' if chips else ''}</div>
-        <div>{render_status_summary(status)}</div>
-        <div>{render_report_summary(report)}</div>
-      </div>
+      {render_end_to_end_flow_map(status, report)}
       {render_operation_result_panel()}
       {render_disabled_actions(manifest)}
     </section>
@@ -418,7 +409,7 @@ def render_guided_step_workspace(
     step = workflow_step(action)
     primary = primary_cockpit_action(action)
     selected = selected_group_label(groups, manifest)
-    command = controller_commands(manifest).get(primary["action"], controller_commands(manifest).get(action, ""))
+    command = primary_command(primary, manifest, fallback_action=action)
     facts = "".join(f"<li>{escape(item)}</li>" for item in primary["facts"])
     return f"""
     <div class="guided-grid">
@@ -436,14 +427,14 @@ def render_guided_step_workspace(
         <p class="eyebrow">{escape(primary['eyebrow'])}</p>
         <h2>{escape(primary['headline'])}</h2>
         <ul class="fact-list">{facts}</ul>
-        {render_primary_action_button(primary['action'], manifest, label=primary['label'])}
+        {render_primary_action_button(primary, manifest)}
         <p class="next-note">Next: {escape(primary['next'])}</p>
       </article>
       <article class="command-shell">
         <p class="eyebrow">Controller command shell</p>
         <h2>{escape(primary['label'])} command</h2>
         <pre><code>{escape(command or 'No command loaded for this step.')}</code></pre>
-        <button type="button" data-controller-action="{escape(primary['action'])}" data-controller-endpoint="/api/controller/{escape(primary['action'])}" data-controller-command="{escape(command)}">{escape(primary['label'])}</button>
+        {render_secondary_action_button(primary, manifest)}
         <p id="controller-feedback" class="controller-feedback" aria-live="polite">Ready to run the selected step from the cockpit server.</p>
         <div class="what-next">
           <strong>What happens next?</strong>
@@ -566,6 +557,64 @@ def render_operation_result_panel() -> str:
         </article>
       </div>
     </section>"""
+
+
+def render_end_to_end_flow_map(status: dict[str, Any] | None, report: dict[str, Any] | None) -> str:
+    current = current_workflow_action(status, report)
+    current_index = workflow_index(current)
+    cards = []
+    for step in WORKFLOW_STEPS:
+        action = step["action"]
+        index = workflow_index(action)
+        if action == "confirm":
+            title = "Confirmation gate"
+            detail = "Manual stability decision after the report is reviewed."
+        elif action == "promote":
+            title = "Promotion gate"
+            detail = "Writes a profile only after explicit opt-in."
+        elif action == "report":
+            title = "Load Report"
+            detail = "Builds the canonical ranking and recommendation artifact."
+        elif action == "run":
+            title = "Start Optimization"
+            detail = "Runs plan, preview, and the live sweep through real gates."
+        else:
+            title = step["label"]
+            detail = step["description"]
+        state = "waiting"
+        state_label = "Waiting"
+        if index < current_index:
+            state = "complete"
+            state_label = "Done"
+        if action == current:
+            state = "current"
+            state_label = "Current"
+        if action in {"confirm", "promote"} and index >= current_index:
+            state = "gate" if action != current else "current gate"
+            state_label = "Gate" if action != current else "Review"
+        cards.append(
+            f"""
+            <article class="flow-card {escape(state)}" data-flow-step="{escape(action)}">
+              <span>{escape(state_label)}</span>
+              <strong>{escape(title)}</strong>
+              <small>{escape(detail)}</small>
+            </article>"""
+        )
+    return f"""
+      <section class="flow-map" aria-label="End-to-end optimization flow">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">End-to-End Flow</p>
+            <h2>What happens from click to decision</h2>
+          </div>
+          <p>{escape(pipeline_caption(status, report))}</p>
+        </div>
+        <div class="flow-grid">{''.join(cards)}</div>
+        <div class="flow-context">
+          {render_status_summary(status)}
+          {render_report_summary(report)}
+        </div>
+      </section>"""
 
 
 def render_run_paths(value: Any) -> str:
@@ -722,7 +771,6 @@ def render_next_action_panel(
 ) -> str:
     action = current_workflow_action(status, report)
     primary = primary_cockpit_action(action)
-    command = controller_commands(manifest).get(primary["action"], controller_commands(manifest).get(action, ""))
     facts = "".join(f"<li>{escape(item)}</li>" for item in primary["facts"])
     followups = "".join(f"<li>{escape(item['label'])}</li>" for item in WORKFLOW_STEPS[workflow_index(action) : workflow_index(action) + 3])
     return f"""
@@ -732,7 +780,7 @@ def render_next_action_panel(
         <h2 id="next-action-headline">{escape(primary['headline'])}</h2>
         <p id="next-action-description">{escape(primary['description'])}</p>
         <ul id="next-action-facts" class="fact-list compact">{facts}</ul>
-        <button id="next-action-button" type="button" class="primary-action" data-controller-action="{escape(primary['action'])}" data-controller-endpoint="/api/controller/{escape(primary['action'])}" data-controller-command="{escape(command)}">{escape(primary['label'])}</button>
+        {render_primary_action_button(primary, manifest, button_id="next-action-button")}
         <div class="after-this">
           <strong>After this:</strong>
           <ul>{followups or '<li>Review the resulting artifacts.</li>'}</ul>
@@ -827,10 +875,19 @@ def render_controller_buttons(manifest: dict[str, Any] | None, *, compact: bool 
     ordered.extend((name, command) for name, command in sorted(commands.items()) if name not in preferred)
     if compact:
         ordered = ordered[:6]
-    return "".join(
-        f'<button type="button" data-controller-action="{escape(name)}" data-controller-endpoint="/api/controller/{escape(name)}" data-controller-command="{escape(command)}">{escape(name.title())}{help_button(name)}</button>'
-        for name, command in ordered
-    )
+    buttons = []
+    for name, command in ordered:
+        if name in {"confirm", "promote"}:
+            buttons.append(
+                f'<button type="button" disabled data-gated-action="{escape(name)}" '
+                f'data-controller-command="{escape(command)}">{escape(name.title())}{help_button(name)}</button>'
+            )
+            continue
+        buttons.append(
+            f'<button type="button" data-controller-action="{escape(name)}" data-controller-endpoint="/api/controller/{escape(name)}" '
+            f'data-controller-command="{escape(command)}">{escape(name.title())}{help_button(name)}</button>'
+        )
+    return "".join(buttons)
 
 
 def controller_commands(manifest: dict[str, Any] | None) -> dict[str, str]:
@@ -952,9 +1009,33 @@ def primary_cockpit_action(action: str) -> dict[str, Any]:
             "headline": "Start Optimization",
             "eyebrow": "Automatic flow",
             "description": "Runs plan and preview first, then stops for live GX10 confirmation before remote execution.",
-            "facts": ["Plans automatically", "Previews safety", "Stops at real gates"],
+            "facts": ["Plans automatically", "No execution until gate", "Previews safety", "Stops at real gates"],
             "next": "The cockpit will plan, preview, then ask before live GX10 execution.",
             "what_next": "The cockpit creates the plan and preview artifacts first, then uses the live-run confirmation gate before touching the GX10.",
+        }
+    if action == "confirm":
+        return {
+            "action": "review-report",
+            "label": "Review Report",
+            "headline": "Review Report",
+            "eyebrow": "Decision gate",
+            "description": "Read the recommendation and evidence before deciding whether a confirmation run is warranted.",
+            "facts": ["Report is ready", "No unsupported endpoint", "Confirmation stays gated"],
+            "next": "Use the report evidence to decide whether to run confirmation.",
+            "what_next": "The Reports tab shows the current winner, failure reasons, rationale, and recommended follow-up before any confirmation work.",
+            "tab_jump": "reports",
+        }
+    if action == "promote":
+        return {
+            "action": "review-promotion",
+            "label": "Review Promotion Gate",
+            "headline": "Review Promotion Gate",
+            "eyebrow": "Promotion gate",
+            "description": "Review the confirmed candidate and promotion command before writing a profile.",
+            "facts": ["Explicit opt-in", "Writes a profile", "Never automatic"],
+            "next": "Promote only with the explicit CLI gate after confirmation.",
+            "what_next": "The Promotion tab keeps the write action visible, disabled by default, and tied to its required gate.",
+            "tab_jump": "promotion",
         }
     step = workflow_step(action)
     return {
@@ -1108,13 +1189,48 @@ def dedupe_strings(values: list[str]) -> list[str]:
     return deduped
 
 
-def render_primary_action_button(action: str, manifest: dict[str, Any] | None, *, label: str | None = None) -> str:
-    command = controller_commands(manifest).get(action, "")
-    text = label or workflow_step(action)["label"]
+def primary_command(primary: dict[str, Any], manifest: dict[str, Any] | None, *, fallback_action: str | None = None) -> str:
+    command_action = str(primary.get("command_action") or primary.get("action") or fallback_action or "")
+    return controller_commands(manifest).get(command_action, "")
+
+
+def render_primary_action_button(
+    primary: dict[str, Any], manifest: dict[str, Any] | None, *, button_id: str | None = None
+) -> str:
+    action = str(primary.get("action") or "")
+    text = str(primary.get("label") or workflow_step(action)["label"])
+    button_id_attr = f' id="{escape(button_id)}"' if button_id else ""
+    if primary.get("tab_jump"):
+        tab = str(primary["tab_jump"])
+        refresh = "true" if primary.get("refresh_tab") else "false"
+        return (
+            f'<button{button_id_attr} type="button" class="primary-action" '
+            f'data-tab-jump="{escape(tab)}" data-refresh-tab="{refresh}">'
+            f'{escape(text)} -></button>'
+        )
+    command = primary_command(primary, manifest)
     return (
-        f'<button type="button" class="primary-action" data-controller-action="{escape(action)}" '
+        f'<button{button_id_attr} type="button" class="primary-action" data-controller-action="{escape(action)}" '
         f'data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">'
         f'{escape(text)} -></button>'
+    )
+
+
+def render_secondary_action_button(primary: dict[str, Any], manifest: dict[str, Any] | None) -> str:
+    action = str(primary.get("action") or "")
+    text = str(primary.get("label") or action)
+    if primary.get("tab_jump"):
+        tab = str(primary["tab_jump"])
+        refresh = "true" if primary.get("refresh_tab") else "false"
+        return (
+            f'<button type="button" data-tab-jump="{escape(tab)}" data-refresh-tab="{refresh}">'
+            f'{escape(text)}</button>'
+        )
+    command = primary_command(primary, manifest)
+    return (
+        f'<button type="button" data-controller-action="{escape(action)}" '
+        f'data-controller-endpoint="/api/controller/{escape(action)}" data-controller-command="{escape(command)}">'
+        f'{escape(text)}</button>'
     )
 
 
@@ -1302,6 +1418,20 @@ p, small, .empty { color: var(--muted); line-height: 1.5; }
 .pipeline-stage.running span, .pipeline-stage.automatic span { color: var(--cyan); }
 .pipeline-stage.manual.gate span, .pipeline-stage.manual span { color: var(--amber); }
 .pipeline-stage small { color: var(--muted); overflow-wrap: anywhere; }
+.flow-map { margin-bottom: 16px; padding: 16px; border: 1px solid rgba(55,216,255,.18); border-radius: 8px; background: rgba(3,8,16,.28); }
+.flow-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.flow-card { min-height: 128px; display: grid; align-content: start; gap: 8px; padding: 12px; border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(15,29,47,.44); }
+.flow-card span { color: var(--muted); text-transform: uppercase; font-size: 11px; font-weight: 850; }
+.flow-card strong { overflow-wrap: anywhere; }
+.flow-card small { color: var(--muted); overflow-wrap: anywhere; }
+.flow-card.complete { border-color: rgba(73,242,161,.28); background: rgba(73,242,161,.06); }
+.flow-card.complete span { color: var(--green); }
+.flow-card.current { border-color: rgba(55,216,255,.48); background: rgba(55,216,255,.08); box-shadow: inset 0 0 0 1px rgba(55,216,255,.16); }
+.flow-card.current span { color: var(--cyan); }
+.flow-card.gate, .flow-card.current.gate { border-color: rgba(240,198,91,.36); background: rgba(240,198,91,.06); }
+.flow-card.gate span, .flow-card.current.gate span { color: var(--amber); }
+.flow-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.flow-context .summary-block, .flow-context .empty { border: 1px solid rgba(55,216,255,.12); border-radius: 8px; background: rgba(15,29,47,.32); padding: 12px; margin: 0; }
 .gate-list { display: grid; gap: 10px; padding: 0; margin: 14px 0 0; list-style: none; }
 .gate-list li { display: grid; gap: 6px; border: 1px solid rgba(240,198,91,.22); border-radius: 8px; padding: 10px; background: rgba(240,198,91,.05); }
 .fact-list { display: grid; gap: 8px; padding: 0; margin: 14px 0; list-style: none; }
@@ -1393,6 +1523,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .hero { grid-template-columns: 1fr; min-height: auto; }
   .hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .workflow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .flow-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .workflow-step:nth-child(3)::after { display: none; }
   .guided-grid, .auto-pipeline-panel { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
@@ -1409,7 +1540,7 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   .right-rail { order: 3; }
   h1 { font-size: 34px; }
   .section-heading, .disabled-actions { display: block; }
-  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage { grid-template-columns: 1fr; }
+  .recommendation-card, .report-lists, .report-bar-line, .promotion-grid, .explain-grid, .guided-grid, .auto-pipeline-panel, .workflow-steps, .pipeline-stage, .flow-grid, .flow-context { grid-template-columns: 1fr; }
   .command-shell { grid-column: auto; }
   .workflow-heading { align-items: flex-start; flex-direction: column; }
   .workflow-step { justify-items: start; text-align: left; grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 76px; }
@@ -1803,6 +1934,18 @@ async function cancelControllerJob() {
 
 document.querySelectorAll('[data-controller-command]').forEach((button) => {
   button.addEventListener('click', () => runControllerAction(button));
+});
+
+document.querySelectorAll('[data-tab-jump]').forEach((button) => {
+  if (button.dataset.controllerCommand) return;
+  button.addEventListener('click', () => {
+    if (button.dataset.refreshTab === 'true') {
+      window.sessionStorage.setItem('cockpit-tab-after-reload', button.dataset.tabJump);
+      window.location.reload();
+      return;
+    }
+    setActiveTab(button.dataset.tabJump);
+  });
 });
 
 document.querySelectorAll('.tuning-area-option').forEach((button, index) => {

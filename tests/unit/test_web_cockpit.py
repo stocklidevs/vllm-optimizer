@@ -182,6 +182,7 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "tabJump" in html
     assert "refreshTab" in html
     assert "cockpit-tab-after-reload" in html
+    assert "document.querySelectorAll('[data-tab-jump]')" in html
     assert "completed_stages" in html
     assert "live-execution-title" in html
     assert "live-execution-elapsed" in html
@@ -366,6 +367,48 @@ def test_web_cockpit_uses_start_optimization_as_primary_cta() -> None:
     assert "Runs plan and preview first" in right_rail
     assert 'data-pipeline-stage="plan"' in html
     assert "<strong>Generate Plan</strong>" in html
+
+
+def test_web_cockpit_overview_explains_end_to_end_flow() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        status={
+            "overall_status": "completed",
+            "trial_counts": {"completed": 4, "failed": 0, "total": 4},
+        },
+    )
+
+    assert "End-to-End Flow" in html
+    assert 'data-flow-step="run"' in html
+    assert 'data-flow-step="report"' in html
+    assert "Start Optimization" in html
+    assert "Load Report" in html
+    assert "Confirmation gate" in html
+    assert "Promotion gate" in html
+    assert "Run complete. Reporting can be generated automatically." in html
+
+
+def test_web_cockpit_report_ready_primary_action_reviews_report_not_confirm_endpoint() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        report={
+            "recommendation": {
+                "status": "requires-confirmation",
+                "objective": "balanced",
+                "candidate_id": "candidate-fast",
+            }
+        },
+    )
+    right_rail = html.split('<aside class="right-rail">', 1)[1].split("</aside>", 1)[0]
+    active_step = html.split('<article class="active-step-card">', 1)[1].split("</article>", 1)[0]
+    command_shell = html.split('<article class="command-shell">', 1)[1].split("</article>", 1)[0]
+
+    assert "Review Report" in right_rail
+    assert 'data-tab-jump="reports"' in right_rail
+    assert 'data-controller-action="confirm"' not in right_rail
+    assert 'data-controller-endpoint="/api/controller/confirm"' not in active_step
+    assert 'data-controller-endpoint="/api/controller/confirm"' not in command_shell
+    assert "No unsupported endpoint" in html
 
 
 def test_web_cockpit_renders_selectable_tuning_areas() -> None:

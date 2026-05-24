@@ -1,6 +1,6 @@
 # Feature Specification: Family Filter Tuning Area Selection
 
-**Status**: Draft
+**Status**: Completed
 
 **Created**: 2026-05-23
 
@@ -31,4 +31,3 @@ safe-session cards.
 - Unit tests prove the selection behavior updates when filters change.
 - Browser validation confirms clicking `risky-session` hides safe-session cards
   from the left selector and selects the risky tuning area.
-
