@@ -19,6 +19,7 @@ from .sweep import (
     load_sweep_results,
     rank_sweep_results,
     run_sweep,
+    SweepError,
 )
 
 
@@ -123,10 +124,13 @@ def build_pipeline_plan(request: OptimizerPipelineRequest, artifacts: dict[str, 
 
 def ensure_sweep_plan(request: OptimizerPipelineRequest, artifacts: dict[str, str]) -> dict[str, Any]:
     path = Path(artifacts["sweep_plan"])
-    if path.exists():
-        return read_json(path)
     definition = load_sweep_definition(request.sweep_path)
+    if path.exists():
+        existing = read_json(path)
+        if existing.get("sweep_id") == definition.sweep_id:
+            return existing
     plan = build_sweep_plan(definition, allow_risky_session_flags=request.allow_risky_session_flags)
+    plan["sweep_path"] = request.sweep_path.as_posix()
     write_json(path, plan)
     return plan
 
@@ -151,13 +155,26 @@ def run_live_sweep(request: OptimizerPipelineRequest, sweep_plan: dict[str, Any]
 
 def ensure_ranking(sweep_plan: dict[str, Any], artifacts: dict[str, str]) -> None:
     ranking_path = Path(artifacts["ranking"])
+    expected_sweep_id = str(sweep_plan.get("sweep_id") or "")
     if ranking_path.exists():
-        return
+        ranking = read_json(ranking_path)
+        if ranking.get("sweep_id") == expected_sweep_id:
+            return
     results_path = Path(artifacts["results"])
     if not results_path.exists():
+        if ranking_path.exists():
+            raise OptimizerPipelineError(
+                "stale sweep artifacts: existing ranking does not match the current sweep and no current results are available"
+            )
         raise OptimizerPipelineError(f"results artifact is required for report mode: {results_path}")
     rows = load_sweep_results(results_path)
-    ranking = rank_sweep_results(sweep_plan, rows)
+    try:
+        ranking = rank_sweep_results(sweep_plan, rows)
+    except SweepError as exc:
+        raise OptimizerPipelineError(
+            "stale sweep artifacts: existing results/ranking do not match the current sweep; "
+            "start a new optimization run or use a sweep-specific output directory"
+        ) from exc
     ranking_path.parent.mkdir(parents=True, exist_ok=True)
     write_json(ranking_path, ranking)
 

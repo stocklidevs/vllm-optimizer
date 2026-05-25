@@ -84,6 +84,46 @@ def test_pipeline_report_mode_ranks_existing_results_and_writes_report(tmp_path:
     assert report["recommendation"]["candidate_id"] == trial["candidate_id"]
 
 
+def test_pipeline_report_mode_rejects_stale_ranking_from_previous_sweep(tmp_path: Path) -> None:
+    run_optimizer_pipeline(
+        OptimizerPipelineRequest(
+            mode="preview",
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            out_dir=tmp_path,
+        )
+    )
+    plan = read_json(tmp_path / "sweep-plan.json")
+    trial = plan["trials"][0]
+    live = tmp_path / "live"
+    live.mkdir()
+    (live / "results.jsonl").write_text(
+        _result_row(
+            trial_id=trial["trial_id"],
+            candidate_id=trial["candidate_id"],
+            latency=960.0,
+            throughput=50.0,
+        ),
+        encoding="utf-8",
+    )
+    run_optimizer_pipeline(
+        OptimizerPipelineRequest(
+            mode="report",
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            out_dir=tmp_path,
+        )
+    )
+    assert read_json(tmp_path / "live" / "ranking.json")["sweep_id"] == "qwen-small-sweep"
+
+    with pytest.raises(OptimizerPipelineError, match="stale sweep artifacts"):
+        run_optimizer_pipeline(
+            OptimizerPipelineRequest(
+                mode="report",
+                sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+                out_dir=tmp_path,
+            )
+        )
+
+
 def test_pipeline_run_mode_requires_remote_config(tmp_path: Path) -> None:
     with pytest.raises(OptimizerPipelineError, match="remote config"):
         run_optimizer_pipeline(
@@ -287,7 +327,7 @@ def _write_confirm_fixture(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     ranking = {
-        "sweep_id": "confirm-fixture",
+        "sweep_id": "qwen-small-sweep",
         "objectives": {
             "balanced": [
                 {

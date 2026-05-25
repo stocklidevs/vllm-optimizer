@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.54.1 - 2026-05-25
+
+- Fixed stale sweep artifact reuse in `optimize-workload --mode report` so a
+  ranking from one sweep cannot be reused for a different configured sweep.
+- Active cockpit now hides implicit output-directory reports whose candidate
+  IDs do not all match the configured sweep, preventing old small-sweep
+  50 tok/s results from appearing as current C8 performance results.
+- Added regression coverage for stale ranking rejection, stale report hiding,
+  and mixed-candidate report hiding.
+
 ## 0.54.0 - 2026-05-25
 
 - Repaired the active cockpit end-to-end flow: completed runs now expose one

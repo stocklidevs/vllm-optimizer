@@ -14,6 +14,7 @@ from .artifacts import write_json
 from .cockpit_controller import CockpitPreviewRequest, CockpitRunRequest, run_cockpit_live, run_cockpit_preview
 from .optimizer_pipeline import OptimizerPipelineRequest, run_optimizer_pipeline
 from .promotion import write_promoted_profile
+from .sweep import load_sweep_definition
 from .web_cockpit import read_profile_summaries, render_web_cockpit
 
 
@@ -426,8 +427,13 @@ def build_handler(
 def render_active_cockpit(config: CockpitServerConfig) -> str:
     catalog = _read_json_or_empty(config.catalog_path, {"groups": []})
     manifest = _read_optional_json(config.manifest_path)
+    implicit_artifacts_match = _implicit_artifacts_match_config(config)
     status = _read_optional_json(config.status_path)
-    report = _read_optional_json(config.report_path) or _read_optional_json(config.out_dir / "report.json")
+    if config.status_path is None and not implicit_artifacts_match:
+        status = None
+    report = _read_optional_json(config.report_path)
+    if report is None and implicit_artifacts_match:
+        report = _read_optional_json(config.out_dir / "report.json")
     run_index = _read_optional_json(config.run_index_path)
     profiles = read_profile_summaries(config.profile_paths)
     return render_web_cockpit(
@@ -464,6 +470,42 @@ def _read_optional_json(path: Path | None) -> dict[str, Any] | None:
     if path is None or not path.exists():
         return None
     return _read_json_or_empty(path, {})
+
+
+def _implicit_artifacts_match_config(config: CockpitServerConfig) -> bool:
+    expected_sweep_id = _configured_sweep_id(config.sweep_path)
+    if expected_sweep_id is None:
+        return True
+    sweep_plan = _read_optional_json(config.out_dir / "sweep-plan.json")
+    if sweep_plan is not None and sweep_plan.get("sweep_id") != expected_sweep_id:
+        return False
+    report = _read_optional_json(config.out_dir / "report.json")
+    if report is not None and not _report_matches_sweep(report, expected_sweep_id):
+        return False
+    return True
+
+
+def _configured_sweep_id(sweep_path: Path) -> str | None:
+    try:
+        return load_sweep_definition(sweep_path).sweep_id
+    except Exception:
+        return None
+
+
+def _report_matches_sweep(report: dict[str, Any], expected_sweep_id: str) -> bool:
+    candidates = report.get("candidates")
+    candidate_ids: list[str] = []
+    if isinstance(candidates, dict):
+        candidate_ids = [str(candidate_id) for candidate_id in candidates if isinstance(candidate_id, str)]
+    elif isinstance(candidates, list):
+        candidate_ids = [
+            str(candidate.get("candidate_id"))
+            for candidate in candidates
+            if isinstance(candidate, dict) and isinstance(candidate.get("candidate_id"), str)
+        ]
+    if not candidate_ids:
+        return True
+    return all(candidate_id.startswith(f"{expected_sweep_id}-") for candidate_id in candidate_ids)
 
 
 def _source(path: Path | None) -> str | None:

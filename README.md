@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.54.1-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -138,6 +138,9 @@ The project is spec-driven with SpecKit and currently supports:
 - The active cockpit can select a report candidate and exercise gated local
   promotion when launched with `--allow-promotion`; the default launcher now
   starts from the high-throughput Qwen C8 concurrency sweep.
+- Active cockpit and `optimize-workload` report mode validate sweep artifact
+  provenance so a reused output directory cannot show an old small-sweep
+  50 tok/s report as the current C8 performance result.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -353,6 +356,13 @@ writes the selected candidate profile artifact under the cockpit output
 directory. The runtime cockpit remains dependency-free; Playwright is pinned as
 a dev-only UI QA dependency, installed with `npm ci`, and checked with
 `npm audit`.
+
+The cockpit only auto-loads implicit reports from its output directory when
+those artifacts match the configured sweep. If you switch from one sweep to
+another while reusing an output directory, old reports are hidden and report
+mode fails loudly with a stale-artifact message instead of presenting the wrong
+winner. Start a new optimization or use a sweep-specific `--out-dir` to produce
+fresh report artifacts.
 
 If the cockpit opens on an older loaded report, use `Close Loaded Run` to hide
 that history in the current browser session and return the dashboard to a fresh

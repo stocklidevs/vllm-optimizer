@@ -148,6 +148,63 @@ def test_active_cockpit_loads_generated_report_from_out_dir(tmp_path: Path) -> N
     assert "Recommendation detail" in html
 
 
+def test_active_cockpit_hides_stale_report_from_different_sweep(tmp_path: Path) -> None:
+    out_dir = tmp_path / "active-stale-report"
+    out_dir.mkdir()
+    (out_dir / "sweep-plan.json").write_text(
+        """{"sweep_id":"qwen-small-sweep","trials":[]}""",
+        encoding="utf-8",
+    )
+    (out_dir / "report.json").write_text(
+        """{
+          "recommendation": {"status": "ready", "objective": "balanced", "candidate_id": "qwen-small-sweep-c001"},
+          "candidates": [{"candidate_id": "qwen-small-sweep-c001", "metrics": {"aggregate_tokens_per_second": 50}}]
+        }""",
+        encoding="utf-8",
+    )
+
+    html = render_active_cockpit(
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            out_dir=out_dir,
+        )
+    )
+
+    assert "qwen-small-sweep-c001" not in html
+    assert "Start Optimization" in html
+    assert "no report" in html
+
+
+def test_active_cockpit_hides_mixed_report_from_different_sweep(tmp_path: Path) -> None:
+    out_dir = tmp_path / "active-mixed-report"
+    out_dir.mkdir()
+    (out_dir / "sweep-plan.json").write_text(
+        """{"sweep_id":"qwen-concurrency-saturation-c8","trials":[]}""",
+        encoding="utf-8",
+    )
+    (out_dir / "report.json").write_text(
+        """{
+          "recommendation": {"status": "ready", "objective": "balanced", "candidate_id": "qwen-concurrency-saturation-c8-c001"},
+          "candidates": [
+            {"candidate_id": "qwen-concurrency-saturation-c8-c001", "metrics": {"aggregate_tokens_per_second": 98}},
+            {"candidate_id": "qwen-small-sweep-c001", "metrics": {"aggregate_tokens_per_second": 50}}
+          ]
+        }""",
+        encoding="utf-8",
+    )
+
+    html = render_active_cockpit(
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            out_dir=out_dir,
+        )
+    )
+
+    assert "qwen-small-sweep-c001" not in html
+    assert "Start Optimization" in html
+    assert "no report" in html
+
+
 def test_cockpit_server_rejects_unknown_action(tmp_path: Path) -> None:
     with pytest.raises(CockpitServerError, match="unsupported controller action"):
         handle_controller_action(
