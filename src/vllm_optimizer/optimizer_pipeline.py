@@ -49,6 +49,7 @@ class OptimizerPipelineRequest:
     original_label: str = "current"
     recommended_label: str = "candidate"
     allow_promotion: bool = False
+    candidate_id: str | None = None
     sweep_runner: SweepRunner | None = None
     benchmark_runner: BenchmarkRunner | None = None
 
@@ -213,6 +214,7 @@ def run_confirmation_stage(request: OptimizerPipelineRequest, artifacts: dict[st
             profile_id=current_profile_id,
             expected_recommended_label=request.recommended_label,
             force=True,
+            candidate_id=request.candidate_id,
         )
         promoted = True
     return {
@@ -246,6 +248,7 @@ def write_candidate_profile(request: OptimizerPipelineRequest, artifacts: dict[s
         summary_out=Path(artifacts["candidate_summary_markdown"]),
         profile_id=(candidate_profile.stem if candidate_profile is not None else "candidate"),
         force=True,
+        candidate_id=request.candidate_id,
     )
 
 

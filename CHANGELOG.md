@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.54.0 - 2026-05-25
+
+- Repaired the active cockpit end-to-end flow: completed runs now expose one
+  `Generate & Review Report` action that opens the Reports view automatically.
+- Added report candidate selection and a gated active cockpit promotion action
+  that writes a selected-candidate profile artifact under the cockpit output
+  directory when launched with `--allow-promotion`.
+- Added optional `--candidate-id` support to promotion helpers and CLI commands.
+- Changed the default `cockpit-launch` sweep to the high-throughput
+  `qwen-concurrency-saturation-c8` recipe while preserving explicit overrides.
+- Removed duplicate primary cockpit action/progress presentation that made the
+  dashboard state ambiguous.
+
 ## 0.53.2 - 2026-05-24
 
 - Fixed the cockpit close-history flow so future `Load Report` and

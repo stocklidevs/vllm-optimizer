@@ -278,6 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_parser.add_argument("--original-label", default="current")
     optimize_parser.add_argument("--recommended-label", default="candidate")
     optimize_parser.add_argument("--allow-promotion", action="store_true")
+    optimize_parser.add_argument("--candidate-id")
     optimize_parser.add_argument("--timeout-seconds", type=int, default=1200)
     optimize_parser.add_argument("--continue-on-failure", action="store_true")
     optimize_parser.add_argument("--allow-risky-session-flags", action="store_true")
@@ -411,6 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_server_parser.add_argument("--timeout-seconds", type=int, default=1200)
     cockpit_server_parser.add_argument("--continue-on-failure", action="store_true")
     cockpit_server_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    cockpit_server_parser.add_argument("--allow-promotion", action="store_true")
     cockpit_server_parser.set_defaults(func=cmd_cockpit_server)
 
     cockpit_launch_parser = subparsers.add_parser(
@@ -418,7 +420,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     cockpit_launch_parser.add_argument("--host", default="127.0.0.1")
     cockpit_launch_parser.add_argument("--port", type=int, default=8787)
-    cockpit_launch_parser.add_argument("--sweep", type=Path, default=Path("config/sweeps/qwen-small-sweep.json"))
+    cockpit_launch_parser.add_argument("--sweep", type=Path, default=Path("config/sweeps/qwen-concurrency-saturation-c8.json"))
     cockpit_launch_parser.add_argument("--config", type=Path)
     cockpit_launch_parser.add_argument("--config-root", type=Path, default=Path("config"))
     cockpit_launch_parser.add_argument("--artifacts-root", type=Path, default=Path("artifacts"))
@@ -430,6 +432,7 @@ def build_parser() -> argparse.ArgumentParser:
     cockpit_launch_parser.add_argument("--timeout-seconds", type=int, default=1200)
     cockpit_launch_parser.add_argument("--continue-on-failure", action="store_true")
     cockpit_launch_parser.add_argument("--allow-risky-session-flags", action="store_true")
+    cockpit_launch_parser.add_argument("--allow-promotion", action="store_true")
     cockpit_launch_parser.set_defaults(func=cmd_cockpit_launch)
 
     flag_catalog_parser = subparsers.add_parser(
@@ -523,6 +526,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     promote_preview_parser.add_argument("--ranking", required=True, type=Path)
     promote_preview_parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    promote_preview_parser.add_argument("--candidate-id")
     promote_preview_parser.add_argument("--out", required=True, type=Path)
     promote_preview_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
     promote_preview_parser.set_defaults(func=cmd_promote_preview)
@@ -532,6 +536,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     promote_profile_parser.add_argument("--ranking", required=True, type=Path)
     promote_profile_parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    promote_profile_parser.add_argument("--candidate-id")
     promote_profile_parser.add_argument("--profile-out", required=True, type=Path)
     promote_profile_parser.add_argument("--summary-out", required=True, type=Path)
     promote_profile_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
@@ -545,6 +550,7 @@ def build_parser() -> argparse.ArgumentParser:
     promote_confirmed_parser.add_argument("--confirmation-report", required=True, type=Path)
     promote_confirmed_parser.add_argument("--ranking", required=True, type=Path)
     promote_confirmed_parser.add_argument("--objective", default=DEFAULT_OBJECTIVE)
+    promote_confirmed_parser.add_argument("--candidate-id")
     promote_confirmed_parser.add_argument("--profile-out", required=True, type=Path)
     promote_confirmed_parser.add_argument("--summary-out", required=True, type=Path)
     promote_confirmed_parser.add_argument("--profile-id", default=DEFAULT_PROFILE_ID)
@@ -762,6 +768,7 @@ def cmd_optimize_workload(args: argparse.Namespace) -> int:
             original_label=args.original_label,
             recommended_label=args.recommended_label,
             allow_promotion=args.allow_promotion,
+            candidate_id=args.candidate_id,
         )
     )
     print(summary["artifacts"]["pipeline_summary"])
@@ -908,6 +915,7 @@ def cmd_cockpit_server(args: argparse.Namespace) -> int:
             allow_risky_session_flags=args.allow_risky_session_flags,
             timeout_seconds=args.timeout_seconds,
             continue_on_failure=args.continue_on_failure,
+            allow_promotion=args.allow_promotion,
         ),
         args.host,
         args.port,
@@ -934,6 +942,7 @@ def cmd_cockpit_launch(args: argparse.Namespace) -> int:
             allow_risky_session_flags=args.allow_risky_session_flags,
             timeout_seconds=args.timeout_seconds,
             continue_on_failure=args.continue_on_failure,
+            allow_promotion=args.allow_promotion,
         )
     )
     return 0
@@ -1052,7 +1061,7 @@ def load_allowed_session_tuning(path: Path | None, allowed: bool):
 
 
 def cmd_promote_preview(args: argparse.Namespace) -> int:
-    preview = build_promotion_preview(args.ranking, args.objective, args.profile_id)
+    preview = build_promotion_preview(args.ranking, args.objective, args.profile_id, candidate_id=args.candidate_id)
     write_json(args.out, preview)
     print(str(args.out))
     return 0
@@ -1066,6 +1075,7 @@ def cmd_promote_profile(args: argparse.Namespace) -> int:
         objective=args.objective,
         profile_id=args.profile_id,
         force=args.force,
+        candidate_id=args.candidate_id,
     )
     print(result["profile_path"])
     return 0
@@ -1081,6 +1091,7 @@ def cmd_promote_confirmed_profile(args: argparse.Namespace) -> int:
         profile_id=args.profile_id,
         expected_recommended_label=args.expected_recommended_label,
         force=args.force,
+        candidate_id=args.candidate_id,
     )
     print(result["profile_path"])
     return 0

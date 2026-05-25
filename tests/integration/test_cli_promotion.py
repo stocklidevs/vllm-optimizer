@@ -26,6 +26,42 @@ def test_promote_preview_cli_writes_preview(tmp_path: Path) -> None:
     assert preview["eligible"] is True
 
 
+def test_promote_preview_cli_can_select_candidate(tmp_path: Path) -> None:
+    ranking_path = _write_ranking_fixture(tmp_path)
+    data = read_json(ranking_path)
+    data["objectives"]["balanced"].append(
+        {
+            "candidate_id": "qwen-scheduler-safe-c009-selected",
+            "rank": 2,
+            "metrics": {"aggregate_tokens_per_second": 97.0, "mean_latency_ms": 720.0},
+        }
+    )
+    data["candidate_aggregates"].append(
+        {
+            "candidate_id": "qwen-scheduler-safe-c009-selected",
+            "success_count": 1,
+            "source_trials": data["candidate_aggregates"][0]["source_trials"],
+        }
+    )
+    write_json(ranking_path, data)
+    out = tmp_path / "preview-selected.json"
+
+    exit_code = main(
+        [
+            "promote-preview",
+            "--ranking",
+            str(ranking_path),
+            "--candidate-id",
+            "qwen-scheduler-safe-c009-selected",
+            "--out",
+            str(out),
+        ]
+    )
+
+    assert exit_code == 0
+    assert read_json(out)["candidate_id"] == "qwen-scheduler-safe-c009-selected"
+
+
 def test_promote_profile_cli_writes_profile_and_summary(tmp_path: Path) -> None:
     ranking_path = _write_ranking_fixture(tmp_path)
     profile_out = tmp_path / "recommended.json"

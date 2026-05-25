@@ -58,6 +58,7 @@ def render_web_cockpit(
     report: dict[str, Any] | None = None,
     run_index: dict[str, Any] | None = None,
     profiles: list[dict[str, Any]] | None = None,
+    promotion_allowed: bool = False,
     sources: dict[str, str | None] | None = None,
 ) -> str:
     groups = _list_of_dicts(catalog.get("groups"))
@@ -74,7 +75,17 @@ def render_web_cockpit(
             "</head>",
             "<body>",
             '<main class="objective-cockpit">',
-            render_objective_command_center(groups, families, manifest, status, report, run_index, profiles or [], sources or {}),
+            render_objective_command_center(
+                groups,
+                families,
+                manifest,
+                status,
+                report,
+                run_index,
+                profiles or [],
+                sources or {},
+                promotion_allowed=promotion_allowed,
+            ),
             f"<script>{JS}</script>",
             "</main>",
             "</body>",
@@ -93,6 +104,8 @@ def render_objective_command_center(
     run_index: dict[str, Any] | None,
     profiles: list[dict[str, Any]],
     sources: dict[str, str | None],
+    *,
+    promotion_allowed: bool = False,
 ) -> str:
     return f"""
     {render_command_topbar(status, report)}
@@ -106,7 +119,7 @@ def render_objective_command_center(
     {render_command_setup(groups, manifest, status, report, profiles)}
     {render_command_operations(groups, manifest, status, report)}
     {render_command_report_story(report)}
-    {render_advanced_command_center(groups, families, manifest, status, report, run_index, sources)}
+    {render_advanced_command_center(groups, families, manifest, status, report, run_index, sources, promotion_allowed=promotion_allowed)}
     """
 
 
@@ -171,7 +184,6 @@ def render_command_setup(
     target_cards = "".join(render_target_card(target, index == 0) for index, target in enumerate(OPTIMIZATION_TARGETS))
     selected = selected_group_label(groups, manifest)
     description = selected_group_description(groups, manifest) or "The optimizer chooses candidates from the deterministic recipe."
-    primary = primary_cockpit_action(current_workflow_action(status, report))
     return f"""
     <section class="command-setup-grid" aria-label="Optimization setup">
       <article class="command-panel model-panel">
@@ -206,9 +218,6 @@ def render_command_setup(
         <div class="knobs-tuned-panel compact-knobs">
           <strong>Included knobs</strong>
           <ul id="selected-knobs-tuned">{render_selected_knob_items(groups, manifest)}</ul>
-        </div>
-        <div class="recipe-action">
-          {render_primary_action_button(primary, manifest)}
         </div>
         {render_loaded_run_controls(manifest, status, report)}
       </article>
@@ -331,6 +340,8 @@ def render_advanced_command_center(
     report: dict[str, Any] | None,
     run_index: dict[str, Any] | None,
     sources: dict[str, str | None],
+    *,
+    promotion_allowed: bool = False,
 ) -> str:
     return f"""
     <section class="advanced-command-center" aria-label="Advanced optimizer details">
@@ -351,8 +362,8 @@ def render_advanced_command_center(
             {render_pipeline(manifest)}
             {render_runs(run_index)}
             {render_performance_evidence(report)}
-            {render_reporting(report, manifest)}
-            {render_promotion_workflow(report, manifest)}
+            {render_reporting(report, manifest, promotion_allowed=promotion_allowed)}
+            {render_promotion_workflow(report, manifest, promotion_allowed=promotion_allowed)}
             {render_how_to_use()}
             {render_sources(sources)}
           </div>
@@ -760,18 +771,24 @@ def render_pipeline(manifest: dict[str, Any] | None) -> str:
     </section>"""
 
 
-def render_reporting(report: dict[str, Any] | None, manifest: dict[str, Any] | None = None) -> str:
+def render_reporting(
+    report: dict[str, Any] | None,
+    manifest: dict[str, Any] | None = None,
+    *,
+    promotion_allowed: bool = False,
+) -> str:
     if report is None:
         content = """
         <div class="report-card">
           <p class="empty">No canonical report loaded.</p>
-          <p>After an optimization run finishes, use <strong>Load Report</strong> to generate the decision artifact.</p>
+          <p>After an optimization run finishes, use <strong>Generate &amp; Review Report</strong> to generate and open the decision artifact.</p>
         </div>"""
     else:
         candidates = report.get("candidates", {})
         content = f"""
         {render_recommendation_detail(report)}
         {render_report_next_steps(report, manifest)}
+        {render_candidate_selector(report, promotion_allowed=promotion_allowed)}
         {render_metric_visualizer(candidates)}
         {render_failure_summary(candidates)}"""
     return f"""
@@ -785,6 +802,49 @@ def render_reporting(report: dict[str, Any] | None, manifest: dict[str, Any] | N
       </div>
       {content}
     </section>"""
+
+
+def render_candidate_selector(report: dict[str, Any], *, promotion_allowed: bool = False) -> str:
+    rows = _candidate_metric_rows(report.get("candidates", {}))
+    if not rows:
+        return ""
+    recommendation = report.get("recommendation", {}) if isinstance(report.get("recommendation"), dict) else {}
+    selected_id = str(recommendation.get("candidate_id") or rows[0]["candidate_id"])
+    objective = promotion_objective(str(recommendation.get("objective") or "balanced"))
+    cards = []
+    for row in rows:
+        candidate_id = row["candidate_id"]
+        active = candidate_id == selected_id
+        cards.append(
+            f"""
+            <button type="button" class="candidate-choice {'active' if active else ''}"
+              data-candidate-select="{escape(candidate_id)}"
+              data-candidate-id="{escape(candidate_id)}"
+              data-candidate-objective="{escape(objective)}"
+              data-candidate-throughput="{escape(_fmt(row['throughput']))}"
+              data-candidate-latency="{escape(_fmt(row['latency']))}">
+              <span>{'Selected' if active else 'Candidate'}</span>
+              <strong><code>{escape(candidate_id)}</code></strong>
+              <small>{escape(_fmt(row['throughput']))} tok/s / {escape(_fmt(row['latency']))} ms</small>
+            </button>"""
+        )
+    gate_text = (
+        "Promotion gate is open for this server session."
+        if promotion_allowed
+        else "Launch with --allow-promotion to test the promote flow."
+    )
+    return f"""
+    <div class="report-card candidate-selector" data-selected-candidate-id="{escape(selected_id)}" data-selected-objective="{escape(objective)}">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="eyebrow">Select Candidate</p>
+          <h3>Choose the profile candidate to promote</h3>
+        </div>
+        <p id="selected-candidate-summary">Selected <code id="selected-candidate-id">{escape(selected_id)}</code> for <code id="selected-candidate-objective">{escape(objective)}</code>.</p>
+      </div>
+      <div class="candidate-choice-grid">{''.join(cards)}</div>
+      <p class="candidate-gate-note">{escape(gate_text)}</p>
+    </div>"""
 
 
 def render_report_next_steps(report: dict[str, Any], manifest: dict[str, Any] | None) -> str:
@@ -983,7 +1043,12 @@ def render_guided_step_workspace(
     </div>"""
 
 
-def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str, Any] | None) -> str:
+def render_promotion_workflow(
+    report: dict[str, Any] | None,
+    manifest: dict[str, Any] | None,
+    *,
+    promotion_allowed: bool = False,
+) -> str:
     if report is None:
         content = '<p class="empty">No promotion workflow loaded.</p>'
     else:
@@ -992,16 +1057,24 @@ def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str,
         gate = str(promotion.get("required_gate") or "--allow-promotion")
         available = bool(promotion.get("available", False))
         automatic = bool(promotion.get("automatic", False))
-        candidate_id = str(recommendation.get("candidate_id") or "no candidate")
-        objective = str(recommendation.get("objective") or "no objective")
+        rows = _candidate_metric_rows(report.get("candidates", {}))
+        candidate_id = str(recommendation.get("candidate_id") or (rows[0]["candidate_id"] if rows else "no candidate"))
+        objective = promotion_objective(str(recommendation.get("objective") or "balanced"))
         status = str(recommendation.get("status") or "unknown")
+        promote_command = controller_commands(manifest).get("promote", "")
+        disabled = "" if promotion_allowed else " disabled"
+        gate_copy = (
+            "The cockpit server was launched with the promotion gate. The button writes a local selected-candidate profile artifact."
+            if promotion_allowed
+            else f"Promotion is locked. Restart the cockpit with {gate} when you want to test the write path."
+        )
         content = f"""
-        <div class="promotion-grid">
+        <div class="promotion-grid" data-selected-candidate-id="{escape(candidate_id)}" data-selected-objective="{escape(objective)}">
           <article class="promotion-card">
             <p class="eyebrow">Recommendation</p>
             <h3>{escape(status)}</h3>
             <dl>
-              <div><dt>Candidate</dt><dd><code>{escape(candidate_id)}</code></dd></div>
+              <div><dt>Candidate</dt><dd><code id="promotion-selected-candidate">{escape(candidate_id)}</code></dd></div>
               <div><dt>Objective</dt><dd>{escape(objective)}</dd></div>
               <div><dt>Available</dt><dd>{escape(str(available))}</dd></div>
               <div><dt>Automatic</dt><dd>{escape(str(automatic))}</dd></div>
@@ -1010,18 +1083,21 @@ def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str,
           <article class="promotion-card gate-card">
             <p class="eyebrow">Required gate</p>
             <h3><code>{escape(gate)}</code></h3>
-            <p>Promotion remains disabled in the static cockpit. Use the CLI gate after repeated confirmation approves the candidate.</p>
-            <button disabled>Promote disabled</button>
+            <p>{escape(gate_copy)}</p>
+            <button type="button" class="primary-action"
+              data-controller-action="promote"
+              data-controller-endpoint="/api/controller/promote"
+              data-controller-command="{escape(promote_command)}"{disabled}>Promote Selected Candidate</button>
           </article>
         </div>
         <div class="command-stack">
           <article>
             <strong>Preview profile promotion</strong>
-            <code>uv run vllm-optimizer promote-preview --ranking ARTIFACT_DIR/live/ranking.json --out ARTIFACT_DIR/promotion-preview.json</code>
+            <code>uv run vllm-optimizer promote-preview --ranking ARTIFACT_DIR/live/ranking.json --candidate-id {escape(candidate_id)} --out ARTIFACT_DIR/promotion-preview.json</code>
           </article>
           <article>
             <strong>Promote after confirmation</strong>
-            <code>uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT {escape(gate)}</code>
+            <code>uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --candidate-id {escape(candidate_id)} --profile-out PROFILE_OUT --summary-out SUMMARY_OUT --force</code>
           </article>
         </div>"""
     return f"""
@@ -1031,7 +1107,7 @@ def render_promotion_workflow(report: dict[str, Any] | None, manifest: dict[str,
           <p class="eyebrow">Promotion</p>
           <h2>Promotion workflow</h2>
         </div>
-        <p>Profile promotion is visible for traceability, gated by explicit CLI flags, and never automatic from this static cockpit.</p>
+        <p>Profile promotion is gated by explicit opt-in and writes only the selected candidate profile artifact.</p>
       </div>
       {content}
     </section>"""
@@ -1078,9 +1154,6 @@ def render_operation_result_panel() -> str:
         </div>
         <button type="button" id="operation-cancel" disabled>Cancel</button>
       </div>
-      <div class="progress-track" aria-label="Operation progress">
-        <div id="operation-progress-bar" class="progress-bar" style="width:0%"></div>
-      </div>
       <div class="explain-grid">
         <article>
           <strong>What happened?</strong>
@@ -1112,8 +1185,8 @@ def render_end_to_end_flow_map(status: dict[str, Any] | None, report: dict[str, 
             title = "Promotion gate"
             detail = "Writes a profile only after explicit opt-in."
         elif action == "report":
-            title = "Load Report"
-            detail = "Builds the canonical ranking and recommendation artifact."
+            title = "Generate & Review Report"
+            detail = "Builds and opens the canonical ranking and recommendation artifact."
         elif action == "run":
             title = "Start Optimization"
             detail = "Runs plan, preview, and the live sweep through real gates."
@@ -1442,7 +1515,7 @@ def controller_commands(manifest: dict[str, Any] | None) -> dict[str, str]:
         "run": "uv run vllm-optimizer cockpit-run --sweep SWEEP_JSON --config config/local.gx10.json --out-dir ARTIFACT_DIR --confirm-live-run",
         "report": "uv run vllm-optimizer optimize-workload --mode report --sweep SWEEP_JSON --out ARTIFACT_DIR",
         "confirm": "uv run vllm-optimizer optimize-workload --mode confirm --sweep SWEEP_JSON --out ARTIFACT_DIR",
-        "promote": "uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT --allow-promotion",
+        "promote": "uv run vllm-optimizer promote-confirmed-profile --confirmation-report ARTIFACT_DIR/confirmation/confirmation-report.json --ranking ARTIFACT_DIR/live/ranking.json --profile-out PROFILE_OUT --summary-out SUMMARY_OUT --force",
     }
     return {**defaults, **commands}
 
@@ -1475,16 +1548,16 @@ WORKFLOW_STEPS = [
         "description": "Execute the selected sweep and write progress artifacts for reporting.",
         "group_hint": "Run the selected tuning family and watch status artifacts update.",
         "facts": ["Can touch GX10", "Requires confirmation", "Cancelable from server jobs"],
-        "next": "Load Report will be enabled after results exist.",
+        "next": "Generate & Review Report will be enabled after results exist.",
         "what_next": "When execution finishes, generate or load the canonical report.",
     },
     {
         "action": "report",
-        "label": "Load Report",
-        "headline": "Load Report",
-        "description": "Rank completed results and explain the current recommendation.",
+        "label": "Generate & Review Report",
+        "headline": "Generate & Review Report",
+        "description": "Rank completed results, write the canonical report, and open the report view.",
         "group_hint": "Turn run artifacts into a decision-ready report.",
-        "facts": ["Artifact only", "Shows winner", "Explains failures"],
+        "facts": ["Artifact only", "Shows winner", "Report opens automatically after generation"],
         "next": "Confirm Candidate will be enabled if a candidate is recommendable.",
         "what_next": "Use confirmation before trusting a winner enough to promote it.",
     },
@@ -1922,6 +1995,14 @@ def _candidate_metric_rows(candidates: Any) -> list[dict[str, Any]]:
             }
         )
     return sorted(rows, key=lambda row: (not row["recommendable"], row["candidate_id"]))
+
+
+def promotion_objective(value: str) -> str:
+    if value == "performance":
+        return "throughput"
+    if value in {"stability", "tool_use", "no objective"}:
+        return "balanced"
+    return value or "balanced"
 
 
 def report_outcome_summary(report: dict[str, Any] | None) -> dict[str, Any]:
@@ -2448,6 +2529,44 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .decision-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .decision-grid article { display: grid; gap: 8px; align-content: start; border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(15,29,47,.44); padding: 12px; }
 .decision-grid code { display: block; overflow-wrap: anywhere; }
+.candidate-selector {
+  border-color: rgba(69,242,155,.28);
+  background:
+    radial-gradient(circle at 8% 0, rgba(69,242,155,.12), transparent 32%),
+    rgba(3,8,16,.42);
+}
+.candidate-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.candidate-choice {
+  width: 100%;
+  min-height: 118px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  text-align: left;
+  padding: 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(141,221,255,.16);
+  background: rgba(15,29,47,.54);
+}
+.candidate-choice.active {
+  border-color: rgba(69,242,155,.72);
+  background: rgba(69,242,155,.10);
+  box-shadow: inset 0 0 0 1px rgba(69,242,155,.16), 0 0 28px rgba(69,242,155,.08);
+}
+.candidate-choice span {
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.candidate-choice small,
+.candidate-gate-note {
+  color: var(--muted);
+}
 .metric-visuals { display: grid; gap: 12px; margin-bottom: 16px; }
 .metric-row { border: 1px solid rgba(55,216,255,.12); border-radius: 8px; padding: 12px; background: rgba(15,29,47,.58); }
 .metric-row-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
@@ -2776,9 +2895,6 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
   background: rgba(255,255,255,.07);
   font-size: 12px;
 }
-.recipe-action {
-  margin-top: 16px;
-}
 .loaded-run-controls {
   display: grid;
   gap: 10px;
@@ -3056,7 +3172,11 @@ const state = {
   family: 'all',
   query: '',
   currentJobId: null,
-  pollTimer: null
+  pollTimer: null,
+  selectedObjective: 'balanced',
+  selectedCandidateId: '',
+  selectedCandidateObjective: '',
+  reportAutoOpened: false
 };
 
 function setActiveTab(tab) {
@@ -3188,6 +3308,8 @@ function selectTuningArea(button) {
 function selectObjectiveTarget(button) {
   const label = button.dataset.targetLabel || 'Balanced';
   const description = button.dataset.targetDescription || 'Blend throughput, latency, failure rate, and safety.';
+  const target = button.dataset.objectiveTarget || 'balanced';
+  state.selectedObjective = objectiveForTarget(target);
   document.querySelectorAll('[data-objective-target]').forEach((item) => {
     item.classList.toggle('active', item === button);
   });
@@ -3197,6 +3319,51 @@ function selectObjectiveTarget(button) {
   if (labelTarget) labelTarget.textContent = label;
   if (descriptionTarget) descriptionTarget.textContent = description;
   if (flowTarget) flowTarget.textContent = label;
+}
+
+function objectiveForTarget(target) {
+  if (target === 'performance') return 'throughput';
+  if (target === 'stability' || target === 'tool_use') return 'balanced';
+  return target || 'balanced';
+}
+
+function selectedCandidateId() {
+  const active = document.querySelector('[data-candidate-select].active');
+  const holder = document.querySelector('[data-selected-candidate-id]');
+  return state.selectedCandidateId || (active ? active.dataset.candidateId : '') || (holder ? holder.dataset.selectedCandidateId : '');
+}
+
+function selectedPromotionObjective() {
+  const active = document.querySelector('[data-candidate-select].active');
+  const holder = document.querySelector('[data-selected-objective]');
+  return state.selectedCandidateObjective || (active ? active.dataset.candidateObjective : '') || (holder ? holder.dataset.selectedObjective : '') || state.selectedObjective || 'balanced';
+}
+
+function selectPromotionCandidate(button) {
+  const candidateId = button.dataset.candidateId || button.dataset.candidateSelect || '';
+  const objective = button.dataset.candidateObjective || selectedPromotionObjective();
+  if (!candidateId) return;
+  state.selectedCandidateId = candidateId;
+  state.selectedCandidateObjective = objective;
+  document.querySelectorAll('[data-candidate-select]').forEach((item) => {
+    const active = item.dataset.candidateId === candidateId;
+    item.classList.toggle('active', active);
+    const label = item.querySelector('span');
+    if (label) label.textContent = active ? 'Selected' : 'Candidate';
+  });
+  document.querySelectorAll('[data-selected-candidate-id]').forEach((item) => {
+    item.dataset.selectedCandidateId = candidateId;
+    item.dataset.selectedObjective = objective;
+  });
+  document.querySelectorAll('#selected-candidate-id').forEach((item) => {
+    item.textContent = candidateId;
+  });
+  document.querySelectorAll('#selected-candidate-objective').forEach((item) => {
+    item.textContent = objective;
+  });
+  document.querySelectorAll('#promotion-selected-candidate').forEach((item) => {
+    item.textContent = candidateId;
+  });
 }
 
 function selectProfileCard(button) {
@@ -3252,6 +3419,19 @@ async function runControllerAction(button) {
       return;
     }
     payload.confirm_live_run = true;
+  }
+  if (action === 'promote') {
+    payload.candidate_id = selectedCandidateId();
+    payload.objective = selectedPromotionObjective();
+    if (!payload.candidate_id) {
+      if (feedback) feedback.textContent = 'Select a candidate before promotion.';
+      return;
+    }
+    const confirmed = window.confirm('Promotion writes a selected-candidate profile artifact under the cockpit output directory. Continue?');
+    if (!confirmed) {
+      if (feedback) feedback.textContent = 'Promotion cancelled before writing a profile artifact.';
+      return;
+    }
   }
   renderOperationResult({
     action,
@@ -3328,10 +3508,21 @@ function renderOperationResult(job) {
   if (liveSummary) liveSummary.textContent = summary.what_happened || 'Operation state updated.';
   updatePipelineFromJob(job);
   updateNextActionFromJob(job);
+  autoOpenReportAfterCompletion(job);
   if (cancel) {
     cancel.disabled = !job.job_id || !['running', 'cancel-requested'].includes(job.status);
     cancel.dataset.jobId = job.job_id || '';
   }
+}
+
+function autoOpenReportAfterCompletion(job) {
+  if (state.reportAutoOpened) return;
+  if (job.action !== 'report' || job.status !== 'completed') return;
+  state.reportAutoOpened = true;
+  safeSessionSet('cockpit-tab-after-reload', 'reports');
+  const feedback = document.getElementById('controller-feedback');
+  if (feedback) feedback.textContent = 'Report generated. Opening report...';
+  window.setTimeout(() => window.location.reload(), 120);
 }
 
 function updatePipelineFromJob(job) {
@@ -3404,13 +3595,13 @@ function updateNextActionFromJob(job) {
   const facts = document.getElementById('next-action-facts');
   const button = document.getElementById('next-action-button');
   const reportCommand = commandForAction('report');
-  if (headline) headline.textContent = 'Load Report';
+  if (headline) headline.textContent = 'Generate & Review Report';
   if (description) description.textContent = 'Run artifacts are ready. Generate the report so the cockpit can rank candidates and explain the recommendation.';
   if (facts) {
-    facts.innerHTML = '<li>Uses completed artifacts</li><li>No remote execution</li><li>Explains the winner</li>';
+    facts.innerHTML = '<li>Uses completed artifacts</li><li>No remote execution</li><li>Opens the report automatically</li>';
   }
   if (button) {
-    configureControllerButton(button, 'report', '/api/controller/report', reportCommand, 'Load Report');
+    configureControllerButton(button, 'report', '/api/controller/report', reportCommand, 'Generate & Review Report');
   }
 }
 
@@ -3610,7 +3801,7 @@ function runTabJumpButton(button) {
 function pipelineCaptionForCompleted(completed) {
   if (completed.includes('confirm')) return 'Confirmation is complete. Promotion remains the next manual gate.';
   if (completed.includes('report')) return 'Report is available. Review the recommendation before confirmation or promotion.';
-  if (completed.includes('run')) return 'Run complete. Load Report is the next local step.';
+  if (completed.includes('run')) return 'Run complete. Generate & Review Report is the next local step.';
   if (completed.includes('preview')) return 'Preview complete. The run is ready for the live execution gate.';
   return 'Plan complete. Preview safety before execution.';
 }
@@ -3670,6 +3861,11 @@ document.addEventListener('click', (event) => {
   const controllerButton = event.target.closest('[data-controller-command]');
   if (controllerButton) {
     runControllerAction(controllerButton);
+    return;
+  }
+  const candidateButton = event.target.closest('[data-candidate-select]');
+  if (candidateButton) {
+    selectPromotionCandidate(candidateButton);
     return;
   }
   const tabButton = event.target.closest('[data-tab-jump]');

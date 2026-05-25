@@ -16,7 +16,7 @@ class CockpitLaunchError(ValueError):
 
 @dataclass(frozen=True)
 class CockpitLaunchRequest:
-    sweep_path: Path = Path("config/sweeps/qwen-small-sweep.json")
+    sweep_path: Path = Path("config/sweeps/qwen-concurrency-saturation-c8.json")
     config_path: Path | None = None
     config_root: Path = Path("config")
     artifacts_root: Path = Path("artifacts")
@@ -28,6 +28,7 @@ class CockpitLaunchRequest:
     host: str = "127.0.0.1"
     port: int = 8787
     allow_risky_session_flags: bool = False
+    allow_promotion: bool = False
     timeout_seconds: int = 1200
     continue_on_failure: bool = False
 
@@ -69,6 +70,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
         run_index_path=request.run_index_path,
         profile_paths=profile_paths,
         allow_risky_session_flags=request.allow_risky_session_flags,
+        allow_promotion=request.allow_promotion,
         timeout_seconds=request.timeout_seconds,
         continue_on_failure=request.continue_on_failure,
     )
@@ -84,6 +86,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
         "manifest_path": manifest_path.as_posix(),
         "run_index_path": request.run_index_path.as_posix(),
         "profile_paths": [path.as_posix() for path in profile_paths],
+        "allow_promotion": request.allow_promotion,
         "server_config": server_config,
     }
 

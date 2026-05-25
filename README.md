@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.53.2-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.54.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -133,7 +133,11 @@ The project is spec-driven with SpecKit and currently supports:
 - Loaded cockpit run history can be closed locally, keeping old artifacts on
   disk while revealing a fresh Start Optimization path for the next run.
 - Cockpit report actions remain recoverable after closing loaded history, so a
-  later completed run can surface `Load Report` and `Review Report` again.
+  later completed run can surface `Generate & Review Report` and open the
+  Reports view automatically.
+- The active cockpit can select a report candidate and exercise gated local
+  promotion when launched with `--allow-promotion`; the default launcher now
+  starts from the high-throughput Qwen C8 concurrency sweep.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -239,9 +243,10 @@ uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contra
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 uv run vllm-optimizer run-browser --artifacts-root artifacts --out artifacts/catalog/run-index.json --html-out artifacts/catalog/run-index.html
 uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-prefix-prefill-tool-json.json --out-dir artifacts/controller/qwen-prefix-prefill-tool-json --result-out artifacts/controller/qwen-prefix-prefill-tool-json/controller-result.json
-uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-live --confirm-live-run
+uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-concurrency-saturation-c8.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-c8-live --confirm-live-run
 uv run vllm-optimizer cockpit-launch
-uv run vllm-optimizer cockpit-server --sweep config/sweeps/qwen-small-sweep.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-small-sweep-active --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --run-index artifacts/catalog/run-index.json
+uv run vllm-optimizer cockpit-launch --allow-promotion
+uv run vllm-optimizer cockpit-server --sweep config/sweeps/qwen-concurrency-saturation-c8.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-c8-active --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --run-index artifacts/catalog/run-index.json --allow-promotion
 uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --profile config/profiles/qwen3-coder-next-awq-recommended.json --out artifacts/cockpit/index.html
 ```
 
@@ -315,9 +320,11 @@ non-interruptible step, the cockpit says that honestly instead of pretending it
 stopped instantly.
 
 `cockpit-launch` is the simplest way to start the cockpit. With no arguments it
-generates the knob catalog, selected sweep control manifest, and run index, then
-starts the active cockpit at `http://127.0.0.1:8787`. Optional flags can override
-the sweep, config, output directory, host, and port.
+uses `config/sweeps/qwen-concurrency-saturation-c8.json`, generates the knob
+catalog, selected sweep control manifest, and run index, then starts the active
+cockpit at `http://127.0.0.1:8787`. Optional flags can override the sweep,
+config, output directory, host, and port. Add `--allow-promotion` only when you
+want to test the local selected-candidate promotion write path.
 
 `web-cockpit` is the combined web interface. It now opens as an objective
 command center: choose the model/profile, choose the optimization target,
@@ -338,18 +345,21 @@ calls.
 Reports read as a decision story: baseline, winner, improvement, risk, and the
 next safe action. Starting a new optimization from a report-loaded dashboard
 clears the previous progress and completed-stage state immediately, then
-advances to `Load Report` when the new run completes. After report generation,
-`Review Report` opens the advanced Reports view so the freshly generated
-artifact is visible. The runtime cockpit remains dependency-free; Playwright is
-pinned as a dev-only UI QA dependency, installed with `npm ci`, and checked
-with `npm audit`.
+advances to `Generate & Review Report` when the new run completes. Report
+generation opens the advanced Reports view automatically so the freshly
+generated artifact is visible. Reports also expose selectable candidate cards;
+when the cockpit was launched with `--allow-promotion`, the Promotion action
+writes the selected candidate profile artifact under the cockpit output
+directory. The runtime cockpit remains dependency-free; Playwright is pinned as
+a dev-only UI QA dependency, installed with `npm ci`, and checked with
+`npm audit`.
 
 If the cockpit opens on an older loaded report, use `Close Loaded Run` to hide
 that history in the current browser session and return the dashboard to a fresh
 ready state. This does not delete report, status, or run artifacts; it only
 prevents an old run from blocking the next `Start Optimization` action. Future
-run results can still restore `Load Report` and `Review Report` actions in that
-same browser session.
+run results can still restore `Generate & Review Report` actions in that same
+browser session.
 
 Smoke serve:
 

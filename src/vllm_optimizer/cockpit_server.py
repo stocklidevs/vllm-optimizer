@@ -13,6 +13,7 @@ from typing import Any, Callable
 from .artifacts import write_json
 from .cockpit_controller import CockpitPreviewRequest, CockpitRunRequest, run_cockpit_live, run_cockpit_preview
 from .optimizer_pipeline import OptimizerPipelineRequest, run_optimizer_pipeline
+from .promotion import write_promoted_profile
 from .web_cockpit import read_profile_summaries, render_web_cockpit
 
 
@@ -32,6 +33,7 @@ class CockpitServerConfig:
     run_index_path: Path | None = None
     profile_paths: tuple[Path, ...] = ()
     allow_risky_session_flags: bool = False
+    allow_promotion: bool = False
     timeout_seconds: int = 1200
     continue_on_failure: bool = False
 
@@ -202,7 +204,59 @@ def handle_controller_action(
                 allow_risky_session_flags=config.allow_risky_session_flags,
             )
         )
+    if action == "promote":
+        if not config.allow_promotion:
+            raise CockpitServerError("promote action requires allow_promotion / --allow-promotion")
+        candidate_id = payload.get("candidate_id")
+        if not isinstance(candidate_id, str) or not candidate_id.strip():
+            candidate_id = None
+        objective = _promotion_objective(payload.get("objective"))
+        profile_id = str(payload.get("profile_id") or "cockpit-selected-candidate")
+        promotion_dir = config.out_dir / "promotion"
+        profile_out = promotion_dir / "selected-candidate-profile.json"
+        summary_out = promotion_dir / "promotion-summary.md"
+        promoted = write_promoted_profile(
+            ranking_path=config.out_dir / "live" / "ranking.json",
+            profile_out=profile_out,
+            summary_out=summary_out,
+            objective=objective,
+            profile_id=profile_id,
+            force=True,
+            candidate_id=candidate_id,
+        )
+        selected = str(promoted.get("preview", {}).get("candidate_id") or candidate_id or "")
+        result = {
+            "action": "promote",
+            "status": "completed",
+            "remote_execution": False,
+            "promotion": True,
+            "candidate_id": selected,
+            "objective": objective,
+            "artifacts": {
+                "profile_json": profile_out.as_posix(),
+                "summary_markdown": summary_out.as_posix(),
+            },
+            "pipeline_summary": {
+                "mode": "promote",
+                "completed_stages": ["plan", "preview", "run", "report", "promote"],
+                "artifacts": {
+                    "profile_json": profile_out.as_posix(),
+                    "summary_markdown": summary_out.as_posix(),
+                },
+            },
+        }
+        write_json(config.out_dir / "controller-result.json", result)
+        return result
     raise CockpitServerError(f"unsupported controller action: {action}")
+
+
+def _promotion_objective(value: Any) -> str:
+    objective = str(value or "balanced")
+    if objective == "performance":
+        return "throughput"
+    if objective in {"stability", "tool_use"}:
+        return "balanced"
+    return objective
 
 
 def _job_with_runtime_state(job: dict[str, Any]) -> dict[str, Any]:
@@ -261,13 +315,20 @@ def plain_summary(action: str, status: str, result: dict[str, Any] | None = None
         return {
             "what_happened": "The run finished.",
             "what_it_means": "The controller completed the remote-capable run request and wrote artifacts.",
-            "next_step": "Click Load Report to rank candidates and explain the recommendation.",
+            "next_step": "Click Generate & Review Report to rank candidates and open the report.",
         }
     if action == "report":
         return {
             "what_happened": "The report is ready.",
             "what_it_means": "The cockpit generated local report artifacts from the completed run.",
             "next_step": "Review the report, then confirm the candidate if it looks good.",
+        }
+    if action == "promote":
+        candidate = str(result.get("candidate_id") or "the selected candidate")
+        return {
+            "what_happened": f"Promotion profile written for {candidate}.",
+            "what_it_means": "The cockpit wrote a local profile artifact under the output directory using the explicit promotion gate.",
+            "next_step": "Review the promoted profile and summary before making it your default configuration.",
         }
     return {
         "what_happened": f"{action.title()} finished.",
@@ -376,6 +437,7 @@ def render_active_cockpit(config: CockpitServerConfig) -> str:
         report=report,
         run_index=run_index,
         profiles=profiles,
+        promotion_allowed=config.allow_promotion,
         sources={
             "catalog": _source(config.catalog_path),
             "manifest": _source(config.manifest_path),

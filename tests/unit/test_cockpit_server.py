@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vllm_optimizer.artifacts import read_json
+from vllm_optimizer.artifacts import read_json, write_json
 from vllm_optimizer.cockpit_server import (
     CockpitServerConfig,
     CockpitServerError,
@@ -87,6 +87,41 @@ def test_cockpit_server_report_action_writes_report_artifacts(tmp_path: Path) ->
     assert result["remote_execution"] is False
     assert result["pipeline_summary"]["mode"] == "report"
     assert result["artifacts"]["report_json"].endswith("report.json")
+
+
+def test_cockpit_server_promote_requires_promotion_gate(tmp_path: Path) -> None:
+    with pytest.raises(CockpitServerError, match="allow_promotion"):
+        handle_controller_action(
+            "promote",
+            {"candidate_id": "candidate-2", "objective": "balanced"},
+            CockpitServerConfig(
+                sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+                out_dir=tmp_path / "promote-gated",
+            ),
+        )
+
+
+def test_cockpit_server_promote_writes_selected_candidate_profile(tmp_path: Path) -> None:
+    out_dir = tmp_path / "promote-enabled"
+    _write_promotable_ranking(out_dir)
+
+    result = handle_controller_action(
+        "promote",
+        {"candidate_id": "candidate-2", "objective": "balanced"},
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            out_dir=out_dir,
+            allow_promotion=True,
+        ),
+    )
+
+    assert result["action"] == "promote"
+    assert result["status"] == "completed"
+    assert result["promotion"] is True
+    assert result["candidate_id"] == "candidate-2"
+    profile = read_json(Path(result["artifacts"]["profile_json"]))
+    assert profile["promotion"]["candidate_id"] == "candidate-2"
+    assert Path(result["artifacts"]["summary_markdown"]).exists()
 
 
 def test_active_cockpit_loads_generated_report_from_out_dir(tmp_path: Path) -> None:
@@ -195,3 +230,67 @@ def test_cockpit_job_store_cancel_marks_running_job() -> None:
     assert cancelled["status"] == "cancel-requested"
     assert cancelled["cancel_requested"] is True
     assert "Stop requested" in cancelled["plain_summary"]["what_happened"]
+
+
+def _write_promotable_ranking(out_dir: Path) -> Path:
+    live_dir = out_dir / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    plan_path = live_dir / "trial-plan.json"
+    write_json(
+        plan_path,
+        {
+            "serve_plan": {
+                "serve_command": [
+                    "vllm",
+                    "serve",
+                    "cyankiwi/Qwen3-Coder-Next-AWQ-4bit",
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "8001",
+                    "--served-model-name",
+                    "Qwen3-Coder-Next",
+                    "--max-model-len",
+                    "32768",
+                    "--gpu-memory-utilization",
+                    "0.90",
+                    "--enable-auto-tool-choice",
+                    "--tool-call-parser",
+                    "qwen3_coder",
+                    "--performance-mode",
+                    "interactivity",
+                ]
+            }
+        },
+    )
+    ranking_path = live_dir / "ranking.json"
+    write_json(
+        ranking_path,
+        {
+            "sweep_id": "server-promotion",
+            "objectives": {
+                "balanced": [
+                    {"candidate_id": "candidate-1", "rank": 1, "metrics": {"aggregate_tokens_per_second": 48.0}},
+                    {"candidate_id": "candidate-2", "rank": 2, "metrics": {"aggregate_tokens_per_second": 96.0}},
+                ]
+            },
+            "candidate_aggregates": [
+                {
+                    "candidate_id": "candidate-1",
+                    "success_count": 1,
+                    "source_trials": [
+                        {"trial_id": "trial-1", "status": "completed", "artifact_paths": {"plan": str(plan_path)}}
+                    ],
+                },
+                {
+                    "candidate_id": "candidate-2",
+                    "success_count": 1,
+                    "overrides": {"gpu_memory_utilization": 0.86, "max_model_len": 32768},
+                    "source_trials": [
+                        {"trial_id": "trial-2", "status": "completed", "artifact_paths": {"plan": str(plan_path)}}
+                    ],
+                },
+            ],
+        },
+    )
+    return ranking_path

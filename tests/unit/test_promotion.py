@@ -47,6 +47,51 @@ def test_build_promotion_preview_is_deterministic(tmp_path: Path) -> None:
     assert first == second
 
 
+def test_build_promotion_preview_can_select_specific_candidate(tmp_path: Path) -> None:
+    ranking = _write_ranking_fixture(tmp_path)
+    data = read_json(ranking)
+    data["objectives"]["balanced"].append(
+        {
+            "candidate_id": "qwen-scheduler-safe-c009-selected",
+            "rank": 2,
+            "metrics": {
+                "aggregate_tokens_per_second": 97.5,
+                "failure_count": 0,
+                "failure_rate": 0.0,
+                "mean_latency_ms": 720.0,
+                "success_count": 3,
+            },
+            "baseline_delta": {},
+        }
+    )
+    data["candidate_aggregates"].append(
+        {
+            "candidate_id": "qwen-scheduler-safe-c009-selected",
+            "success_count": 3,
+            "failure_count": 0,
+            "failure_rate": 0.0,
+            "overrides": {
+                "gpu_memory_utilization": 0.86,
+                "max_model_len": 32768,
+                "max_num_seqs": 16,
+            },
+            "source_trials": data["candidate_aggregates"][0]["source_trials"],
+        }
+    )
+    write_json(ranking, data)
+
+    preview = build_promotion_preview(
+        ranking,
+        "balanced",
+        "qwen3-coder-next-awq-selected",
+        candidate_id="qwen-scheduler-safe-c009-selected",
+    )
+
+    assert preview["candidate_id"] == "qwen-scheduler-safe-c009-selected"
+    assert preview["rank"] == 2
+    assert preview["proposed_profile"]["profile_id"] == "qwen3-coder-next-awq-selected"
+
+
 def test_write_promoted_profile_writes_profile_and_summary(tmp_path: Path) -> None:
     ranking_path = _write_ranking_fixture(tmp_path)
     profile_out = tmp_path / "recommended.json"

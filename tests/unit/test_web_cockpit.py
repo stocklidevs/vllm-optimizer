@@ -201,7 +201,6 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     html = render_web_cockpit(catalog={"groups": []})
 
     assert "Operation Result" in html
-    assert 'id="operation-progress-bar"' in html
     assert 'id="pipeline-overall-progress-bar"' in html
     assert 'id="pipeline-overall-progress-label"' in html
     assert 'id="pipeline-caption"' in html
@@ -485,7 +484,7 @@ def test_web_cockpit_overview_explains_end_to_end_flow() -> None:
     assert 'data-pipeline-stage="run"' in html
     assert 'data-pipeline-stage="report"' in html
     assert "Start Optimization" in html
-    assert "Load Report" in html
+    assert "Generate & Review Report" in html
     assert "Confirm Candidate" in html
     assert "Promote Profile" in html
     assert "Run complete. Reporting can be generated automatically." in html
@@ -567,11 +566,74 @@ def test_web_cockpit_loaded_history_close_keeps_future_report_loading_available(
         report={"recommendation": {"status": "requires-confirmation", "candidate_id": "candidate-fast"}},
     )
 
-    assert "configureControllerButton(button, 'report', '/api/controller/report', reportCommand, 'Load Report')" in html
+    assert "configureControllerButton(button, 'report', '/api/controller/report', reportCommand, 'Generate & Review Report')" in html
     assert "configureControllerButton(nextButton, 'run', '/api/controller/run', runCommand, 'Start Optimization')" in html
     assert "button.classList.remove('hidden')" in html
     assert "event.target.closest('[data-controller-command]')" in html
     assert "event.target.closest('[data-tab-jump]')" in html
+
+
+def test_web_cockpit_one_click_report_review_and_single_main_action() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={
+            "stages": [
+                {"name": "run", "command_hint": "uv run vllm-optimizer optimize-workload --mode run"},
+                {"name": "report", "command_hint": "uv run vllm-optimizer optimize-workload --mode report"},
+            ]
+        },
+        status={"overall_status": "completed", "trial_counts": {"completed": 4, "total": 4}},
+    )
+
+    assert "Generate & Review Report" in html
+    assert "autoOpenReportAfterCompletion(job)" in html
+    assert "Report opens automatically after generation" in html
+    assert "recipe-action" not in html
+    assert html.count('id="next-action-button"') == 1
+
+
+def test_web_cockpit_renders_candidate_selection_and_gated_promotion_controls() -> None:
+    report = {
+        "recommendation": {
+            "status": "requires-confirmation",
+            "objective": "throughput",
+            "candidate_id": "candidate-fast",
+        },
+        "candidates": [
+            {
+                "candidate_id": "candidate-safe",
+                "metrics": {
+                    "aggregate_tokens_per_second": 49.0,
+                    "mean_latency_ms": 1000.0,
+                    "failure_rate": 0.0,
+                },
+            },
+            {
+                "candidate_id": "candidate-fast",
+                "metrics": {
+                    "aggregate_tokens_per_second": 99.0,
+                    "mean_latency_ms": 700.0,
+                    "failure_rate": 0.0,
+                },
+            },
+        ],
+    }
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        manifest={"promotion": {"required_gate": "--allow-promotion"}},
+        report=report,
+        promotion_allowed=True,
+    )
+
+    assert "Select Candidate" in html
+    assert 'data-candidate-select="candidate-fast"' in html
+    assert 'data-candidate-select="candidate-safe"' in html
+    assert 'data-selected-candidate-id="candidate-fast"' in html
+    assert 'data-controller-action="promote"' in html
+    assert 'data-controller-endpoint="/api/controller/promote"' in html
+    assert "Promote Selected Candidate" in html
+    assert "function selectPromotionCandidate" in html
+    assert "payload.candidate_id = selectedCandidateId()" in html
 
 
 def test_web_cockpit_tab_jump_false_does_not_reload() -> None:
@@ -751,7 +813,8 @@ def test_web_cockpit_renders_promotion_workflow() -> None:
     assert "--allow-promotion" in html
     assert "promote-preview" in html
     assert "promote-confirmed-profile" in html
-    assert "Promote disabled" in html
+    assert "Promote Selected Candidate" in html
+    assert "Restart the cockpit with --allow-promotion" in html
 
 
 def test_web_cockpit_renders_promotion_empty_state() -> None:

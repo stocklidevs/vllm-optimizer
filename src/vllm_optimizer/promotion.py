@@ -21,9 +21,10 @@ def build_promotion_preview(
     ranking_path: Path,
     objective: str = DEFAULT_OBJECTIVE,
     profile_id: str = DEFAULT_PROFILE_ID,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     ranking = read_json(ranking_path)
-    selected = select_ranked_candidate(ranking, objective)
+    selected = select_ranked_candidate(ranking, objective, candidate_id)
     aggregate = find_candidate_aggregate(ranking, selected["candidate_id"])
     source_trials = aggregate.get("source_trials")
     if not isinstance(source_trials, list) or not source_trials:
@@ -67,13 +68,14 @@ def write_promoted_profile(
     objective: str = DEFAULT_OBJECTIVE,
     profile_id: str = DEFAULT_PROFILE_ID,
     force: bool = False,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     existing = [path for path in (profile_out, summary_out) if path.exists()]
     if existing and not force:
         names = ", ".join(str(path) for path in existing)
         raise PromotionError(f"output path already exists: {names}")
 
-    preview = build_promotion_preview(ranking_path, objective, profile_id)
+    preview = build_promotion_preview(ranking_path, objective, profile_id, candidate_id=candidate_id)
     profile = {
         **preview["proposed_profile"],
         "promotion": {
@@ -103,6 +105,7 @@ def write_confirmed_promoted_profile(
     profile_id: str = DEFAULT_PROFILE_ID,
     expected_recommended_label: str | None = None,
     force: bool = False,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     report = read_json(confirmation_report_path)
     decision = report.get("decision")
@@ -126,7 +129,7 @@ def write_confirmed_promoted_profile(
         names = ", ".join(str(path) for path in existing)
         raise PromotionError(f"output path already exists: {names}")
 
-    preview = build_promotion_preview(ranking_path, objective, profile_id)
+    preview = build_promotion_preview(ranking_path, objective, profile_id, candidate_id=candidate_id)
     profile = {
         **preview["proposed_profile"],
         "promotion": {
@@ -150,7 +153,11 @@ def write_confirmed_promoted_profile(
     }
 
 
-def select_ranked_candidate(ranking: dict[str, Any], objective: str) -> dict[str, Any]:
+def select_ranked_candidate(
+    ranking: dict[str, Any],
+    objective: str,
+    candidate_id: str | None = None,
+) -> dict[str, Any]:
     objectives = ranking.get("objectives")
     if not isinstance(objectives, dict) or objective not in objectives:
         raise PromotionError(f"objective {objective!r} is not present in ranking")
@@ -158,8 +165,19 @@ def select_ranked_candidate(ranking: dict[str, Any], objective: str) -> dict[str
     if not isinstance(ranked, list) or not ranked:
         raise PromotionError(f"objective {objective!r} has no ranked candidates")
     selected = ranked[0]
+    if candidate_id is not None:
+        selected = next(
+            (
+                row
+                for row in ranked
+                if isinstance(row, dict) and row.get("candidate_id") == candidate_id
+            ),
+            None,
+        )
+        if selected is None:
+            raise PromotionError(f"candidate {candidate_id!r} is not ranked for objective {objective!r}")
     if not isinstance(selected, dict) or not isinstance(selected.get("candidate_id"), str):
-        raise PromotionError(f"objective {objective!r} top candidate is invalid")
+        raise PromotionError(f"objective {objective!r} candidate is invalid")
     return selected
 
 
