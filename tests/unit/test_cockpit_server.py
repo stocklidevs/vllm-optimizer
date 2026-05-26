@@ -262,6 +262,63 @@ def test_cockpit_job_store_reports_running_heartbeat() -> None:
     assert "live optimization is running" in running["plain_summary"]["what_happened"].lower()
 
 
+def test_cockpit_job_store_persists_failed_job_with_diagnostics(tmp_path: Path) -> None:
+    store = CockpitJobStore()
+    out_dir = tmp_path / "failed-job"
+
+    def failing_action(_action, _payload, _config):
+        raise RuntimeError("no rankable sweep trials")
+
+    job = store.start(
+        "run",
+        {"confirm_live_run": True},
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            config_path=Path("config/gx10.example.json"),
+            out_dir=out_dir,
+        ),
+        action_runner=failing_action,
+    )
+
+    result = store.wait(job["job_id"], timeout_seconds=5)
+
+    assert result["status"] == "failed"
+    assert "diagnostics" in result
+    assert "No successful trial" in result["diagnostics"]["likely_cause"]
+    assert "live/results.jsonl" in result["diagnostics"]["artifacts"]["results"]
+    persisted = read_json(out_dir / "controller-last-job.json")
+    assert persisted["status"] == "failed"
+    assert persisted["plain_summary"]["next_step"] == result["plain_summary"]["next_step"]
+
+
+def test_cockpit_job_store_recent_reads_persisted_failure(tmp_path: Path) -> None:
+    out_dir = tmp_path / "recent-failure"
+    write_json(
+        out_dir / "controller-last-job.json",
+        {
+            "job_id": "stored-failure",
+            "action": "run",
+            "status": "failed",
+            "progress_percent": 100,
+            "plain_summary": {
+                "what_happened": "Run failed.",
+                "what_it_means": "The GX10 run did not produce rankable results.",
+                "next_step": "Open the failure detail.",
+            },
+        },
+    )
+
+    recent = CockpitJobStore().recent(
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            out_dir=out_dir,
+        )
+    )
+
+    assert recent["job_id"] == "stored-failure"
+    assert recent["status"] == "failed"
+
+
 def test_cockpit_job_store_cancel_marks_running_job() -> None:
     store = CockpitJobStore()
 

@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/067-stale-sweep-artifact-guard/plan.md
+specs/068-cockpit-failure-diagnostics/plan.md
 <!-- SPECKIT END -->

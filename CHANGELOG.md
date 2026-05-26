@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.54.2 - 2026-05-26
+
+- Added persisted active cockpit failure diagnostics in
+  `controller-last-job.json` and `controller-failure.json`.
+- Added recent-job recovery so page refreshes can restore failed/running
+  cockpit operation details from the server.
+- Upgraded the operation panel to render likely cause, next steps, artifact
+  paths, and failed trial reasons instead of only showing "Failed".
+
 ## 0.54.1 - 2026-05-25
 
 - Fixed stale sweep artifact reuse in `optimize-workload --mode report` so a

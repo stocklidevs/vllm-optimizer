@@ -1,6 +1,6 @@
 [project]
 name = "vllm-optimizer"
-version = "0.54.1"
+version = "0.54.2"
 description = "Deterministic vLLM optimization lab with dry-run remote safety."
 readme = "README.md"
 requires-python = ">=3.11"

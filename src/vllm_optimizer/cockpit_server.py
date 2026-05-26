@@ -10,7 +10,7 @@ from pathlib import Path
 from time import monotonic
 from typing import Any, Callable
 
-from .artifacts import write_json
+from .artifacts import read_json, read_jsonl, write_json
 from .cockpit_controller import CockpitPreviewRequest, CockpitRunRequest, run_cockpit_live, run_cockpit_preview
 from .optimizer_pipeline import OptimizerPipelineRequest, run_optimizer_pipeline
 from .promotion import write_promoted_profile
@@ -45,6 +45,7 @@ ActionRunner = Callable[[str, dict[str, Any], CockpitServerConfig], dict[str, An
 class CockpitJobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, dict[str, Any]] = {}
+        self._last_job_id: str | None = None
         self._lock = threading.Lock()
 
     def start(
@@ -69,6 +70,9 @@ class CockpitJobStore:
         }
         with self._lock:
             self._jobs[job_id] = job
+            self._last_job_id = job_id
+            snapshot = _job_with_runtime_state(job)
+        _persist_job(config, snapshot)
         thread = threading.Thread(
             target=self._run_job,
             args=(job_id, action, payload, config, action_runner or handle_controller_action),
@@ -83,6 +87,15 @@ class CockpitJobStore:
                 raise CockpitServerError(f"unknown job: {job_id}")
             return _job_with_runtime_state(self._jobs[job_id])
 
+    def recent(self, config: CockpitServerConfig) -> dict[str, Any]:
+        with self._lock:
+            if self._last_job_id and self._last_job_id in self._jobs:
+                return _job_with_runtime_state(self._jobs[self._last_job_id])
+        path = _last_job_path(config)
+        if not path.exists():
+            raise CockpitServerError("no recent cockpit job")
+        return read_json(path)
+
     def wait(self, job_id: str, timeout_seconds: float) -> dict[str, Any]:
         deadline = monotonic() + timeout_seconds
         while monotonic() < deadline:
@@ -92,7 +105,7 @@ class CockpitJobStore:
             threading.Event().wait(0.01)
         return self.get(job_id)
 
-    def cancel(self, job_id: str) -> dict[str, Any]:
+    def cancel(self, job_id: str, config: CockpitServerConfig | None = None) -> dict[str, Any]:
         with self._lock:
             if job_id not in self._jobs:
                 raise CockpitServerError(f"unknown job: {job_id}")
@@ -103,7 +116,10 @@ class CockpitJobStore:
             job["status"] = "cancel-requested"
             job["progress_percent"] = max(int(job["progress_percent"]), 10)
             job["plain_summary"] = plain_summary(job["action"], "cancel-requested")
-            return dict(job)
+            snapshot = _job_with_runtime_state(job)
+        if config is not None:
+            _persist_job(config, snapshot)
+        return snapshot
 
     def _run_job(
         self,
@@ -122,18 +138,26 @@ class CockpitJobStore:
                     job["progress_percent"] = max(int(job["progress_percent"]), 90)
                     job["result"] = result
                     job["plain_summary"] = plain_summary(action, "cancel-requested")
+                    snapshot = _job_with_runtime_state(job)
+                    _persist_job(config, snapshot)
                     return
                 job["status"] = "completed"
                 job["progress_percent"] = 100
                 job["result"] = result
                 job["plain_summary"] = plain_summary(action, "completed", result)
+                snapshot = _job_with_runtime_state(job)
+            _persist_job(config, snapshot)
         except Exception as exc:  # pragma: no cover - defensive job boundary
+            diagnostics = failure_diagnostics(action, exc, config)
             with self._lock:
                 job = self._jobs[job_id]
                 job["status"] = "failed"
                 job["progress_percent"] = 100
                 job["error"] = str(exc)
-                job["plain_summary"] = plain_summary(action, "failed", {"error": str(exc)})
+                job["diagnostics"] = diagnostics
+                job["plain_summary"] = plain_summary(action, "failed", {"error": str(exc), "diagnostics": diagnostics})
+                snapshot = _job_with_runtime_state(job)
+            _persist_job(config, snapshot)
 
 
 def handle_controller_action(
@@ -271,6 +295,98 @@ def _job_with_runtime_state(job: dict[str, Any]) -> dict[str, Any]:
     return visible
 
 
+def _last_job_path(config: CockpitServerConfig) -> Path:
+    return config.out_dir / "controller-last-job.json"
+
+
+def _persist_job(config: CockpitServerConfig, job: dict[str, Any]) -> None:
+    write_json(_last_job_path(config), job)
+    if job.get("status") == "failed":
+        write_json(config.out_dir / "controller-failure.json", job)
+
+
+def failure_diagnostics(action: str, error: Exception, config: CockpitServerConfig) -> dict[str, Any]:
+    message = str(error) or error.__class__.__name__
+    artifacts = {
+        "pipeline_plan": (config.out_dir / "pipeline-plan.json").as_posix(),
+        "sweep_plan": (config.out_dir / "sweep-plan.json").as_posix(),
+        "results": (config.out_dir / "live" / "results.jsonl").as_posix(),
+        "ranking": (config.out_dir / "live" / "ranking.json").as_posix(),
+        "report": (config.out_dir / "report.json").as_posix(),
+        "failure_record": (config.out_dir / "controller-failure.json").as_posix(),
+    }
+    failed_trials = _failed_trial_context(config.out_dir / "live" / "results.jsonl")
+    lowered = message.lower()
+    if "no rankable sweep trials" in lowered:
+        likely_cause = "No successful trial was available to rank. The live sweep probably failed before any candidate produced benchmark metrics."
+        next_steps = [
+            "Open live/results.jsonl and inspect the first failed trial reason.",
+            "Check the GX10 vLLM serve startup logs for the failed trial.",
+            "Retry after fixing the remote serve/config issue, or run with continue-on-failure if you want later candidates to keep going.",
+        ]
+    elif "stale sweep artifacts" in lowered:
+        likely_cause = "The output directory contains artifacts from a different sweep."
+        next_steps = [
+            "Start a fresh optimization in a sweep-specific output directory.",
+            "Use Generate & Review Report only after the current sweep has matching live results.",
+        ]
+    elif "config_path" in lowered or "remote config" in lowered:
+        likely_cause = "The live run is missing the GX10 connection config."
+        next_steps = [
+            "Launch the cockpit with --config config/local.gx10.json.",
+            "Confirm the config file still points at the Tailscale SSH target.",
+        ]
+    elif "timeout" in lowered or "timed out" in lowered:
+        likely_cause = "A remote step timed out before the benchmark completed."
+        next_steps = [
+            "Check whether the GX10 is reachable over Tailscale SSH.",
+            "Inspect the trial server log artifact and increase the timeout if the model is still loading.",
+        ]
+    else:
+        likely_cause = "The controller hit an unexpected error while running the requested cockpit action."
+        next_steps = [
+            "Open the failure record and the latest trial artifacts.",
+            "Fix the reported error, then start a fresh optimization.",
+        ]
+    if failed_trials:
+        first_reason = str(failed_trials[0].get("failure_reason") or "").strip()
+        if first_reason:
+            next_steps.insert(0, f"First failed trial says: {first_reason}")
+    return {
+        "action": action,
+        "error": message,
+        "error_type": error.__class__.__name__,
+        "likely_cause": likely_cause,
+        "next_steps": next_steps,
+        "artifacts": artifacts,
+        "failed_trials": failed_trials,
+    }
+
+
+def _failed_trial_context(results_path: Path) -> list[dict[str, Any]]:
+    if not results_path.exists():
+        return []
+    try:
+        rows = read_jsonl(results_path)
+    except Exception:
+        return []
+    failed = []
+    for row in rows:
+        if row.get("status") != "failed" and not row.get("failure_reason"):
+            continue
+        failed.append(
+            {
+                "trial_id": row.get("trial_id"),
+                "candidate_id": row.get("candidate_id"),
+                "failure_reason": row.get("failure_reason") or "benchmark failure",
+                "artifact_paths": row.get("artifact_paths", {}),
+            }
+        )
+        if len(failed) >= 3:
+            break
+    return failed
+
+
 def plain_summary(action: str, status: str, result: dict[str, Any] | None = None) -> dict[str, str]:
     result = result or {}
     if status == "running":
@@ -293,6 +409,19 @@ def plain_summary(action: str, status: str, result: dict[str, Any] | None = None
             "next_step": "Wait for the job status to settle before starting another run.",
         }
     if status == "failed":
+        diagnostics = result.get("diagnostics")
+        if isinstance(diagnostics, dict):
+            next_steps = diagnostics.get("next_steps")
+            next_step = (
+                str(next_steps[0])
+                if isinstance(next_steps, list) and next_steps
+                else "Open the failure detail, fix the cause, then start a fresh optimization."
+            )
+            return {
+                "what_happened": f"{action.title()} failed.",
+                "what_it_means": str(diagnostics.get("likely_cause") or result.get("error") or "The controller reported an error."),
+                "next_step": next_step,
+            }
         return {
             "what_happened": f"{action.title()} did not finish.",
             "what_it_means": str(result.get("error") or "The controller reported an error."),
@@ -362,6 +491,12 @@ def build_handler(
             if self.path == "/api/health":
                 self._send_json({"status": "ok"})
                 return
+            if self.path == "/api/jobs/recent":
+                try:
+                    self._send_json(jobs.recent(config))
+                except CockpitServerError as exc:
+                    self._send_json({"status": "error", "error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
             job_prefix = "/api/jobs/"
             if self.path.startswith(job_prefix):
                 job_id = self.path.removeprefix(job_prefix)
@@ -378,7 +513,7 @@ def build_handler(
                 if self.path.startswith("/api/jobs/") and self.path.endswith("/cancel"):
                     job_id = self.path.removeprefix("/api/jobs/").removesuffix("/cancel")
                     try:
-                        self._send_json(jobs.cancel(job_id))
+                        self._send_json(jobs.cancel(job_id, config))
                     except CockpitServerError as exc:
                         self._send_json({"status": "error", "error": str(exc)}, HTTPStatus.NOT_FOUND)
                     return

@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.1-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.54.2-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -141,6 +141,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Active cockpit and `optimize-workload` report mode validate sweep artifact
   provenance so a reused output directory cannot show an old small-sweep
   50 tok/s report as the current C8 performance result.
+- Active cockpit failures now persist a recent job/failure artifact and render
+  likely cause, next steps, relevant artifact paths, and failed trial reasons
+  instead of showing only a bare "Failed" state.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -363,6 +366,12 @@ another while reusing an output directory, old reports are hidden and report
 mode fails loudly with a stale-artifact message instead of presenting the wrong
 winner. Start a new optimization or use a sweep-specific `--out-dir` to produce
 fresh report artifacts.
+
+When an active cockpit job fails, the server writes `controller-last-job.json`
+and `controller-failure.json` under the cockpit output directory. The operation
+panel reloads recent failed or running job state from the server and shows a
+plain-language likely cause, first failed-trial reason when available, next
+steps, and the artifact paths to inspect.
 
 If the cockpit opens on an older loaded report, use `Close Loaded Run` to hide
 that history in the current browser session and return the dashboard to a fresh

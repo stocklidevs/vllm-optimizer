@@ -201,6 +201,7 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     html = render_web_cockpit(catalog={"groups": []})
 
     assert "Operation Result" in html
+    assert 'id="operation-diagnostics"' in html
     assert 'id="pipeline-overall-progress-bar"' in html
     assert 'id="pipeline-overall-progress-label"' in html
     assert 'id="pipeline-caption"' in html
@@ -216,6 +217,8 @@ def test_web_cockpit_renders_operation_result_progress_and_cancel() -> None:
     assert "function updateNextActionFromJob" in html
     assert "function resetWorkflowForNewOperation" in html
     assert "function setRunningOptimizationAction" in html
+    assert "function renderFailureDiagnostics" in html
+    assert "function loadRecentControllerJob" in html
     assert "Prior run state has been cleared for this run" in html
     assert "Progress and stages now reflect this run" in html
     assert "progressLabel.textContent = '8%'" in html

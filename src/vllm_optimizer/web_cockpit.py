@@ -1168,6 +1168,13 @@ def render_operation_result_panel() -> str:
           <p id="operation-next">Click Preview to check if it is safe after you make a plan.</p>
         </article>
       </div>
+      <div id="operation-diagnostics" class="failure-diagnostics hidden">
+        <strong>Failure detail</strong>
+        <p id="operation-failure-cause"></p>
+        <ul id="operation-failure-steps"></ul>
+        <dl id="operation-failure-artifacts"></dl>
+        <div id="operation-failed-trials"></div>
+      </div>
     </section>"""
 
 
@@ -2514,11 +2521,21 @@ button:disabled { border-color: rgba(141,164,187,.3); background: rgba(141,164,1
 .controller-feedback { min-height: 42px; margin: 10px 0 0; font-size: 13px; }
 .help-dot { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; border: 1px solid rgba(55,216,255,.32); color: var(--cyan); font-size: 12px; font-weight: 800; vertical-align: middle; }
 .operation-result { border: 1px solid rgba(73,242,161,.2); border-radius: 8px; background: rgba(73,242,161,.05); padding: 16px; margin: 16px 0; }
+.operation-result.failed { border-color: rgba(255,107,107,.38); background: rgba(255,107,107,.07); }
 .progress-track { height: 14px; border-radius: 999px; background: rgba(141,164,187,.16); overflow: hidden; margin-bottom: 14px; }
 .progress-bar { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--green)); transition: width .24s ease; }
 .explain-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .explain-grid article { border: 1px solid rgba(55,216,255,.14); border-radius: 8px; background: rgba(3,8,16,.32); padding: 12px; }
 .explain-grid strong { display: block; margin-bottom: 6px; }
+.failure-diagnostics { margin-top: 12px; border: 1px solid rgba(255,107,107,.28); border-radius: 8px; background: rgba(3,8,16,.48); padding: 12px; }
+.failure-diagnostics strong { display: block; margin-bottom: 6px; color: var(--red); }
+.failure-diagnostics ul { display: grid; gap: 6px; margin: 8px 0 12px 18px; padding: 0; }
+.failure-diagnostics dl { display: grid; grid-template-columns: minmax(120px, .45fr) minmax(0, 1fr); gap: 7px 10px; margin: 10px 0; }
+.failure-diagnostics dt { color: var(--amber); }
+.failure-diagnostics dd { margin: 0; overflow-wrap: anywhere; }
+.failure-diagnostics code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.failed-trial-list { display: grid; gap: 8px; margin-top: 10px; }
+.failed-trial-list article { border: 1px solid rgba(255,107,107,.18); border-radius: 8px; background: rgba(255,107,107,.06); padding: 9px; }
 .how-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .how-card { border: 1px solid rgba(55,216,255,.16); border-radius: 8px; background: rgba(3,8,16,.38); padding: 14px; }
 .how-card strong { display: block; margin-bottom: 8px; color: var(--ink); }
@@ -3480,6 +3497,7 @@ async function runControllerAction(button) {
 }
 
 function renderOperationResult(job) {
+  const panel = document.querySelector('.operation-result');
   const title = document.getElementById('operation-title');
   const bar = document.getElementById('operation-progress-bar');
   const what = document.getElementById('operation-what');
@@ -3496,6 +3514,7 @@ function renderOperationResult(job) {
   const actionLabel = formatActionLabel(job.action || 'action');
   const statusLabel = job.status || 'unknown';
   const elapsed = Number(job.elapsed_seconds || 0);
+  if (panel) panel.classList.toggle('failed', statusLabel === 'failed');
   if (title) title.textContent = actionLabel + ': ' + statusLabel;
   if (bar) bar.style.width = progress + '%';
   if (what) what.textContent = summary.what_happened || 'The controller updated this operation.';
@@ -3506,12 +3525,69 @@ function renderOperationResult(job) {
   if (liveElapsed) liveElapsed.textContent = elapsed ? elapsed + 's elapsed' : 'Just started';
   if (liveBar) liveBar.style.width = progress + '%';
   if (liveSummary) liveSummary.textContent = summary.what_happened || 'Operation state updated.';
+  renderFailureDiagnostics(job);
   updatePipelineFromJob(job);
   updateNextActionFromJob(job);
   autoOpenReportAfterCompletion(job);
   if (cancel) {
     cancel.disabled = !job.job_id || !['running', 'cancel-requested'].includes(job.status);
     cancel.dataset.jobId = job.job_id || '';
+  }
+}
+
+function renderFailureDiagnostics(job) {
+  const panel = document.getElementById('operation-diagnostics');
+  if (!panel) return;
+  const diagnostics = job.diagnostics || null;
+  if (job.status !== 'failed' || !diagnostics) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  const cause = document.getElementById('operation-failure-cause');
+  const steps = document.getElementById('operation-failure-steps');
+  const artifacts = document.getElementById('operation-failure-artifacts');
+  const trials = document.getElementById('operation-failed-trials');
+  if (cause) cause.textContent = diagnostics.likely_cause || diagnostics.error || 'The controller reported a failure.';
+  if (steps) {
+    steps.innerHTML = '';
+    (Array.isArray(diagnostics.next_steps) ? diagnostics.next_steps : []).forEach((step) => {
+      const li = document.createElement('li');
+      li.textContent = step;
+      steps.appendChild(li);
+    });
+  }
+  if (artifacts) {
+    artifacts.innerHTML = '';
+    Object.entries(diagnostics.artifacts || {}).forEach(([label, path]) => {
+      const dt = document.createElement('dt');
+      const dd = document.createElement('dd');
+      const code = document.createElement('code');
+      dt.textContent = label.replace(/_/g, ' ');
+      code.textContent = String(path || '');
+      dd.appendChild(code);
+      artifacts.appendChild(dt);
+      artifacts.appendChild(dd);
+    });
+  }
+  if (trials) {
+    trials.innerHTML = '';
+    const failedTrials = Array.isArray(diagnostics.failed_trials) ? diagnostics.failed_trials : [];
+    if (failedTrials.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'failed-trial-list';
+      failedTrials.forEach((trial) => {
+        const item = document.createElement('article');
+        const strong = document.createElement('strong');
+        const p = document.createElement('p');
+        strong.textContent = trial.trial_id || trial.candidate_id || 'failed trial';
+        p.textContent = trial.failure_reason || 'No failure reason was recorded.';
+        item.appendChild(strong);
+        item.appendChild(p);
+        wrap.appendChild(item);
+      });
+      trials.appendChild(wrap);
+    }
   }
 }
 
@@ -3834,6 +3910,19 @@ async function pollControllerJob(jobId) {
   }
 }
 
+async function loadRecentControllerJob() {
+  try {
+    const response = await fetch('/api/jobs/recent');
+    if (!response.ok) return;
+    const job = await response.json();
+    if (['failed', 'running', 'cancel-requested'].includes(job.status)) {
+      renderOperationResult(job);
+    }
+  } catch (error) {
+    // Static HTML mode and older cockpit servers may not expose recent jobs.
+  }
+}
+
 async function cancelControllerJob() {
   const cancel = document.getElementById('operation-cancel');
   const jobId = cancel ? cancel.dataset.jobId : '';
@@ -3903,4 +3992,5 @@ if (tabAfterReload) {
 }
 
 applyGroupFilters();
+loadRecentControllerJob();
 """
