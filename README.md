@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.4-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.54.5-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -158,7 +158,9 @@ handled by separate specs with explicit safety gates.
 ## Quickstart
 
 See the [Setup Guide](docs/SETUP.md) for local installation, GX10 config
-expectations, safe first commands, and release checks.
+expectations, safe first commands, and release checks. See
+[Project Status](docs/PROJECT_STATUS.md) for the current release state,
+main workflows, and safety boundary.
 
 ```powershell
 uv sync

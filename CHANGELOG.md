@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.5 - 2026-05-26
+
+- Added a project status handoff document summarizing current workflows,
+  objective modes, release verification, and safety boundaries before merging
+  the development branch back to the local release branch.
+
 ## 0.54.4 - 2026-05-26
 
 - Added a `single_user` sweep objective that ranks one-request responsiveness
