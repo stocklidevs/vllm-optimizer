@@ -24,8 +24,11 @@ class ServeProfile:
     gpu_memory_utilization: float
     enable_auto_tool_choice: bool
     tool_call_parser: str
-    performance_mode: str
     optional_flags: dict[str, bool | int | float | str]
+    performance_mode: str | None = None
+    chat_template: str | None = None
+    reasoning_parser: str | None = None
+    trust_remote_code: bool = False
 
 
 OPTIONAL_FLAG_RULES: dict[str, dict[str, Any]] = {
@@ -54,7 +57,13 @@ def parse_serve_profile(data: dict[str, Any]) -> ServeProfile:
     served_model_name = _required_str(data, "served_model_name", errors)
     host = _required_str(data, "host", errors)
     tool_call_parser = _required_str(data, "tool_call_parser", errors)
-    performance_mode = _required_str(data, "performance_mode", errors)
+    performance_mode = _optional_str(data, "performance_mode", errors)
+    chat_template = _optional_str(data, "chat_template", errors)
+    reasoning_parser = _optional_str(data, "reasoning_parser", errors)
+    trust_remote_code = data.get("trust_remote_code", False)
+    if not isinstance(trust_remote_code, bool):
+        errors.append("trust_remote_code must be a boolean")
+        trust_remote_code = False
     port = _required_int(data, "port", errors)
     max_model_len = _required_int(data, "max_model_len", errors)
     gpu_memory_utilization = _required_number(data, "gpu_memory_utilization", errors)
@@ -81,8 +90,11 @@ def parse_serve_profile(data: dict[str, Any]) -> ServeProfile:
         gpu_memory_utilization=gpu_memory_utilization,
         enable_auto_tool_choice=enable_auto_tool_choice,
         tool_call_parser=tool_call_parser,
-        performance_mode=performance_mode,
         optional_flags=optional_flags,
+        performance_mode=performance_mode,
+        chat_template=chat_template,
+        reasoning_parser=reasoning_parser,
+        trust_remote_code=trust_remote_code,
     )
 
 
@@ -104,14 +116,15 @@ def render_vllm_serve_command(profile: ServeProfile) -> list[str]:
     ]
     if profile.enable_auto_tool_choice:
         command.append("--enable-auto-tool-choice")
-    command.extend(
-        [
-            "--tool-call-parser",
-            profile.tool_call_parser,
-            "--performance-mode",
-            profile.performance_mode,
-        ]
-    )
+    command.extend(["--tool-call-parser", profile.tool_call_parser])
+    if profile.reasoning_parser:
+        command.extend(["--reasoning-parser", profile.reasoning_parser])
+    if profile.chat_template:
+        command.extend(["--chat-template", profile.chat_template])
+    if profile.performance_mode:
+        command.extend(["--performance-mode", profile.performance_mode])
+    if profile.trust_remote_code:
+        command.append("--trust-remote-code")
     for name in sorted(profile.optional_flags):
         value = profile.optional_flags[name]
         rule = OPTIONAL_FLAG_RULES[name]
@@ -195,6 +208,16 @@ def _required_str(data: dict[str, Any], field: str, errors: list[str]) -> str:
     if not isinstance(value, str) or not value:
         errors.append(f"{field} is required")
         return ""
+    return value
+
+
+def _optional_str(data: dict[str, Any], field: str, errors: list[str]) -> str | None:
+    value = data.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        errors.append(f"{field} must be a non-empty string when provided")
+        return None
     return value
 
 

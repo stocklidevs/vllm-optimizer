@@ -42,6 +42,11 @@ The Qwen profile expects the remote vLLM executable path recorded in the profile
 configuration. If that path changes, update the local profile or config before
 running live sweeps.
 
+The multi-model workflow starts from `config/model-catalog.json`. Catalog
+entries are local vLLM candidates only and point at committed serve profiles for
+Qwen, Gemma, GLM, Qwen 27B variants, and DeepSeek. New models should pass a
+model-aware smoke check before benchmark or sweep results are compared.
+
 ## Safe First Workflow
 
 Start with local planning and previews:
@@ -62,6 +67,15 @@ Run live only after the preview looks right:
 
 ```powershell
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-prefix-prefill-tool-json/plan.json --out artifacts/sweeps/qwen-prefix-prefill-tool-json/live --timeout-seconds 1200 --continue-on-failure
+```
+
+For a new model, preview the model smoke lifecycle, then run the live check only
+with the explicit gate:
+
+```powershell
+uv run vllm-optimizer model-catalog --catalog config/model-catalog.json --out artifacts/models/catalog.json
+uv run vllm-optimizer model-smoke-plan --catalog config/model-catalog.json --model gemma-4-e4b-it --out artifacts/models/gemma-4-e4b-it/smoke-plan.json
+uv run vllm-optimizer model-smoke-run --catalog config/model-catalog.json --model gemma-4-e4b-it --config config/local.gx10.json --out artifacts/models/gemma-4-e4b-it/live --timeout-seconds 1200 --confirm-live-run
 ```
 
 For one active user's interactive feel, use the single-user recipe instead of a

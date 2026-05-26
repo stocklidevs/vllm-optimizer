@@ -12,6 +12,8 @@ def test_build_smoke_serve_plan_is_dry_run() -> None:
     assert plan["will_execute"] is False
     assert "port 8001 must be free" in plan["preflight_checks"]
     assert plan["serve_command"][0] == "$HOME/qwen3next-venv/bin/vllm"
+    assert plan["readiness_categories"] == ["serve", "chat", "tool", "cleanup"]
+    assert plan["tool_request"]["required"] is True
 
 
 def test_parse_remote_smoke_output_sections() -> None:
@@ -22,6 +24,9 @@ __VLLM_SMOKE_SUMMARY_START__
 __VLLM_SMOKE_RESPONSE_START__
 {"ok": true}
 HTTP_STATUS:200
+__VLLM_SMOKE_TOOL_RESPONSE_START__
+{"choices":[{"message":{"tool_calls":[{"function":{"name":"report_status"}}]}}]}
+HTTP_STATUS:200
 __VLLM_SMOKE_CLEANUP_START__
 {"cleaned":true}
 __VLLM_SMOKE_LOG_START__
@@ -31,5 +36,6 @@ server log
 
     assert parsed["summary"]["pid"] == "123"
     assert "HTTP_STATUS:200" in parsed["response"]["raw"]
+    assert "tool_calls" in parsed["tool_response"]["raw"]
     assert parsed["cleanup"]["cleaned"] is True
     assert parsed["server_log"] == "server log"

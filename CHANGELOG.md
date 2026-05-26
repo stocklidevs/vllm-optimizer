@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.55.0 - 2026-05-26
+
+- Added a local vLLM model catalog for Qwen3 Coder Next, Gemma 4 E4B IT, GLM
+  4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite Instruct.
+- Added Gemma, GLM, Qwen 27B, and DeepSeek serve profiles with parser,
+  template, reasoning-parser, and trust-remote-code metadata where needed.
+- Added `model-catalog`, `model-smoke-plan`, and gated `model-smoke-run`
+  commands with model-aware readiness categories and smoke artifacts.
+- Added model-catalog readiness context to the cockpit model/profile selector.
+
 ## 0.54.7 - 2026-05-26
 
 - Corrected the Spec 071 model-baseline scope after clarifying that the intended

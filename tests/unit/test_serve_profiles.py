@@ -38,6 +38,45 @@ def test_load_qwen_profile_renders_user_command() -> None:
     ]
 
 
+def test_load_gemma_profile_renders_user_command_with_chat_template() -> None:
+    profile = load_serve_profile(Path("config/profiles/gemma-4-e4b-it.json"))
+
+    command = render_vllm_serve_command(profile)
+
+    assert command == [
+        "vllm",
+        "serve",
+        "google/gemma-4-E4B-it",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+        "--served-model-name",
+        "Gemma-4-E4B-IT",
+        "--max-model-len",
+        "16384",
+        "--gpu-memory-utilization",
+        "0.80",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "gemma4",
+        "--chat-template",
+        "~/vllm-templates/tool_chat_template_gemma4.jinja",
+    ]
+
+
+def test_load_glm_profile_renders_reasoning_parser_and_trust_remote_code() -> None:
+    profile = load_serve_profile(Path("config/profiles/glm-4-7-flash.json"))
+
+    command = render_vllm_serve_command(profile)
+
+    assert "--tool-call-parser" in command
+    assert "glm47" in command
+    assert "--reasoning-parser" in command
+    assert "glm45" in command
+    assert "--trust-remote-code" in command
+
+
 def test_build_serve_plan_is_dry_run_only() -> None:
     profile = load_serve_profile(Path("config/profiles/qwen3-coder-next-awq.json"))
 

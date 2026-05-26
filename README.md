@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.7-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.55.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -151,6 +151,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Single-user performance is available as a cockpit target and deterministic
   sweep recipe. It uses a one-request interactive workload and ranks candidates
   by responsiveness instead of aggregate concurrent throughput.
+- A local vLLM model catalog records Qwen, Gemma, GLM, Qwen 27B, and DeepSeek
+  candidates with deterministic smoke plans, parser/template metadata, and
+  model-aware readiness artifacts before any expensive sweeps run.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -176,6 +179,8 @@ uv run vllm-optimizer dry-run --plan artifacts/demo/trial-plan.json --out artifa
 uv run vllm-optimizer rank --plan artifacts/demo/trial-plan.json --results tests/fixtures/results/throughput.jsonl --out artifacts/demo/report.json
 uv run vllm-optimizer discover --config tests/fixtures/discovery/local.gx10.mock.json --executor mock --mock-results tests/fixtures/discovery/mock_outputs.json --out artifacts/discovery/mock
 uv run vllm-optimizer serve-plan --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/demo/qwen-serve-plan.json
+uv run vllm-optimizer model-catalog --catalog config/model-catalog.json --out artifacts/models/catalog.json
+uv run vllm-optimizer model-smoke-plan --catalog config/model-catalog.json --model gemma-4-e4b-it --out artifacts/models/gemma-4-e4b-it/smoke-plan.json
 uv run vllm-optimizer benchmark-plan --profile config/profiles/qwen3-coder-next-awq.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-baseline/plan.json
 uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-small-sweep.json --out artifacts/sweeps/qwen-small/plan.json
 uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-small/plan.json --out artifacts/sweeps/qwen-small/preview.json
@@ -405,6 +410,14 @@ Smoke serve:
 ```powershell
 uv run vllm-optimizer smoke-serve-plan --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/smoke/qwen/plan.json
 uv run vllm-optimizer smoke-serve --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/smoke/qwen --timeout-seconds 1200
+```
+
+Model-aware smoke checks:
+
+```powershell
+uv run vllm-optimizer model-catalog --catalog config/model-catalog.json --out artifacts/models/catalog.json
+uv run vllm-optimizer model-smoke-plan --catalog config/model-catalog.json --model gemma-4-e4b-it --out artifacts/models/gemma-4-e4b-it/smoke-plan.json
+uv run vllm-optimizer model-smoke-run --catalog config/model-catalog.json --model gemma-4-e4b-it --config config/local.gx10.json --out artifacts/models/gemma-4-e4b-it/live --timeout-seconds 1200 --confirm-live-run
 ```
 
 Baseline benchmark:

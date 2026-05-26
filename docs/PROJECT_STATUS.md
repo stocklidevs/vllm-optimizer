@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-26
 
-Current release: 0.54.6
+Current release: 0.55.0
 
 ## What Exists
 
@@ -16,6 +16,8 @@ The current system can:
 - Run gated live sweeps against the GX10.
 - Rank candidates for throughput, latency, balanced score, and single-user
   responsiveness.
+- List local vLLM model candidates and generate model-aware smoke plans before
+  benchmarking new models.
 - Produce report and release artifacts for cockpit consumption.
 - Launch a local active cockpit with objective-first controls, live progress,
   report review, candidate selection, and gated promotion.
