@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/070-single-user-performance-target/plan.md
+specs/071-multi-model-smoke/plan.md
 <!-- SPECKIT END -->

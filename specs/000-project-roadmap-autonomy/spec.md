@@ -145,7 +145,7 @@ Codex must pause or ask before:
 
 The current active implementation target is:
 
-- `specs/070-single-user-performance-target/spec.md`
+- `specs/071-multi-model-smoke/spec.md`
 
 This roadmap should guide future specs, but it should not replace `.specify/feature.json` as the active feature pointer.
 
