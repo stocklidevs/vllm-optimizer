@@ -99,6 +99,7 @@ def run_optimizer_pipeline(request: OptimizerPipelineRequest) -> dict[str, Any]:
 
 
 def build_pipeline_plan(request: OptimizerPipelineRequest, artifacts: dict[str, str]) -> dict[str, Any]:
+    allow_risky_session_flags = effective_allow_risky_session_flags(request)
     return {
         "generated_at": _now(),
         "mode": request.mode,
@@ -116,18 +117,28 @@ def build_pipeline_plan(request: OptimizerPipelineRequest, artifacts: dict[str, 
         "remote_actions": remote_actions_for_mode(request.mode),
         "promotion": {"automatic": False, "note": "Promotion remains an explicit separate command."},
         "safety": {
-            "allow_risky_session_flags": request.allow_risky_session_flags,
+            "allow_risky_session_flags": allow_risky_session_flags,
             "continue_on_failure": request.continue_on_failure,
         },
     }
 
 
+def effective_allow_risky_session_flags(request: OptimizerPipelineRequest) -> bool:
+    if request.allow_risky_session_flags:
+        return True
+    definition = load_sweep_definition(request.sweep_path)
+    return definition.allow_risky_session_flags
+
+
 def ensure_sweep_plan(request: OptimizerPipelineRequest, artifacts: dict[str, str]) -> dict[str, Any]:
     path = Path(artifacts["sweep_plan"])
     definition = load_sweep_definition(request.sweep_path)
+    allow_risky_session_flags = request.allow_risky_session_flags or definition.allow_risky_session_flags
     if path.exists():
         existing = read_json(path)
-        if existing.get("sweep_id") == definition.sweep_id:
+        same_sweep = existing.get("sweep_id") == definition.sweep_id
+        same_safety_gate = existing.get("allow_risky_session_flags") == allow_risky_session_flags
+        if same_sweep and same_safety_gate:
             return existing
     plan = build_sweep_plan(definition, allow_risky_session_flags=request.allow_risky_session_flags)
     plan["sweep_path"] = request.sweep_path.as_posix()
@@ -139,7 +150,7 @@ def run_live_sweep(request: OptimizerPipelineRequest, sweep_plan: dict[str, Any]
     if request.sweep_runner is not None:
         request.sweep_runner(request, sweep_plan, artifacts)
         return
-    if sweep_plan.get("has_risky_session_flags") and not request.allow_risky_session_flags:
+    if sweep_plan.get("has_risky_session_flags") and not sweep_plan.get("allow_risky_session_flags"):
         raise OptimizerPipelineError("risky-session sweep requires --allow-risky-session-flags")
     target = load_target(request.config_path)  # type: ignore[arg-type]
     prompts = load_prompt_set(Path(sweep_plan["prompts_path"]))

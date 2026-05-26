@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.2-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.54.3-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -144,6 +144,9 @@ The project is spec-driven with SpecKit and currently supports:
 - Active cockpit failures now persist a recent job/failure artifact and render
   likely cause, next steps, relevant artifact paths, and failed trial reasons
   instead of showing only a bare "Failed" state.
+- The default C8 active cockpit now applies the sweep's declared risky-session
+  allowance consistently, so curated high-impact recipes do not fail before
+  any live trials start.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -331,6 +334,11 @@ catalog, selected sweep control manifest, and run index, then starts the active
 cockpit at `http://127.0.0.1:8787`. Optional flags can override the sweep,
 config, output directory, host, and port. Add `--allow-promotion` only when you
 want to test the local selected-candidate promotion write path.
+For curated risky-session recipes such as the default C8 sweep, the launcher
+honors the sweep's checked-in `allow_risky_session_flags` setting and passes
+that effective allowance to the active server. Safe-session overrides remain
+strict unless the sweep definition or command line explicitly enables risky
+session flags.
 
 `web-cockpit` is the combined web interface. It now opens as an objective
 command center: choose the model/profile, choose the optimization target,

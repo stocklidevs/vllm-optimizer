@@ -291,6 +291,33 @@ def test_cockpit_job_store_persists_failed_job_with_diagnostics(tmp_path: Path) 
     assert persisted["plain_summary"]["next_step"] == result["plain_summary"]["next_step"]
 
 
+def test_cockpit_job_store_explains_missing_risky_session_gate(tmp_path: Path) -> None:
+    store = CockpitJobStore()
+    out_dir = tmp_path / "risky-gate-failure"
+
+    def failing_action(_action, _payload, _config):
+        raise RuntimeError("risky-session sweep requires --allow-risky-session-flags")
+
+    job = store.start(
+        "run",
+        {"confirm_live_run": True},
+        CockpitServerConfig(
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            config_path=Path("config/gx10.example.json"),
+            out_dir=out_dir,
+        ),
+        action_runner=failing_action,
+    )
+
+    result = store.wait(job["job_id"], timeout_seconds=5)
+
+    assert result["status"] == "failed"
+    assert "risky-session" in result["diagnostics"]["likely_cause"]
+    assert "--allow-risky-session-flags" in result["diagnostics"]["likely_cause"]
+    assert any("--allow-risky-session-flags" in step for step in result["diagnostics"]["next_steps"])
+    assert "--allow-risky-session-flags" in result["plain_summary"]["what_it_means"]
+
+
 def test_cockpit_job_store_recent_reads_persisted_failure(tmp_path: Path) -> None:
     out_dir = tmp_path / "recent-failure"
     write_json(

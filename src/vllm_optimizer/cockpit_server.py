@@ -336,6 +336,16 @@ def failure_diagnostics(action: str, error: Exception, config: CockpitServerConf
             "Launch the cockpit with --config config/local.gx10.json.",
             "Confirm the config file still points at the Tailscale SSH target.",
         ]
+    elif "risky-session sweep requires --allow-risky-session-flags" in lowered:
+        likely_cause = (
+            "This sweep includes risky-session knobs, but the cockpit controller was started without "
+            "--allow-risky-session-flags."
+        )
+        next_steps = [
+            "Restart direct cockpit-server or cockpit-run commands with --allow-risky-session-flags.",
+            "Use cockpit-launch for default sweeps so sweep-level risky-session allowance is applied automatically.",
+            "Choose a safe-session tuning area if you do not want to allow risky-session knobs.",
+        ]
     elif "timeout" in lowered or "timed out" in lowered:
         likely_cause = "A remote step timed out before the benchmark completed."
         next_steps = [

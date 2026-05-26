@@ -43,6 +43,45 @@ def test_pipeline_preview_mode_writes_sweep_plan_and_preview(tmp_path: Path) -> 
     assert preview["blocked"] is False
 
 
+def test_pipeline_run_mode_records_sweep_level_risky_allowance(tmp_path: Path) -> None:
+    def sweep_runner(_request, _sweep_plan, _artifacts):
+        return None
+
+    run_optimizer_pipeline(
+        OptimizerPipelineRequest(
+            mode="run",
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            out_dir=tmp_path,
+            config_path=Path("config/gx10.example.json"),
+            sweep_runner=sweep_runner,
+        )
+    )
+
+    pipeline_plan = read_json(tmp_path / "pipeline-plan.json")
+    sweep_plan = read_json(tmp_path / "sweep-plan.json")
+    assert pipeline_plan["safety"]["allow_risky_session_flags"] is True
+    assert sweep_plan["allow_risky_session_flags"] is True
+
+
+def test_pipeline_preview_rebuilds_stale_safety_allowance(tmp_path: Path) -> None:
+    (tmp_path / "sweep-plan.json").write_text(
+        '{"sweep_id":"qwen-concurrency-saturation-c8","allow_risky_session_flags":false,"trials":[]}',
+        encoding="utf-8",
+    )
+
+    run_optimizer_pipeline(
+        OptimizerPipelineRequest(
+            mode="preview",
+            sweep_path=Path("config/sweeps/qwen-concurrency-saturation-c8.json"),
+            out_dir=tmp_path,
+        )
+    )
+
+    sweep_plan = read_json(tmp_path / "sweep-plan.json")
+    assert sweep_plan["allow_risky_session_flags"] is True
+    assert sweep_plan["trial_count"] > 0
+
+
 def test_pipeline_report_mode_ranks_existing_results_and_writes_report(tmp_path: Path) -> None:
     run_optimizer_pipeline(
         OptimizerPipelineRequest(

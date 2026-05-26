@@ -25,9 +25,11 @@ def test_prepare_cockpit_launch_generates_default_artifacts(tmp_path: Path) -> N
     assert Path(result["manifest_path"]).exists()
     assert Path(result["run_index_path"]).exists()
     assert result["profile_paths"]
+    assert result["allow_risky_session_flags"] is True
     assert result["server_config"].sweep_path == Path("config/sweeps/qwen-concurrency-saturation-c8.json")
     assert result["server_config"].out_dir == out_dir
     assert result["server_config"].profile_paths
+    assert result["server_config"].allow_risky_session_flags is True
 
 
 def test_prepare_cockpit_launch_accepts_sweep_override(tmp_path: Path) -> None:
@@ -48,6 +50,8 @@ def test_prepare_cockpit_launch_accepts_sweep_override(tmp_path: Path) -> None:
     assert result["url"] == "http://127.0.0.1:8790"
     assert result["sweep_path"] == sweep.as_posix()
     assert result["group_id"] == "qwen-prefix-prefill-tool-json"
+    assert result["allow_risky_session_flags"] is False
+    assert result["server_config"].allow_risky_session_flags is False
 
 
 def test_prepare_cockpit_launch_accepts_profile_overrides(tmp_path: Path) -> None:

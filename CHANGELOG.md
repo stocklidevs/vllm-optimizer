@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.54.3 - 2026-05-26
+
+- Fixed the default C8 `cockpit-launch` path so it applies the selected
+  sweep's declared risky-session allowance to the active server.
+- Aligned optimizer pipeline safety metadata and stale sweep-plan reuse with
+  effective risky-session allowance.
+- Added specific cockpit failure diagnostics for missing
+  `--allow-risky-session-flags` gates.
+
 ## 0.54.2 - 2026-05-26
 
 - Added persisted active cockpit failure diagnostics in

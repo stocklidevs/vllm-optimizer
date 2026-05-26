@@ -8,6 +8,7 @@ from .cockpit_server import CockpitServerConfig, serve_cockpit
 from .knob_catalog import write_knob_catalog
 from .pipeline_control import write_pipeline_control_manifest
 from .run_browser import write_run_index
+from .sweep import load_sweep_definition
 
 
 class CockpitLaunchError(ValueError):
@@ -54,6 +55,8 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
     profile_paths = request.profile_paths or default_profile_paths()
     group_id = sweep_path.stem
     manifest_path = request.manifest_path or Path("artifacts/catalog") / f"{group_id}-control.json"
+    sweep_definition = load_sweep_definition(sweep_path)
+    allow_risky_session_flags = request.allow_risky_session_flags or sweep_definition.allow_risky_session_flags
 
     request.artifacts_root.mkdir(parents=True, exist_ok=True)
     request.out_dir.mkdir(parents=True, exist_ok=True)
@@ -69,7 +72,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
         manifest_path=manifest_path,
         run_index_path=request.run_index_path,
         profile_paths=profile_paths,
-        allow_risky_session_flags=request.allow_risky_session_flags,
+        allow_risky_session_flags=allow_risky_session_flags,
         allow_promotion=request.allow_promotion,
         timeout_seconds=request.timeout_seconds,
         continue_on_failure=request.continue_on_failure,
@@ -86,6 +89,7 @@ def prepare_cockpit_launch(request: CockpitLaunchRequest) -> dict[str, Any]:
         "manifest_path": manifest_path.as_posix(),
         "run_index_path": request.run_index_path.as_posix(),
         "profile_paths": [path.as_posix() for path in profile_paths],
+        "allow_risky_session_flags": allow_risky_session_flags,
         "allow_promotion": request.allow_promotion,
         "server_config": server_config,
     }
