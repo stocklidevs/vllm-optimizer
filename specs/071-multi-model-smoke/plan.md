@@ -12,8 +12,7 @@ or pretending untested models have performance winners. The first concrete new
 baseline is the user-provided Gemma 4 E4B IT vLLM serve recipe; GLM 4.7 Flash,
 Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite Instruct are cataloged as
 local vLLM candidates whose performance baselines remain pending until smoke
-checks and benchmarks run. Gemini remains an external API baseline for a later
-spec.
+checks and benchmarks run.
 
 ## Technical Context
 
@@ -39,7 +38,7 @@ performance metrics are measured only after a model passes readiness checks
 mutating only because it may start and stop vLLM
 
 **Scale/Scope**: Initial catalog covers the existing Qwen3 Coder Next model plus
-five new model candidates and one deferred external baseline
+five new local model candidates
 
 ## Constitution Check
 

@@ -22,15 +22,6 @@ the Gemma tool chat template for tool use.
 rejected. Only Gemma has enough local recipe detail to become a first-class
 baseline immediately.
 
-## Decision: Gemini Is Deferred to External Baseline Work
-
-**Rationale**: The Gemini API is not a local vLLM/GX10 serve target. The current
-local model smoke workflow should not mix hosted API cost, credential, quota,
-and latency controls into local vLLM artifacts.
-
-**Alternatives considered**: Adding Gemini to the same catalog as a runnable
-local model was rejected because it would violate the local smoke safety model.
-
 ## Decision: Large Qwen Models Need Memory-Fit Validation
 
 **Rationale**: Qwen3.6 27B and Qwen3.5 27B publish long context defaults and

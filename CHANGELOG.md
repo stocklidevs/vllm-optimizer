@@ -1,10 +1,16 @@
 # Changelog
 
+## 0.54.7 - 2026-05-26
+
+- Corrected the Spec 071 model-baseline scope after clarifying that the intended
+  Google model was Gemma 4 E4B IT.
+- Kept the multi-model smoke workflow focused on local vLLM candidates only.
+
 ## 0.54.6 - 2026-05-26
 
 - Added a validated model-baseline tracker to the project handoff document for
   Qwen3 Coder Next, Gemma 4 E4B IT, GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B,
-  DeepSeek Coder V2 Lite Instruct, and Gemini external-baseline follow-up.
+  and DeepSeek Coder V2 Lite Instruct.
 - Captured the user-provided Gemma 4 E4B IT vLLM serve recipe as the first new
   local model smoke baseline for Spec 071.
 

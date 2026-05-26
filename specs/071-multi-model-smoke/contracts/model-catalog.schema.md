@@ -26,11 +26,9 @@ Optional model fields:
 - `profile_path`
 - `default_objectives`
 - `warnings`
-- `external_baseline_notes`
 
 Rules:
 
 - Local vLLM candidates must include `profile_path`.
-- External API baselines must not include a local vLLM profile path.
 - Untested models must not use `support_status=measured`.
 - Models are ordered by recommended validation priority.

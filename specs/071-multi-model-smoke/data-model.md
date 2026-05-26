@@ -4,7 +4,7 @@
 
 - `model_id`: Stable internal identifier.
 - `display_name`: User-facing model name.
-- `runtime`: `local-vllm` or `external-api`.
+- `runtime`: `local-vllm`.
 - `source_model`: Upstream model identifier or API family.
 - `served_model_name`: Name expected by OpenAI-compatible requests.
 - `profile_path`: Local serve profile path when runnable through vLLM.

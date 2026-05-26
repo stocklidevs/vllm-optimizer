@@ -62,7 +62,7 @@ The cockpit should stay objective-first:
 
 ## Model Baseline Tracker
 
-Validated on 2026-05-26 against upstream model pages and vLLM/Gemini
+Validated on 2026-05-26 against upstream model pages and vLLM
 documentation. "Baseline" means the starting serve/readiness baseline to record
 before optimization. Only Qwen3 Coder Next has local GX10 performance baselines
 today; the new models are not performance-ranked until Spec 071 smoke checks
@@ -76,7 +76,6 @@ and first benchmarks run.
 | Qwen3.6 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.6-27B`; upstream card lists vLLM compatibility, recommends `vllm>=0.19.0`, and documents Qwen tool-call parser support. | Not smoked or benchmarked locally yet. | Treat as the highest-priority larger Qwen comparison after Gemma; validate memory fit before long-context sweeps. |
 | Qwen3.5 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.5-27B`; upstream card lists vLLM compatibility, long-context defaults, and `qwen3_coder` tool-call parser support. | Not smoked or benchmarked locally yet. | Optional legacy comparison after Qwen3.6, useful only if we want a generational delta. |
 | DeepSeek Coder V2 Lite Instruct | Local vLLM candidate | Upstream model `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`; upstream card documents 16B total parameters, 2.4B active parameters, 128k context, and a plain vLLM serve example. | Not smoked or benchmarked locally yet. | Add a conservative plain-chat smoke first; tool behavior requires separate validation. |
-| Gemini | External API baseline | Official Gemini API docs currently list Gemini 3/3.5 API families, including Gemini 3.5 Flash as stable. No local vLLM/GX10 serve path. | Out of scope for local smoke and sweeps. | Defer to a future external-baseline spec with API credentials, cost controls, and separate reporting. |
 
 Source notes:
 
@@ -85,4 +84,3 @@ Source notes:
 - Qwen3.6 27B: https://huggingface.co/Qwen/Qwen3.6-27B
 - Qwen3.5 27B: https://huggingface.co/Qwen/Qwen3.5-27B
 - DeepSeek Coder V2 Lite Instruct: https://huggingface.co/deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct
-- Gemini API model catalog: https://ai.google.dev/gemini-api/docs/models

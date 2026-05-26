@@ -6,7 +6,7 @@
 
 **Status**: Implementing
 
-**Input**: User supplied a Gemma 4 E4B IT vLLM serve recipe and asked to add other models and test them after the Qwen optimization flow. Candidate local models include Gemma 4 E4B IT, GLM 4.7 Flash, Qwen 3.6 27B, DeepSeek Coder V2 Lite, and optional Qwen 3.5 27B; Gemini is deferred to a later external API baseline.
+**Input**: User supplied a Gemma 4 E4B IT vLLM serve recipe and asked to add other models and test them after the Qwen optimization flow. Candidate local models include Gemma 4 E4B IT, GLM 4.7 Flash, Qwen 3.6 27B, DeepSeek Coder V2 Lite, and optional Qwen 3.5 27B.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -62,13 +62,12 @@ As an optimizer user, I want to see which models are ready for optimization and 
 - A smoke run fails after starting the server and cleanup still needs to be attempted.
 - Two models share the same port or served model name in user-provided recipes.
 - Existing Qwen sweep artifacts are present while a different model is selected.
-- A model is external API only and cannot be exercised through local vLLM; this must be excluded from local smoke runs.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST maintain a model catalog that separates local vLLM models from external API baselines.
+- **FR-001**: The system MUST maintain a model catalog for local vLLM candidates.
 - **FR-002**: The catalog MUST include Gemma 4 E4B IT using the user-provided serve defaults: model identity `google/gemma-4-E4B-it`, served name `Gemma-4-E4B-IT`, port `8001`, maximum context `16384`, GPU memory utilization `0.80`, auto tool choice enabled, tool parser `gemma4`, and chat template `~/vllm-templates/tool_chat_template_gemma4.jinja`.
 - **FR-003**: The catalog MUST include local candidate metadata for GLM 4.7 Flash, Qwen 3.6 27B, DeepSeek Coder V2 Lite, and optional Qwen 3.5 27B without treating any untested model as a confirmed winner.
 - **FR-004**: Users MUST be able to list model candidates with model identity, served name, runtime type, support status, tool/parser notes, context defaults, safety notes, and recommended next action.
@@ -78,7 +77,6 @@ As an optimizer user, I want to see which models are ready for optimization and 
 - **FR-008**: The cockpit MUST expose model selection separately from objective selection so that users can choose both "what model" and "what target" before optimization.
 - **FR-009**: The cockpit MUST prevent or clearly warn against starting a full optimization for a model whose latest smoke status is failed or missing.
 - **FR-010**: Existing single-model Qwen behavior MUST continue to work when the user does not select a new model.
-- **FR-011**: Gemini MUST be represented only as a future external baseline candidate unless a separate spec defines external API benchmarking.
 
 ### Experiment Requirements *(include for optimizer features)*
 
