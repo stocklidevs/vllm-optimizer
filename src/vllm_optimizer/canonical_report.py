@@ -196,7 +196,7 @@ def preferred_winner(
     objectives: dict[str, dict[str, Any]],
     candidates: dict[str, dict[str, Any]],
 ) -> tuple[str, dict[str, Any]] | None:
-    objective_order = ["balanced", "throughput", "latency", *sorted(objectives)]
+    objective_order = ["single_user", "balanced", "throughput", "latency", *sorted(objectives)]
     seen: set[str] = set()
     for objective in objective_order:
         if objective in seen:

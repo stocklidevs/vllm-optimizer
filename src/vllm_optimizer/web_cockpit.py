@@ -1937,6 +1937,12 @@ OPTIMIZATION_TARGETS = [
         "description": "Prefer higher tokens/sec and lower latency.",
     },
     {
+        "id": "single_user",
+        "label": "Single User",
+        "headline": "Fastest personal session",
+        "description": "Prefer one active request: lower latency and smoother interactive response over aggregate concurrency.",
+    },
+    {
         "id": "stability",
         "label": "Stability",
         "headline": "Lowest operational risk",
@@ -2007,6 +2013,8 @@ def _candidate_metric_rows(candidates: Any) -> list[dict[str, Any]]:
 def promotion_objective(value: str) -> str:
     if value == "performance":
         return "throughput"
+    if value == "single_user":
+        return "single_user"
     if value in {"stability", "tool_use", "no objective"}:
         return "balanced"
     return value or "balanced"
@@ -3340,6 +3348,7 @@ function selectObjectiveTarget(button) {
 
 function objectiveForTarget(target) {
   if (target === 'performance') return 'throughput';
+  if (target === 'single_user') return 'single_user';
   if (target === 'stability' || target === 'tool_use') return 'balanced';
   return target || 'balanced';
 }

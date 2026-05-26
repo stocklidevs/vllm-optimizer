@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/069-cockpit-risky-gate-alignment/plan.md
+specs/070-single-user-performance-target/plan.md
 <!-- SPECKIT END -->

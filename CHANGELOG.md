@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.54.4 - 2026-05-26
+
+- Added a `single_user` sweep objective that ranks one-request responsiveness
+  by latency first, then stability and throughput tie-breakers.
+- Added `config/sweeps/qwen-single-user-interactive.json`, a concurrency-one
+  interactive recipe for single-user performance tuning.
+- Added Single User cockpit target and catalog labeling so users can distinguish
+  personal responsiveness from aggregate concurrent throughput.
+- Updated comparison and canonical reports to prefer `single_user` when that
+  objective is present.
+
 ## 0.54.3 - 2026-05-26
 
 - Fixed the default C8 `cockpit-launch` path so it applies the selected

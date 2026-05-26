@@ -137,6 +137,31 @@ def test_rank_sweep_results_reports_objective_rankings() -> None:
     assert {"candidate_id": failed_candidate, "reason": "no successful repetitions"} in report["excluded_trials"]
 
 
+def test_single_user_objective_ranks_latency_before_aggregate_throughput() -> None:
+    plan = build_sweep_plan(load_sweep_definition(Path("config/sweeps/qwen-small-sweep.json")))
+    plan["objectives"] = ["single_user", "throughput"]
+    trial_ids = [trial["trial_id"] for trial in plan["trials"]]
+    rows = [
+        {
+            "trial_id": trial_ids[0],
+            "status": "completed",
+            "summary": {"mean_latency_ms": 1200, "aggregate_tokens_per_second": 90, "failure_count": 0},
+            "artifact_paths": {"summary": "aggregate-fast.json"},
+        },
+        {
+            "trial_id": trial_ids[1],
+            "status": "completed",
+            "summary": {"mean_latency_ms": 700, "aggregate_tokens_per_second": 50, "failure_count": 0},
+            "artifact_paths": {"summary": "responsive.json"},
+        },
+    ]
+
+    report = rank_sweep_results(plan, rows)
+
+    assert report["objectives"]["throughput"][0]["candidate_id"] == plan["trials"][0]["candidate_id"]
+    assert report["objectives"]["single_user"][0]["candidate_id"] == plan["trials"][1]["candidate_id"]
+
+
 def test_repeated_sweep_plan_adds_candidate_and_repetition_metadata() -> None:
     definition = load_sweep_definition(Path("config/sweeps/qwen-top2-repeated.json"))
 
@@ -371,3 +396,12 @@ def test_concurrency_saturation_sweep_plan_shapes() -> None:
     assert [plan["candidate_count"] for plan in plans] == [5, 5, 5, 5, 5, 5]
     assert [plan["trial_count"] for plan in plans] == [10, 10, 10, 10, 10, 10]
     assert [plan["trials"][0]["benchmark_plan"]["concurrency"] for plan in plans] == levels
+
+
+def test_single_user_sweep_plan_uses_one_request_workload() -> None:
+    plan = build_sweep_plan(load_sweep_definition(Path("config/sweeps/qwen-single-user-interactive.json")))
+
+    assert plan["prompt_set_id"] == "qwen-coding-interactive-concurrency-1-v1"
+    assert "single_user" in plan["objectives"]
+    assert plan["trials"][0]["benchmark_plan"]["concurrency"] == 1
+    assert plan["candidate_count"] >= 2

@@ -25,7 +25,7 @@ SAFE_PARAMETERS: dict[str, dict[str, Any]] = {
 }
 BLOCKED_PARAMETERS = {"download_dir", "model_loader_extra_config", "tokenizer_mode"}
 
-OBJECTIVES = {"throughput", "latency", "balanced"}
+OBJECTIVES = {"throughput", "latency", "balanced", "single_user"}
 
 
 @dataclass(frozen=True)
@@ -539,6 +539,9 @@ def rank_for_objective(
         if objective == "throughput":
             score = throughput
             key = (-throughput, failure_rate, throughput_spread, latency, _row_id(row))
+        elif objective == "single_user":
+            score = latency
+            key = (latency, failure_rate, latency_spread, -throughput, throughput_spread, _row_id(row))
         elif objective == "latency":
             score = latency
             key = (latency, failure_rate, latency_spread, -throughput, _row_id(row))

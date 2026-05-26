@@ -74,7 +74,7 @@ def extract_candidates(ranking: dict[str, Any], source: str) -> list[dict[str, A
     objectives = ranking.get("objectives", {})
     if not isinstance(objectives, dict):
         return []
-    preferred_objectives = ["balanced", "throughput", "latency"]
+    preferred_objectives = ["single_user", "balanced", "throughput", "latency"]
     snapshots: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for objective in preferred_objectives:
@@ -112,17 +112,15 @@ def extract_candidates(ranking: dict[str, Any], source: str) -> list[dict[str, A
 
 
 def choose_recommendation(candidates: list[dict[str, Any]]) -> dict[str, Any]:
-    preferred = [
-        item
-        for item in candidates
-        if item["source"] == "repeated" and item["objective"] == "balanced" and item.get("rank") == 1
-    ]
-    if not preferred:
+    preferred = []
+    for objective in ("single_user", "balanced", "throughput"):
         preferred = [
             item
             for item in candidates
-            if item["source"] == "repeated" and item["objective"] == "throughput" and item.get("rank") == 1
+            if item["source"] == "repeated" and item["objective"] == objective and item.get("rank") == 1
         ]
+        if preferred:
+            break
     if not preferred:
         preferred = [item for item in candidates if item.get("rank") == 1]
     if not preferred:

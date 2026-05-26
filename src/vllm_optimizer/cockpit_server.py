@@ -279,6 +279,8 @@ def _promotion_objective(value: Any) -> str:
     objective = str(value or "balanced")
     if objective == "performance":
         return "throughput"
+    if objective == "single_user":
+        return "single_user"
     if objective in {"stability", "tool_use"}:
         return "balanced"
     return objective

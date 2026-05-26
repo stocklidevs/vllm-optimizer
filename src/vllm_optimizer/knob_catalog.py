@@ -82,6 +82,8 @@ def infer_family(path: Path) -> str:
     name = path.stem.lower()
     if "session-tuning-sweeps" in text:
         return "session-tuning"
+    if "single-user" in name or "single_user" in name:
+        return "single-user"
     if "concurrency" in name:
         return "concurrency"
     if "high-impact" in name:
@@ -115,6 +117,8 @@ def action_scope_for(safety_tier: str) -> str:
 def description_for(stem: str, family: str, safety_tier: str) -> str:
     if family == "concurrency":
         return "Explore request concurrency and saturation behavior."
+    if family == "single-user":
+        return "Optimize one active interactive request for latency and responsiveness."
     if family == "workload":
         return "Optimize a workload-specific prompt and request mix."
     if family == "fp8":
@@ -131,6 +135,9 @@ def display_label_for(stem: str, family: str) -> str:
     if family == "concurrency":
         count = concurrency_count(name)
         return f"Concurrency - {count} Request{'s' if count != '1' else ''}" if count else "Concurrency Saturation"
+    if family == "single-user":
+        workload = workload_label(name)
+        return f"Single User - {workload}" if workload else "Single User Performance"
     if family == "fp8":
         workload = workload_label(name)
         return f"FP8 KV Cache - {workload}" if workload else "FP8 KV Cache"
@@ -157,6 +164,8 @@ def display_family_for(stem: str, family: str) -> str:
         return "FP8 KV Cache"
     if family == "concurrency":
         return "Concurrency"
+    if family == "single-user":
+        return "Single User"
     if family == "workload":
         return "Workload Shape"
     if family == "session-tuning":
@@ -174,6 +183,8 @@ def knobs_tuned_for(stem: str, family: str, command_kind: str) -> list[str]:
         return ["kv_cache_dtype", "block_size", "max_num_batched_tokens", "max_num_seqs"]
     if family == "concurrency":
         return ["request_concurrency", "gpu_memory_utilization", "max_num_batched_tokens", "max_num_seqs"]
+    if family == "single-user":
+        return ["request_concurrency", "mean_latency_ms", "latency_spread_ms", "interactivity"]
     if family == "workload":
         return ["prompt_set", "workload_mix", "performance_mode", "max_model_len"]
     if command_kind == "session-tuning-sweep":

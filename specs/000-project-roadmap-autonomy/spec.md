@@ -145,7 +145,7 @@ Codex must pause or ask before:
 
 The current active implementation target is:
 
-- `specs/069-cockpit-risky-gate-alignment/spec.md`
+- `specs/070-single-user-performance-target/spec.md`
 
 This roadmap should guide future specs, but it should not replace `.specify/feature.json` as the active feature pointer.
 

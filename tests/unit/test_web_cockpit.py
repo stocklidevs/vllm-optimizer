@@ -143,8 +143,11 @@ def test_web_cockpit_renders_model_profile_selector() -> None:
     assert "max_num_seqs=16" in html
     assert 'data-profile-card' in html
     assert 'data-objective-target="performance"' in html
+    assert 'data-objective-target="single_user"' in html
+    assert "Single User" in html
     assert 'data-objective-target="stability"' in html
     assert 'data-objective-target="tool_use"' in html
+    assert "if (target === 'single_user') return 'single_user';" in html
 
 
 def test_web_cockpit_controller_buttons_copy_commands() -> None:

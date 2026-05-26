@@ -64,6 +64,16 @@ Run live only after the preview looks right:
 uv run vllm-optimizer sweep-run --config config/local.gx10.json --plan artifacts/sweeps/qwen-prefix-prefill-tool-json/plan.json --out artifacts/sweeps/qwen-prefix-prefill-tool-json/live --timeout-seconds 1200 --continue-on-failure
 ```
 
+For one active user's interactive feel, use the single-user recipe instead of a
+high-concurrency saturation recipe:
+
+```powershell
+uv run vllm-optimizer cockpit-launch --sweep config/sweeps/qwen-single-user-interactive.json --out-dir artifacts/controller/qwen-single-user
+```
+
+That recipe uses the concurrency-one interactive prompt set and ranks the
+`single_user` objective by latency/responsiveness before aggregate throughput.
+
 Promotion stays gated. Use `--allow-promotion` only after repeated confirmation
 supports the change and you intentionally want to write the promoted profile.
 

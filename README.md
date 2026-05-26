@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.3-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.54.4-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -17,7 +17,7 @@ The project is spec-driven with SpecKit and currently supports:
   request, artifact capture, and cleanup.
 - A small Qwen baseline benchmark with fixed prompts and summary metrics.
 - Deterministic small Qwen parameter sweeps with dry-run previews and local
-  ranking for throughput, latency, and balanced objectives.
+  ranking for throughput, latency, balanced, and single-user objectives.
 - Repeated top-two sweep stability analysis with per-candidate aggregates,
   spread metrics, baseline deltas, and stability-aware rankings.
 - Local comparison reports that summarize baseline, sweep, and repeated sweep
@@ -126,7 +126,8 @@ The project is spec-driven with SpecKit and currently supports:
   winner comparison, latency/throughput map, stability band, and failure
   heatmap rendered from canonical report artifacts.
 - Model/profile selection and local optimization target selection for
-  Performance, Stability, Tool Use, and Balanced cockpit workflows.
+  Balanced, Performance, Single User, Stability, and Tool Use cockpit
+  workflows.
 - An objective-first cockpit command center that replaces the old left/right
   rail default with model, target, recipe, primary action, progress, and
   decision-story panels while hiding micro-tweaks in an advanced recipe drawer.
@@ -147,6 +148,9 @@ The project is spec-driven with SpecKit and currently supports:
 - The default C8 active cockpit now applies the sweep's declared risky-session
   allowance consistently, so curated high-impact recipes do not fail before
   any live trials start.
+- Single-user performance is available as a cockpit target and deterministic
+  sweep recipe. It uses a one-request interactive workload and ranks candidates
+  by responsiveness instead of aggregate concurrent throughput.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
@@ -255,6 +259,7 @@ uv run vllm-optimizer cockpit-preview --sweep config/sweeps/qwen-prefix-prefill-
 uv run vllm-optimizer cockpit-run --sweep config/sweeps/qwen-concurrency-saturation-c8.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-c8-live --confirm-live-run
 uv run vllm-optimizer cockpit-launch
 uv run vllm-optimizer cockpit-launch --allow-promotion
+uv run vllm-optimizer cockpit-launch --sweep config/sweeps/qwen-single-user-interactive.json --out-dir artifacts/controller/qwen-single-user
 uv run vllm-optimizer cockpit-server --sweep config/sweeps/qwen-concurrency-saturation-c8.json --config config/local.gx10.json --out-dir artifacts/controller/qwen-c8-active --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --run-index artifacts/catalog/run-index.json --allow-promotion
 uv run vllm-optimizer web-cockpit --catalog artifacts/catalog/knob-groups.json --manifest artifacts/catalog/qwen-c8-control.json --status artifacts/optimizer-runs/qwen-c8-full/execution-status.json --report artifacts/reports/qwen-runtime-env/canonical-report.json --run-index artifacts/catalog/run-index.json --profile config/profiles/qwen3-coder-next-awq-concurrent-recommended.json --profile config/profiles/qwen3-coder-next-awq-recommended.json --out artifacts/cockpit/index.html
 ```
@@ -334,6 +339,11 @@ catalog, selected sweep control manifest, and run index, then starts the active
 cockpit at `http://127.0.0.1:8787`. Optional flags can override the sweep,
 config, output directory, host, and port. Add `--allow-promotion` only when you
 want to test the local selected-candidate promotion write path.
+Use `--sweep config/sweeps/qwen-single-user-interactive.json` when the goal is
+one active user's interactive responsiveness rather than serving many
+simultaneous requests. The Single User cockpit target maps to the
+`single_user` ranking objective, which prioritizes lower latency and stable
+one-request behavior before aggregate tokens/sec.
 For curated risky-session recipes such as the default C8 sweep, the launcher
 honors the sweep's checked-in `allow_risky_session_flags` setting and passes
 that effective allowance to the active server. Safe-session overrides remain
