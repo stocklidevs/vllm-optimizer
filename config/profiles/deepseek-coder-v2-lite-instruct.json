@@ -1,6 +1,6 @@
 {
   "profile_id": "deepseek-coder-v2-lite-instruct",
-  "vllm_executable": "vllm",
+  "vllm_executable": "$HOME/qwen3next-venv/bin/vllm",
   "model": "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
   "served_model_name": "DeepSeek-Coder-V2-Lite-Instruct",
   "host": "0.0.0.0",
@@ -9,5 +9,8 @@
   "gpu_memory_utilization": 0.8,
   "enable_auto_tool_choice": false,
   "tool_call_parser": "auto",
-  "trust_remote_code": true
+  "trust_remote_code": true,
+  "environment": {
+    "HF_HOME": "$HOME/.cache/huggingface-vllm-optimizer"
+  }
 }

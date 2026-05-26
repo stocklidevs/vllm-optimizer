@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.55.0-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.55.1-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -154,6 +154,9 @@ The project is spec-driven with SpecKit and currently supports:
 - A local vLLM model catalog records Qwen, Gemma, GLM, Qwen 27B, and DeepSeek
   candidates with deterministic smoke plans, parser/template metadata, and
   model-aware readiness artifacts before any expensive sweeps run.
+- New-model live runs can export session-scoped profile environment variables;
+  the GLM profile also pins `--moe-backend triton` to avoid the GX10
+  FlashInfer CUTLASS JIT dependency path during smoke readiness.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.

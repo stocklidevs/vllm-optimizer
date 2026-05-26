@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-26
 
-Current release: 0.55.0
+Current release: 0.55.1
 
 ## What Exists
 
@@ -72,10 +72,10 @@ and first benchmarks run.
 
 | Model | Runtime lane | Validation baseline | Local baseline status | Next action |
 | --- | --- | --- | --- | --- |
-| Qwen3 Coder Next AWQ 4-bit | Local vLLM | Existing profile `cyankiwi/Qwen3-Coder-Next-AWQ-4bit`, served as `Qwen3-Coder-Next`, port 8001, `max_model_len=32768`, `gpu_memory_utilization=0.90`, `qwen3_coder` tool parser, interactivity mode. | Measured GX10 reference. Confirmed C8 profile: 6644.200 ms mean latency and 97.683 tokens/sec; saturation sweep candidate recorded 98.415 aggregate tokens/sec. | Keep as the current reference model while new model smoke baselines are added. |
-| Gemma 4 E4B IT | Local vLLM | User-provided baseline: `google/gemma-4-E4B-it`, served as `Gemma-4-E4B-IT`, port 8001, `max_model_len=16384`, `gpu_memory_utilization=0.80`, auto tool choice, `gemma4` tool parser, chat template `~/vllm-templates/tool_chat_template_gemma4.jinja`. | Serve recipe captured, performance not measured in this repo yet. | First Spec 071 smoke target; verify template, plain chat, and tool-call behavior before sweeps. |
-| GLM 4.7 Flash | Local vLLM candidate | Upstream model `zai-org/GLM-4.7-Flash`; upstream card shows vLLM serving support and describes it as a 30B-A3B MoE model. Start with a plain local smoke baseline before enabling tool/parser assumptions. | Not smoked or benchmarked locally yet. | Add catalog entry, generate dry-run smoke plan, then live serve readiness if GX10 dependencies match. |
-| Qwen3.6 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.6-27B`; upstream card lists vLLM compatibility, recommends `vllm>=0.19.0`, and documents Qwen tool-call parser support. | Not smoked or benchmarked locally yet. | Treat as the highest-priority larger Qwen comparison after Gemma; validate memory fit before long-context sweeps. |
+| Qwen3 Coder Next AWQ 4-bit | Local vLLM | Existing profile `cyankiwi/Qwen3-Coder-Next-AWQ-4bit`, served as `Qwen3-Coder-Next`, port 8001, `max_model_len=32768`, `gpu_memory_utilization=0.90`, `qwen3_coder` tool parser, interactivity mode. | Smoke passed on GX10 in `artifacts/models/qwen3-coder-next-awq/live/summary.json`. Measured GX10 reference remains confirmed C8 profile: 6644.200 ms mean latency and 97.683 tokens/sec; saturation sweep candidate recorded 98.415 aggregate tokens/sec. | Keep as the current reference model while new model smoke baselines are added. |
+| Gemma 4 E4B IT | Local vLLM | User-provided baseline: `google/gemma-4-E4B-it`, served as `Gemma-4-E4B-IT`, port 8001, `max_model_len=16384`, `gpu_memory_utilization=0.80`, auto tool choice, `gemma4` tool parser, chat template `$HOME/vllm-templates/tool_chat_template_gemma4.jinja`. | Smoke passed on GX10 in `artifacts/models/gemma-4-e4b-it/live/summary.json`; performance benchmark still pending. | Run first single-user baseline benchmark, then a safe profile sweep once the GX10 is reachable again. |
+| GLM 4.7 Flash | Local vLLM candidate | Upstream model `zai-org/GLM-4.7-Flash`; upstream card shows vLLM serving support and describes it as a 30B-A3B MoE model. Local profile uses `--moe-backend triton` to avoid the FlashInfer CUTLASS JIT path that requires `ninja` on the GX10. | Smoke passed on GX10 in `artifacts/models/glm-4-7-flash/live/summary.json`; performance benchmark still pending. | Run first single-user baseline benchmark, then a safe profile sweep once the GX10 is reachable again. |
+| Qwen3.6 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.6-27B`; upstream card lists vLLM compatibility, recommends `vllm>=0.19.0`, and documents Qwen tool-call parser support. | Live smoke attempted in `artifacts/models/qwen3-6-27b/live/summary.json` and timed out before readiness; Tailscale then reported the GX10 offline, last seen near the timeout window. | Reconnect to the GX10, verify no orphaned vLLM process is left, then retry with a longer smoke window or a lower-memory profile. |
 | Qwen3.5 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.5-27B`; upstream card lists vLLM compatibility, long-context defaults, and `qwen3_coder` tool-call parser support. | Not smoked or benchmarked locally yet. | Optional legacy comparison after Qwen3.6, useful only if we want a generational delta. |
 | DeepSeek Coder V2 Lite Instruct | Local vLLM candidate | Upstream model `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`; upstream card documents 16B total parameters, 2.4B active parameters, 128k context, and a plain vLLM serve example. | Not smoked or benchmarked locally yet. | Add a conservative plain-chat smoke first; tool behavior requires separate validation. |
 

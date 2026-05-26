@@ -1,6 +1,6 @@
 {
   "profile_id": "glm-4-7-flash",
-  "vllm_executable": "vllm",
+  "vllm_executable": "$HOME/qwen3next-venv/bin/vllm",
   "model": "zai-org/GLM-4.7-Flash",
   "served_model_name": "GLM-4.7-Flash",
   "host": "0.0.0.0",
@@ -10,5 +10,11 @@
   "enable_auto_tool_choice": true,
   "tool_call_parser": "glm47",
   "reasoning_parser": "glm45",
-  "trust_remote_code": true
+  "trust_remote_code": true,
+  "optional_flags": {
+    "moe_backend": "triton"
+  },
+  "environment": {
+    "HF_HOME": "$HOME/.cache/huggingface-vllm-optimizer"
+  }
 }

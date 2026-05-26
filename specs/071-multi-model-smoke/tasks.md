@@ -14,7 +14,7 @@
 - [x] T012 Surface model readiness and smoke recommendations in `src/vllm_optimizer/web_cockpit.py`.
 - [x] T013 Update README and setup documentation with multi-model smoke workflow commands.
 - [x] T014 Run focused tests, release check, and cockpit smoke rendering validation.
-- [ ] T015 Commit the local model catalog and smoke workflow implementation.
+- [x] T015 Commit the local model catalog and smoke workflow implementation.
 - [ ] T016 Run model-aware live smoke checks for all catalog models on the GX10.
 - [ ] T017 Run first baseline benchmarks for models that pass smoke readiness.
 - [ ] T018 Run the initial safe multi-profile sweep for models with a measured baseline.

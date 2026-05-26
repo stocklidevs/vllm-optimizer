@@ -211,7 +211,7 @@ def run_baseline_benchmark(
 
     script = build_remote_benchmark_script(profile, prompt_set, timeout_seconds, session_tuning)
     result = SshExecutor(target.ssh_destination).run(
-        "benchmark-run", script, timeout_seconds + 60
+        "benchmark-run", script, timeout_seconds + 120
     )
     parsed = parse_remote_benchmark_output(result.stdout)
     metrics = parsed["metrics"]
@@ -235,10 +235,11 @@ def build_remote_benchmark_script(
     timeout_seconds: int,
     session_tuning: SessionTuningProfile | None = None,
 ) -> str:
-    from .serve_profiles import render_vllm_serve_command, shell_join
+    from .serve_profiles import render_environment_exports, render_vllm_serve_command, shell_join
 
     serve_command = shell_join(render_vllm_serve_command(profile))
     path_export = build_vllm_bin_path_export(profile.vllm_executable)
+    environment_exports = render_environment_exports(profile)
     tuning_prelude = build_session_tuning_preview(session_tuning)["prelude"] if session_tuning else ""
     cases_json = json_dump(
         [
@@ -256,6 +257,7 @@ set -u
 LOG=$(mktemp /tmp/vllm-benchmark-{profile.profile_id}.XXXXXX.log)
 PID=""
 {path_export}
+{environment_exports}
 {tuning_prelude}
 cleanup() {{
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then

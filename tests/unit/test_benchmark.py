@@ -4,6 +4,7 @@ import pytest
 
 from vllm_optimizer.benchmark import (
     BenchmarkError,
+    build_remote_benchmark_script,
     build_vllm_bin_path_export,
     build_benchmark_plan,
     load_prompt_set,
@@ -76,6 +77,15 @@ def test_build_vllm_bin_path_export_adds_venv_bin_to_path() -> None:
 
 def test_build_vllm_bin_path_export_ignores_pathless_executable() -> None:
     assert build_vllm_bin_path_export("vllm") == ""
+
+
+def test_remote_benchmark_script_exports_profile_environment() -> None:
+    profile = load_serve_profile(Path("config/profiles/gemma-4-e4b-it.json"))
+    prompts = load_prompt_set(Path("config/prompts/qwen-coding-interactive-concurrency-1.json"))
+
+    script = build_remote_benchmark_script(profile, prompts, timeout_seconds=30)
+
+    assert "export HF_HOME=$HOME/.cache/huggingface-vllm-optimizer" in script
 
 
 def test_summarize_metrics() -> None:

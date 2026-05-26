@@ -7,7 +7,7 @@ from typing import Any
 from .artifacts import write_json
 from .discovery import DiscoveryTarget
 from .redaction import REDACTION, redact_data
-from .serve_profiles import ServeProfile, render_vllm_serve_command, shell_join
+from .serve_profiles import ServeProfile, render_environment_exports, render_vllm_serve_command, shell_join
 from .ssh import SshExecutor
 
 
@@ -78,34 +78,21 @@ def run_smoke_serve(
         )
 
     script = build_remote_smoke_script(profile, timeout_seconds)
-    result = SshExecutor(target.ssh_destination).run("smoke-serve", script, timeout_seconds + 30)
+    result = SshExecutor(target.ssh_destination).run("smoke-serve", script, timeout_seconds + 120)
     parsed = parse_remote_smoke_output(result.stdout)
     server_log = parsed.get("server_log", "")
-    remote_summary = parsed.get("summary", {})
-    cleanup = parsed.get("cleanup", {})
     response = parsed.get("response", {})
     tool_response = parsed.get("tool_response", {})
-    serve_ready = bool(remote_summary.get("ready"))
-    chat_ready = response_success(response)
-    tool_ready = "unsupported"
-    if profile.enable_auto_tool_choice:
-        tool_ready = "passed" if response_success(tool_response) and "tool_calls" in str(tool_response.get("raw", "")) else "failed"
-    required_tool_failed = tool_probe_required is True and tool_ready != "passed"
-    cleanup_ready = bool(cleanup.get("cleaned"))
-    summary = {
-        "status": "passed" if result.exit_code == 0 and chat_ready and not required_tool_failed else "failed",
-        "exit_code": result.exit_code,
-        "stderr": result.stderr,
-        "preflight": preflight,
-        "remote_summary": remote_summary,
-        "model": model_context or {},
-        "model_id": (model_context or {}).get("model_id"),
-        "profile_id": profile.profile_id,
-        "serve_ready": serve_ready,
-        "chat_ready": chat_ready,
-        "tool_ready": tool_ready,
-        "cleanup_ready": cleanup_ready,
-    }
+    cleanup = parsed.get("cleanup", {})
+    summary = classify_smoke_summary(
+        profile=profile,
+        exit_code=result.exit_code,
+        stderr=result.stderr,
+        preflight=preflight,
+        parsed=parsed,
+        model_context=model_context,
+        tool_probe_required=tool_probe_required,
+    )
     return save_smoke_artifacts(
         out_dir=out_dir,
         target=target,
@@ -150,6 +137,7 @@ def run_preflight(target: DiscoveryTarget, profile: ServeProfile) -> dict[str, A
 
 def build_remote_smoke_script(profile: ServeProfile, timeout_seconds: int) -> str:
     serve_command = shell_join(render_vllm_serve_command(profile))
+    environment_exports = render_environment_exports(profile)
     request = {
         "model": profile.served_model_name,
         "messages": [{"role": "user", "content": "Say OK."}],
@@ -191,6 +179,8 @@ def build_remote_smoke_script(profile: ServeProfile, timeout_seconds: int) -> st
 set -u
 LOG=$(mktemp /tmp/vllm-smoke-{profile.profile_id}.XXXXXX.log)
 PID=""
+rm -f /tmp/vllm-smoke-response.json /tmp/vllm-smoke-tool-response.json /tmp/vllm-smoke-models.json /tmp/vllm-smoke-curl.err /tmp/vllm-smoke-request.err /tmp/vllm-smoke-tool-request.err
+{environment_exports}
 cleanup() {{
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
     kill "$PID" 2>/dev/null || true
@@ -304,6 +294,55 @@ def response_success(response: dict[str, Any]) -> bool:
         return False
     _payload, status_text = raw.rsplit("HTTP_STATUS:", 1)
     return status_text.strip().splitlines()[0] == "200"
+
+
+def classify_smoke_summary(
+    *,
+    profile: ServeProfile,
+    exit_code: int,
+    stderr: str,
+    preflight: dict[str, Any],
+    parsed: dict[str, Any],
+    model_context: dict[str, Any] | None,
+    tool_probe_required: bool | None,
+) -> dict[str, Any]:
+    remote_summary = parsed.get("summary", {})
+    if not isinstance(remote_summary, dict):
+        remote_summary = {}
+    response = parsed.get("response", {})
+    if not isinstance(response, dict):
+        response = {}
+    tool_response = parsed.get("tool_response", {})
+    if not isinstance(tool_response, dict):
+        tool_response = {}
+    cleanup = parsed.get("cleanup", {})
+    if not isinstance(cleanup, dict):
+        cleanup = {}
+    serve_ready = bool(remote_summary.get("ready"))
+    chat_ready = serve_ready and response_success(response)
+    tool_ready = "unsupported"
+    if profile.enable_auto_tool_choice:
+        tool_ready = (
+            "passed"
+            if serve_ready and response_success(tool_response) and "tool_calls" in str(tool_response.get("raw", ""))
+            else "failed"
+        )
+    required_tool_failed = tool_probe_required is True and tool_ready != "passed"
+    cleanup_ready = bool(cleanup.get("cleaned"))
+    return {
+        "status": "passed" if exit_code == 0 and chat_ready and not required_tool_failed else "failed",
+        "exit_code": exit_code,
+        "stderr": stderr,
+        "preflight": preflight,
+        "remote_summary": remote_summary,
+        "model": model_context or {},
+        "model_id": (model_context or {}).get("model_id"),
+        "profile_id": profile.profile_id,
+        "serve_ready": serve_ready,
+        "chat_ready": chat_ready,
+        "tool_ready": tool_ready,
+        "cleanup_ready": cleanup_ready,
+    }
 
 
 def section(text: str, start: str, end: str) -> str:

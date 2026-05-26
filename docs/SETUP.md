@@ -47,6 +47,11 @@ entries are local vLLM candidates only and point at committed serve profiles for
 Qwen, Gemma, GLM, Qwen 27B variants, and DeepSeek. New models should pass a
 model-aware smoke check before benchmark or sweep results are compared.
 
+Model profiles may export session-scoped environment variables before starting
+vLLM. The committed new-model profiles use `HF_HOME=$HOME/.cache/huggingface-vllm-optimizer`
+so live smoke and benchmark runs avoid root-owned Hugging Face cache locks on
+the GX10 without changing system ownership or deleting existing cache data.
+
 ## Safe First Workflow
 
 Start with local planning and previews:

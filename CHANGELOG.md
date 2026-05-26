@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.55.1 - 2026-05-26
+
+- Added serve-profile environment exports so model smoke and benchmark runs can
+  use a user-owned Hugging Face cache on the GX10.
+- Fixed plain-chat serve profiles so `--tool-call-parser` is omitted when auto
+  tool choice is disabled.
+- Added `moe_backend` as an approved session flag and set GLM 4.7 Flash to
+  `--moe-backend triton`, avoiding the FlashInfer CUTLASS JIT path that
+  requires `ninja`.
+- Increased live smoke and benchmark SSH timeout buffers so long model startup
+  attempts have room to cleanup and write artifacts.
+- Recorded Spec 071 live smoke results for Qwen3 Coder Next, Gemma 4 E4B IT,
+  GLM 4.7 Flash, and the timed-out Qwen3.6 27B attempt.
+
 ## 0.55.0 - 2026-05-26
 
 - Added a local vLLM model catalog for Qwen3 Coder Next, Gemma 4 E4B IT, GLM
