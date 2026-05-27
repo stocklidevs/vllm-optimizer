@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.5 - 2026-05-27
+
+- Removed remaining integration and pipeline test dependencies on ignored local
+  benchmark artifacts, completing the fresh-clone test cleanup.
+
 ## 0.56.4 - 2026-05-27
 
 - Removed the last unit-test dependency on ignored local `artifacts/` files so
