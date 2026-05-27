@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.55.4 - 2026-05-27
+
+- Created Spec 072 for public alpha release readiness and benchmark results
+  presentation, including publishability, safety, fresh-checkout verification,
+  and honest single-user versus aggregate-throughput explanation tasks.
+- Updated active SpecKit pointers to the public alpha release feature.
+
 ## 0.55.3 - 2026-05-27
 
 - Added GX10 live-run cache hygiene to the project roadmap and autonomy spec:

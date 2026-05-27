@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/071-multi-model-smoke/plan.md
+specs/072-public-alpha-release/plan.md
 <!-- SPECKIT END -->

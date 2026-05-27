@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-27
 
-Current release: 0.55.3
+Current release: 0.55.4
 
 ## What Exists
 
