@@ -58,7 +58,7 @@ As a maintainer, I want a repeatable release checklist that validates the public
 ### Edge Cases
 
 - A public reader assumes the 98 tokens/sec C8 result is per user instead of aggregate throughput.
-- A public reader lacks GX10, Tailscale, vLLM, or NVIDIA hardware.
+- A public reader lacks GX10, private network, vLLM, or NVIDIA hardware.
 - A public user tries to run live commands without creating a local ignored config.
 - A benchmark result exists but the source artifact is missing or stale.
 - A dependency install or test run works locally but fails from a clean clone because files are ignored or undocumented.

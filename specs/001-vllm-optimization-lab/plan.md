@@ -26,7 +26,7 @@ plans, command previews, fixture metrics, and reports
 **Testing**: pytest unit and integration tests
 
 **Target Platform**: Local Windows controller now; remote Linux GX10 later via
-Tailscale SSH
+configured SSH
 
 **Project Type**: Python CLI plus importable library
 

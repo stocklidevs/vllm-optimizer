@@ -22,7 +22,7 @@ benchmark modules
 
 **Testing**: pytest unit and integration tests
 
-**Target Platform**: Local Windows controller; remote GX10 through Tailscale SSH
+**Target Platform**: Local Windows controller; remote GX10 through configured SSH
 for approved live runs
 
 **Project Type**: Python CLI

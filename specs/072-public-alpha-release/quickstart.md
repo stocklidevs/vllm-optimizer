@@ -36,7 +36,7 @@ CHANGELOG.md
 
 Live runs remain optional. They require:
 
-- Tailscale SSH access.
+- configured SSH access.
 - Ignored local config such as `config/local.gx10.json`.
 - Explicit live-run gates.
 - One-model-at-a-time cache cleanup.

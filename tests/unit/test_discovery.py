@@ -10,8 +10,8 @@ def test_load_target_from_fixture() -> None:
     target = load_target(Path("tests/fixtures/discovery/local.gx10.mock.json"))
 
     assert target.target_label == "gx10"
-    assert target.ssh_destination == "mock-user@100.84.106.41"
-    assert "100.84.106.41" in target.redact_values
+    assert target.ssh_destination == "mock-user@203.0.113.10"
+    assert "203.0.113.10" in target.redact_values
 
 
 def test_load_target_rejects_bad_timeout(tmp_path: Path) -> None:

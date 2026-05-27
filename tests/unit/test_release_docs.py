@@ -2,6 +2,16 @@ from pathlib import Path
 
 from vllm_optimizer import __version__
 
+PUBLIC_SCAN_ROOTS = (
+    Path("README.md"),
+    Path("CONTRIBUTING.md"),
+    Path("SECURITY.md"),
+    Path("docs"),
+    Path("specs"),
+    Path("src"),
+    Path("tests"),
+)
+
 
 def test_setup_guide_documents_safe_release_workflows() -> None:
     setup = Path("docs/SETUP.md").read_text(encoding="utf-8")
@@ -46,6 +56,49 @@ def test_public_results_explain_aggregate_throughput() -> None:
         "DeepSeek Coder V2 Lite Instruct",
     ):
         assert model_name in results
+
+
+def test_public_tree_has_no_private_machine_references() -> None:
+    tailnet_ip = ".".join(("100", "84", "106", "41"))
+    local_windows_root = "C:" + "/Users"
+    local_windows_root_backslash = "C:" + "\\Users"
+    source_repos = "source" + "/repos"
+    source_repos_backslash = "source" + "\\repos"
+    private_key_name = "id" + "_ed25519"
+    private_user = "alt" + "sens"
+    private_network_name = "Tail" + "scale"
+    private_network_name_lower = private_network_name.lower()
+    private_network_subnet_name = "Tail" + "net"
+    local_user = "ps" + "toc"
+    blocked_terms = (
+        tailnet_ip,
+        private_user,
+        private_network_name,
+        private_network_name_lower,
+        private_network_subnet_name,
+        local_windows_root,
+        local_windows_root_backslash,
+        local_user,
+        source_repos,
+        source_repos_backslash,
+        private_key_name,
+    )
+    texts = []
+    for root in PUBLIC_SCAN_ROOTS:
+        paths = [root] if root.is_file() else [path for path in root.rglob("*") if path.is_file()]
+        for path in paths:
+            if path.suffix.lower() in {".pyc", ".png", ".jpg", ".jpeg", ".gif", ".ico"}:
+                continue
+            texts.append((path, path.read_text(encoding="utf-8", errors="ignore")))
+
+    offenders = [
+        f"{path}: {term}"
+        for path, text in texts
+        for term in blocked_terms
+        if term in text
+    ]
+
+    assert offenders == []
 
 
 def test_changelog_contains_current_version_release_notes() -> None:

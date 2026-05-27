@@ -15,7 +15,7 @@ uv run pytest
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 ```
 
-Expected result: version `0.56.0`, passing tests, and a release-check report
+Expected result: version `0.56.1`, passing tests, and a release-check report
 with `overall_status: pass`.
 
 ## Local Environment
@@ -25,7 +25,7 @@ Requirements:
 - Python 3.11 or newer
 - `uv`
 - Git
-- Tailscale SSH access for optional live GX10 runs
+- configured SSH access for optional live GX10 runs
 
 Install and verify locally:
 
@@ -46,13 +46,13 @@ uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json -
 
 Live runs expect a local, ignored target config such as `config/local.gx10.json`.
 Keep credentials and host-specific paths out of committed files. Before sharing
-logs or reports, redact SSH usernames, Tailnet IP addresses when needed, local
+logs or reports, redact SSH usernames, private host addresses when needed, local
 absolute paths, tokens, passwords, and private model-cache paths.
 
 The current GX10 target has used:
 
 ```text
-altsens@100.84.106.41
+user@host.example
 ```
 
 The Qwen profile expects the remote vLLM executable path recorded in the profile
@@ -88,8 +88,8 @@ next command immediately reuses it.
 Check the live cache footprint:
 
 ```powershell
-ssh altsens@100.84.106.41 df -h /
-ssh altsens@100.84.106.41 du -sh /home/altsens/.cache/huggingface /home/altsens/.cache/huggingface-vllm-optimizer /.cache/huggingface
+ssh user@host.example df -h /
+ssh user@host.example du -sh '$HOME/.cache/huggingface' '$HOME/.cache/huggingface-vllm-optimizer' '/.cache/huggingface'
 ```
 
 The committed multi-model profiles use:
@@ -102,7 +102,7 @@ After a one-model block is done, remove only the matching optimizer-owned model
 directory or clear the dedicated optimizer cache if no follow-on run needs it:
 
 ```powershell
-ssh altsens@100.84.106.41 rm -rf /home/altsens/.cache/huggingface-vllm-optimizer/hub/models--OWNER--MODEL /home/altsens/.cache/huggingface-vllm-optimizer/xet
+ssh user@host.example rm -rf '$HOME/.cache/huggingface-vllm-optimizer/hub/models--OWNER--MODEL' '$HOME/.cache/huggingface-vllm-optimizer/xet'
 ```
 
 After the latest manual cleanup, the GX10 root filesystem reported 916G total,

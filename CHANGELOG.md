@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.56.1 - 2026-05-27
+
+- Scrubbed public-facing setup docs, specs, source messages, and tests of the
+  real private SSH target, private-network product references, and local static
+  machine paths before public alpha publication.
+- Replaced redaction fixtures with documentation-safe placeholder addresses.
+
 ## 0.56.0 - 2026-05-27
 
 - Prepared the repository for public alpha publication with MIT licensing,

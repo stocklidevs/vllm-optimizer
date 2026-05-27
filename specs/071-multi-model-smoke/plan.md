@@ -27,7 +27,7 @@ handoff documentation
 **Testing**: pytest unit and integration tests
 
 **Target Platform**: Local controller on Windows, remote Asus GX10 reachable
-through existing Tailscale SSH configuration
+through existing configured SSH configuration
 
 **Project Type**: Python CLI plus dependency-free local web cockpit
 

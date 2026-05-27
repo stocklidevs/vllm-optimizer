@@ -6,13 +6,13 @@
 
 **Status**: Draft
 
-**Input**: User description: "Add read-only GX10 discovery over Tailscale SSH. The system should verify connectivity, collect host, operating system, GPU, NVIDIA driver, CUDA visibility, Python, and vLLM environment facts, redact configured secrets, save discovery artifacts, and fail safely without mutating the remote host or starting vLLM."
+**Input**: User description: "Add read-only GX10 discovery over configured SSH. The system should verify connectivity, collect host, operating system, GPU, NVIDIA driver, CUDA visibility, Python, and vLLM environment facts, redact configured secrets, save discovery artifacts, and fail safely without mutating the remote host or starting vLLM."
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Verify GX10 Connectivity Safely (Priority: P1)
 
-As the operator, I want to check whether the GX10 is reachable over Tailscale
+As the operator, I want to check whether the GX10 is reachable over private network
 SSH using read-only commands so I know whether live discovery can proceed.
 
 **Why this priority**: Connectivity is the first real contact with the remote
@@ -79,7 +79,7 @@ configured secret values and verifying the saved artifacts contain redactions.
 
 ### Edge Cases
 
-- The Tailscale host alias is missing or incorrect.
+- The private network host alias is missing or incorrect.
 - SSH authentication fails or prompts for interaction.
 - SSH connects but a probe command times out.
 - `nvidia-smi` is absent, broken, or reports no visible GPU.
@@ -168,9 +168,9 @@ configured secret values and verifying the saved artifacts contain redactions.
 
 - The operator will provide the GX10 SSH destination through local config or an
   environment variable outside version control.
-- The known Tailscale address can be supplied locally as configuration and
+- The known private network address can be supplied locally as configuration and
   should be included in redaction values before artifacts are saved.
-- Tailscale SSH or an SSH route to the GX10 already exists before live
+- configured SSH or an SSH route to the GX10 already exists before live
   discovery is attempted.
 - Initial implementation may use mock executor fixtures before a real SSH
   executor is enabled.

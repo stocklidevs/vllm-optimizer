@@ -33,7 +33,7 @@ In scope:
 
 Out of scope for the public alpha:
 
-- Attacks requiring access to a maintainer's private GX10, Tailscale account,
+- Attacks requiring access to a maintainer's private GX10, private network account,
   SSH key, password, or local workstation.
 - Persistent system tuning, Docker cleanup, firmware, kernel, boot, service, or
   credential changes that are explicitly outside the supported optimizer scope.

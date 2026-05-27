@@ -18,7 +18,7 @@ Prepare vLLM Optimizer for a public alpha source release by adding public reposi
 
 **Testing**: pytest plus the existing `release-check` command
 
-**Target Platform**: Public GitHub source repository, local Windows/Linux development, optional remote GX10 via Tailscale SSH
+**Target Platform**: Public GitHub source repository, local Windows/Linux development, optional remote GX10 via configured SSH
 
 **Project Type**: Python CLI plus dependency-free local web cockpit
 

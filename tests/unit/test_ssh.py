@@ -13,7 +13,7 @@ def test_ssh_executor_uses_batch_mode_and_destination(monkeypatch) -> None:
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = SshExecutor("altsens@example").run("connectivity", "hostname", 10)
+    result = SshExecutor("user@example.invalid").run("connectivity", "hostname", 10)
 
     assert result.exit_code == 0
     assert result.stdout == "gx10\n"
@@ -23,7 +23,7 @@ def test_ssh_executor_uses_batch_mode_and_destination(monkeypatch) -> None:
         "BatchMode=yes",
         "-o",
         "ConnectTimeout=10",
-        "altsens@example",
+        "user@example.invalid",
         "hostname",
     ]
     assert captured["kwargs"]["timeout"] == 15

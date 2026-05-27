@@ -12,7 +12,7 @@ def test_ssh_executor_uses_utf8_replacement_decoding(monkeypatch) -> None:
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    SshExecutor("altsens@example").run("probe", "hostname", 10)
+    SshExecutor("user@example.invalid").run("probe", "hostname", 10)
 
     assert captured["kwargs"]["encoding"] == "utf-8"
     assert captured["kwargs"]["errors"] == "replace"

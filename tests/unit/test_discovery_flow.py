@@ -34,7 +34,7 @@ def test_discovery_success_saves_redacted_artifacts(tmp_path: Path) -> None:
     assert result["status"] == "completed"
     raw_text = (tmp_path / "raw-probes.json").read_text(encoding="utf-8")
     summary_text = (tmp_path / "summary.json").read_text(encoding="utf-8")
-    assert "100.84.106.41" not in raw_text
+    assert "203.0.113.10" not in raw_text
     assert "/home/mock-user/private-models" not in raw_text
-    assert "100.84.106.41" not in summary_text
+    assert "203.0.113.10" not in summary_text
     assert result["redaction"]["redacted_value_count"] > 0

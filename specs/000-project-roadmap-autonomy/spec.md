@@ -140,7 +140,7 @@ Codex may proceed without additional user input when:
 Codex must pause or ask before:
 
 - Making persistent Linux, NVIDIA, firmware, kernel, boot, or system service changes on the GX10.
-- Changing credentials, SSH identity, Tailscale settings, or remote access assumptions.
+- Changing credentials, SSH identity, private network settings, or remote access assumptions.
 - Deleting user data, resetting git history, force-pushing, or overwriting unrelated user edits.
 - Auto-promoting a profile or configuration without the explicit promotion gate required by the relevant spec.
 - Choosing between materially different product directions that are not already decided here.
