@@ -1,6 +1,6 @@
 # Public Release Checklist
 
-Release label: `0.56.1 public alpha`
+Release label: `0.56.2 public alpha`
 
 This checklist defines the minimum evidence needed before publishing the
 repository or announcing the alpha. It is intentionally practical: a new reader
@@ -18,6 +18,8 @@ local verification path without a GX10.
 - `docs/PROJECT_STATUS.md`
 - `docs/RESULTS.md`
 - `docs/PUBLIC_RELEASE.md`
+- `docs/PUBLICATION_CHECKLIST.md`
+- `.github/workflows/ci.yml`
 - `specs/000-project-roadmap-autonomy/spec.md`
 
 ## Fresh-Checkout Verification
@@ -33,7 +35,7 @@ uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json -
 
 Expected outcomes:
 
-- `vllm-optimizer --version` prints `0.56.1`.
+- `vllm-optimizer --version` prints `0.56.2`.
 - `pytest` passes.
 - `release-check` writes JSON and Markdown reports with `overall_status:
   pass`.
@@ -43,11 +45,14 @@ Expected outcomes:
 
 Recorded on 2026-05-27:
 
-- Focused release docs tests: `9 passed`.
-- Full test suite: `286 passed`.
-- Version check: `0.56.1`.
+- Focused release docs/version tests: `12 passed`.
+- Full test suite: `287 passed`.
+- Version check: `0.56.2`.
 - Release-check: `overall_status: pass` in
   `artifacts/catalog/release-check.json`.
+- Pinned npm dependency install: `npm ci` passed.
+- npm vulnerability audit: `npm audit --audit-level=high` found `0`
+  vulnerabilities.
 - Active SpecKit feature: completed before the release commit.
 - Git status: clean after the release commit.
 
@@ -78,4 +83,4 @@ credentials.
 1. Keep this work as a public alpha branch for review.
 2. Merge it into `main` and publish the repository as alpha.
 3. Push a pull request and request review before public release.
-4. Tag `v0.56.1-alpha` after the final release-check passes.
+4. Tag `v0.56.2-alpha` after the final release-check passes.

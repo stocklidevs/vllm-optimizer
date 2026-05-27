@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.2 - 2026-05-27
+
+- Added a publication checklist that defines the local gates, GitHub gates, and
+  explicit stop line before pushing a public branch.
+- Added a GitHub Actions CI workflow for pytest, release-check, pinned npm
+  install, and npm vulnerability audit.
+- Linked the publication checklist from the README and public release checklist.
+- Recorded Spec 073 as the completed public branch cleanup feature.
+
 ## 0.56.1 - 2026-05-27
 
 - Scrubbed public-facing setup docs, specs, source messages, and tests of the

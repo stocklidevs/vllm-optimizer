@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.56.1-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.56.2-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -14,6 +14,7 @@ Start here:
 - [Setup Guide](docs/SETUP.md)
 - [Optimization Results](docs/RESULTS.md)
 - [Public Release Checklist](docs/PUBLIC_RELEASE.md)
+- [Publication Checklist](docs/PUBLICATION_CHECKLIST.md)
 - [Project Status](docs/PROJECT_STATUS.md)
 - [Roadmap and Autonomy Rules](specs/000-project-roadmap-autonomy/spec.md)
 - [Contributing](CONTRIBUTING.md)

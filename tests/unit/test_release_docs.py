@@ -36,6 +36,7 @@ def test_readme_links_public_alpha_docs() -> None:
     assert "public alpha" in readme.lower()
     assert "[Optimization Results](docs/RESULTS.md)" in readme
     assert "[Public Release Checklist](docs/PUBLIC_RELEASE.md)" in readme
+    assert "[Publication Checklist](docs/PUBLICATION_CHECKLIST.md)" in readme
     assert "[Contributing](CONTRIBUTING.md)" in readme
     assert "[Security](SECURITY.md)" in readme
     assert "[License](LICENSE)" in readme

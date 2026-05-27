@@ -4,5 +4,5 @@ read:
 specs/000-project-roadmap-autonomy/spec.md
 
 For the current active SpecKit feature, read:
-specs/072-public-alpha-release/plan.md
+specs/073-public-branch-cleanup/plan.md
 <!-- SPECKIT END -->
