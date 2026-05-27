@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.55.3 - 2026-05-27
+
+- Added GX10 live-run cache hygiene to the project roadmap and autonomy spec:
+  run one model at a time, clean optimizer-owned model/cache files after each
+  model block, verify disk state before continuing, and keep root-owned Docker
+  or system cache deletion behind explicit user/sudo action.
+
 ## 0.55.2 - 2026-05-27
 
 - Added safe single-user, latency, balanced, and throughput profile sweep
