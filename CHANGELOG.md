@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.4 - 2026-05-27
+
+- Removed the last unit-test dependency on ignored local `artifacts/` files so
+  fresh public clones and GitHub Actions can run the report tests.
+
 ## 0.56.3 - 2026-05-27
 
 - Updated CI to install the `dev` dependency group explicitly before running
