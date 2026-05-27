@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-27
 
-Current release: 0.56.5 public alpha
+Current release: 0.56.6 public alpha
 
 ## Public Alpha Scope
 

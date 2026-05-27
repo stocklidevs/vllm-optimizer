@@ -15,7 +15,7 @@ uv run pytest
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 ```
 
-Expected result: version `0.56.5`, passing tests, and a release-check report
+Expected result: version `0.56.6`, passing tests, and a release-check report
 with `overall_status: pass`.
 
 ## Local Environment

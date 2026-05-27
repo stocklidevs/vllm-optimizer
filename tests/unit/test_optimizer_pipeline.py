@@ -343,7 +343,7 @@ def _write_test_sweep(tmp_path: Path) -> Path:
         },
     )
     sweep = read_json(Path("config/sweeps/qwen-small-sweep.json"))
-    sweep["baseline_summary_path"] = baseline_path.as_posix()
+    sweep["baseline_summary"] = baseline_path.as_posix()
     sweep_path = tmp_path / "qwen-small-sweep.json"
     write_json(sweep_path, sweep)
     return sweep_path

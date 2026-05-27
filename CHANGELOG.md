@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.6 - 2026-05-27
+
+- Corrected the fresh-clone optimizer pipeline fixture to override the source
+  sweep baseline field instead of the derived plan field.
+
 ## 0.56.5 - 2026-05-27
 
 - Removed remaining integration and pipeline test dependencies on ignored local
