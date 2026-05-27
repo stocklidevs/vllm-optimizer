@@ -15,7 +15,7 @@
 - [x] T013 Update README and setup documentation with multi-model smoke workflow commands.
 - [x] T014 Run focused tests, release check, and cockpit smoke rendering validation.
 - [x] T015 Commit the local model catalog and smoke workflow implementation.
-- [ ] T016 Run model-aware live smoke checks for all catalog models on the GX10.
-- [ ] T017 Run first baseline benchmarks for models that pass smoke readiness.
-- [ ] T018 Run the initial safe multi-profile sweep for models with a measured baseline.
-- [ ] T019 Update the model baseline tracker with live results, version, changelog, and final commit.
+- [x] T016 Run model-aware live smoke checks for all catalog models on the GX10.
+- [x] T017 Run first baseline benchmarks for models that pass smoke readiness.
+- [x] T018 Run the initial safe multi-profile sweep for models with a measured baseline.
+- [x] T019 Update the model baseline tracker with live results, version, changelog, and final commit.

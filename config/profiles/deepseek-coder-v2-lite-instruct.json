@@ -10,6 +10,9 @@
   "enable_auto_tool_choice": false,
   "tool_call_parser": "auto",
   "trust_remote_code": true,
+  "optional_flags": {
+    "moe_backend": "triton"
+  },
   "environment": {
     "HF_HOME": "$HOME/.cache/huggingface-vllm-optimizer"
   }

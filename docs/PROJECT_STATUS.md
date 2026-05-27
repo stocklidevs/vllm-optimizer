@@ -1,8 +1,8 @@
 # Project Status
 
-Last updated: 2026-05-26
+Last updated: 2026-05-27
 
-Current release: 0.55.1
+Current release: 0.55.2
 
 ## What Exists
 
@@ -18,6 +18,8 @@ The current system can:
   responsiveness.
 - List local vLLM model candidates and generate model-aware smoke plans before
   benchmarking new models.
+- Run one-model-at-a-time live smoke, baseline, and safe-profile sweeps for
+  catalog models while keeping Hugging Face cache usage explicit.
 - Produce report and release artifacts for cockpit consumption.
 - Launch a local active cockpit with objective-first controls, live progress,
   report review, candidate selection, and gated promotion.
@@ -64,20 +66,44 @@ The cockpit should stay objective-first:
 
 ## Model Baseline Tracker
 
-Validated on 2026-05-26 against upstream model pages and vLLM
-documentation. "Baseline" means the starting serve/readiness baseline to record
-before optimization. Only Qwen3 Coder Next has local GX10 performance baselines
-today; the new models are not performance-ranked until Spec 071 smoke checks
-and first benchmarks run.
+Validated on 2026-05-26 against upstream model pages, vLLM documentation, and
+live GX10 artifacts. "Baseline" means the first conservative single-user
+benchmark for the model. "Safe sweep top" means the best ranked candidate from
+the initial four-candidate safe-profile sweep; it is not automatically a
+promotion if it does not beat baseline.
 
-| Model | Runtime lane | Validation baseline | Local baseline status | Next action |
-| --- | --- | --- | --- | --- |
-| Qwen3 Coder Next AWQ 4-bit | Local vLLM | Existing profile `cyankiwi/Qwen3-Coder-Next-AWQ-4bit`, served as `Qwen3-Coder-Next`, port 8001, `max_model_len=32768`, `gpu_memory_utilization=0.90`, `qwen3_coder` tool parser, interactivity mode. | Smoke passed on GX10 in `artifacts/models/qwen3-coder-next-awq/live/summary.json`. Measured GX10 reference remains confirmed C8 profile: 6644.200 ms mean latency and 97.683 tokens/sec; saturation sweep candidate recorded 98.415 aggregate tokens/sec. | Keep as the current reference model while new model smoke baselines are added. |
-| Gemma 4 E4B IT | Local vLLM | User-provided baseline: `google/gemma-4-E4B-it`, served as `Gemma-4-E4B-IT`, port 8001, `max_model_len=16384`, `gpu_memory_utilization=0.80`, auto tool choice, `gemma4` tool parser, chat template `$HOME/vllm-templates/tool_chat_template_gemma4.jinja`. | Smoke passed on GX10 in `artifacts/models/gemma-4-e4b-it/live/summary.json`; performance benchmark still pending. | Run first single-user baseline benchmark, then a safe profile sweep once the GX10 is reachable again. |
-| GLM 4.7 Flash | Local vLLM candidate | Upstream model `zai-org/GLM-4.7-Flash`; upstream card shows vLLM serving support and describes it as a 30B-A3B MoE model. Local profile uses `--moe-backend triton` to avoid the FlashInfer CUTLASS JIT path that requires `ninja` on the GX10. | Smoke passed on GX10 in `artifacts/models/glm-4-7-flash/live/summary.json`; performance benchmark still pending. | Run first single-user baseline benchmark, then a safe profile sweep once the GX10 is reachable again. |
-| Qwen3.6 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.6-27B`; upstream card lists vLLM compatibility, recommends `vllm>=0.19.0`, and documents Qwen tool-call parser support. | Live smoke attempted in `artifacts/models/qwen3-6-27b/live/summary.json` and timed out before readiness; Tailscale then reported the GX10 offline, last seen near the timeout window. | Reconnect to the GX10, verify no orphaned vLLM process is left, then retry with a longer smoke window or a lower-memory profile. |
-| Qwen3.5 27B | Local vLLM candidate | Upstream model `Qwen/Qwen3.5-27B`; upstream card lists vLLM compatibility, long-context defaults, and `qwen3_coder` tool-call parser support. | Not smoked or benchmarked locally yet. | Optional legacy comparison after Qwen3.6, useful only if we want a generational delta. |
-| DeepSeek Coder V2 Lite Instruct | Local vLLM candidate | Upstream model `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`; upstream card documents 16B total parameters, 2.4B active parameters, 128k context, and a plain vLLM serve example. | Not smoked or benchmarked locally yet. | Add a conservative plain-chat smoke first; tool behavior requires separate validation. |
+| Model | Runtime lane | Live smoke status | Baseline | Safe sweep top | Next action |
+| --- | --- | --- | --- | --- | --- |
+| Qwen3 Coder Next AWQ 4-bit | `cyankiwi/Qwen3-Coder-Next-AWQ-4bit`, served as `Qwen3-Coder-Next`, `max_model_len=32768`, `gpu_memory_utilization=0.90`, `qwen3_coder`, interactivity mode. | Passed in `artifacts/models/qwen3-coder-next-awq/live/summary.json`. | Confirmed C8 reference remains 97.683 tokens/sec and 6644.200 ms mean latency; saturation sweep recorded 98.415 aggregate tokens/sec. | Existing promoted concurrent profile remains the project reference. | Keep as the reference while comparing new models and objective recipes. |
+| Gemma 4 E4B IT | `google/gemma-4-E4B-it`, served as `Gemma-4-E4B-IT`, `max_model_len=16384`, `gpu_memory_utilization=0.80`, `gemma4`, chat template `$HOME/vllm-templates/tool_chat_template_gemma4.jinja`. | Passed in `artifacts/models/gemma-4-e4b-it/live/summary.json`. | 24.561 tokens/sec, 10830.0 ms mean latency, 0 failures. | `gemma-4-e4b-it-safe-profiles-c002-4e4b7240`: 24.579 tokens/sec, 10822.0 ms, `gpu_memory_utilization=0.84`, interactivity mode. | Keep the C002 safe profile as the local comparison point; run objective-specific workloads before promotion. |
+| GLM 4.7 Flash | `zai-org/GLM-4.7-Flash`, local profile uses `--moe-backend triton` because the FlashInfer CUTLASS path requires `ninja` on the GX10. | Passed in `artifacts/models/glm-4-7-flash/live/summary.json`. | 30.045 tokens/sec, 8375.7 ms mean latency, 0 failures. | `glm-4-7-flash-safe-profiles-c002-74dc2794`: 30.545 tokens/sec, 8238.7 ms, `gpu_memory_utilization=0.84`, `moe_backend=triton`, interactivity mode. | Keep Triton MoE pinned; run deeper performance/tool workloads only after cache space is confirmed. |
+| Qwen3.6 27B | `Qwen/Qwen3.6-27B`, Qwen parser/tool metadata recorded in the catalog. | Passed in `artifacts/models/qwen3-6-27b/live/summary.json` after a longer startup window. | 5.636 tokens/sec, 46312.7 ms mean latency, 0 failures. | `qwen3-6-27b-safe-profiles-c002-fcb682db`: 5.628 tokens/sec, 46377.7 ms, `gpu_memory_utilization=0.80`, interactivity mode. | Treat as smoke-ready but not performance-competitive in this safe profile pass. |
+| Qwen3.5 27B | `Qwen/Qwen3.5-27B`, legacy comparison candidate. | Passed in `artifacts/models/qwen3-5-27b/live/summary.json`. | 5.634 tokens/sec, 46328.7 ms mean latency, 0 failures. | `qwen3-5-27b-safe-profiles-c002-c4dedd70`: 5.612 tokens/sec, 46506.7 ms, `gpu_memory_utilization=0.80`, interactivity mode. | Keep only if we want a generational delta; it did not improve over Qwen3.6 in this pass. |
+| DeepSeek Coder V2 Lite Instruct | `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`, plain-chat-first profile with `--moe-backend triton`. | Passed in `artifacts/models/deepseek-coder-v2-lite-instruct/live/summary.json`; tool probe is unsupported/skipped by design. | 47.482 tokens/sec, 4997.7 ms mean latency, 0 failures. | `deepseek-coder-v2-lite-instruct-safe-profiles-c002-a7b18c4c`: 48.353 tokens/sec, 4908.0 ms, `gpu_memory_utilization=0.86`, `moe_backend=triton`, interactivity mode. | Best new-model single-user baseline so far; tool behavior needs a dedicated validation path before tool-use tuning. |
+
+## GX10 Cache Hygiene
+
+The GX10 root filesystem reports 916G total. After removing stale user-owned
+model caches and deleting each one-model-at-a-time optimizer cache, the latest
+disk check showed 578G used and 292G available.
+
+The optimizer-owned caches are now small:
+
+- `/home/altsens/.cache/huggingface`: 17M
+- `/home/altsens/.cache/huggingface-vllm-optimizer`: 17M
+
+Remaining older model files are root-owned under `/.cache/huggingface` and
+require sudo to remove:
+
+- `/.cache/huggingface/hub/models--cyankiwi--GLM-4.7-Flash-AWQ-4bit`: 19G
+- `/.cache/huggingface/hub/models--Qwen--Qwen3.5-35B-A3B-FP8`: 35G
+- `/.cache/huggingface/hub/models--google--gemma-4-26B-A4B-it`: 49G
+- `/.cache/huggingface/xet`: 99M
+
+New live model work should continue to run one model at a time, use the
+profile-scoped `HF_HOME=$HOME/.cache/huggingface-vllm-optimizer`, and delete
+the model cache after each completed block unless the next run reuses that same
+model immediately.
 
 Source notes:
 

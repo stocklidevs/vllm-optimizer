@@ -1,0 +1,15 @@
+{
+  "sweep_id": "glm-4-7-flash-safe-profiles",
+  "profile": "config/profiles/glm-4-7-flash.json",
+  "prompts": "config/prompts/qwen-coding-interactive-concurrency-1.json",
+  "seed": 72,
+  "repetitions": 1,
+  "allow_risky_session_flags": true,
+  "objectives": ["single_user", "latency", "balanced", "throughput"],
+  "candidates": [
+    {"gpu_memory_utilization": 0.80, "max_model_len": 16384, "moe_backend": "triton", "performance_mode": "interactivity"},
+    {"gpu_memory_utilization": 0.84, "max_model_len": 16384, "moe_backend": "triton", "performance_mode": "interactivity"},
+    {"enable_chunked_prefill": true, "enable_prefix_caching": true, "gpu_memory_utilization": 0.84, "max_model_len": 16384, "max_num_batched_tokens": 4096, "max_num_seqs": 16, "moe_backend": "triton", "performance_mode": "interactivity"},
+    {"enable_chunked_prefill": true, "enable_prefix_caching": true, "gpu_memory_utilization": 0.84, "max_model_len": 16384, "max_num_batched_tokens": 8192, "max_num_seqs": 24, "moe_backend": "triton", "performance_mode": "throughput"}
+  ]
+}

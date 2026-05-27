@@ -4,7 +4,7 @@
 
 **Created**: 2026-05-26
 
-**Status**: Implementing
+**Status**: Completed
 
 **Input**: User supplied a Gemma 4 E4B IT vLLM serve recipe and asked to add other models and test them after the Qwen optimization flow. Candidate local models include Gemma 4 E4B IT, GLM 4.7 Flash, Qwen 3.6 27B, DeepSeek Coder V2 Lite, and optional Qwen 3.5 27B.
 

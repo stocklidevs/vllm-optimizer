@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.55.2 - 2026-05-27
+
+- Added safe single-user, latency, balanced, and throughput profile sweep
+  recipes for Gemma 4 E4B IT, GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and
+  DeepSeek Coder V2 Lite Instruct.
+- Pinned DeepSeek Coder V2 Lite Instruct to `--moe-backend triton` after live
+  smoke exposed the same FlashInfer CUTLASS `ninja` dependency path as GLM.
+- Completed live GX10 smoke, baseline, and safe-profile sweeps for Gemma 4 E4B
+  IT, GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite
+  Instruct.
+- Recorded the first multi-model baseline results: Gemma 24.561 tokens/sec,
+  GLM 30.045 tokens/sec, Qwen3.6 5.636 tokens/sec, Qwen3.5 5.634 tokens/sec,
+  and DeepSeek 47.482 tokens/sec.
+- Added GX10 model cache hygiene documentation after cleaning stale user-owned
+  Hugging Face model caches and returning the root filesystem to 292G free.
+- Added regression coverage proving the multi-model safe-profile sweep recipes
+  generate unblocked previews and keep MoE backend risk gates explicit.
+- Retried Qwen3.6 27B live smoke on the GX10 with a longer startup window; the
+  model reached readiness, answered plain chat, passed the tool probe, and
+  cleaned up.
+
 ## 0.55.1 - 2026-05-26
 
 - Added serve-profile environment exports so model smoke and benchmark runs can

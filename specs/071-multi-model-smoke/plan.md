@@ -11,8 +11,8 @@ can move beyond the current Qwen3 Coder Next baseline without mixing artifacts
 or pretending untested models have performance winners. The first concrete new
 baseline is the user-provided Gemma 4 E4B IT vLLM serve recipe; GLM 4.7 Flash,
 Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite Instruct are cataloged as
-local vLLM candidates whose performance baselines remain pending until smoke
-checks and benchmarks run.
+local vLLM candidates with completed smoke checks, first conservative
+baselines, and initial safe-profile sweep rankings.
 
 ## Technical Context
 

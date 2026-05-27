@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.55.1-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.55.2-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -157,6 +157,13 @@ The project is spec-driven with SpecKit and currently supports:
 - New-model live runs can export session-scoped profile environment variables;
   the GLM profile also pins `--moe-backend triton` to avoid the GX10
   FlashInfer CUTLASS JIT dependency path during smoke readiness.
+- Conservative safe-profile sweep recipes are available for Gemma 4 E4B IT,
+  GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite
+  Instruct, with first GX10 baseline and ranking results recorded in the
+  project status handoff.
+- The multi-model workflow documents one-model-at-a-time cache hygiene with a
+  dedicated optimizer `HF_HOME` and explicit cleanup notes for stale model
+  files on the GX10.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.

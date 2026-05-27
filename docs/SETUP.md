@@ -52,6 +52,38 @@ vLLM. The committed new-model profiles use `HF_HOME=$HOME/.cache/huggingface-vll
 so live smoke and benchmark runs avoid root-owned Hugging Face cache locks on
 the GX10 without changing system ownership or deleting existing cache data.
 
+## Model Cache Hygiene
+
+Large vLLM checkpoints can make the 916G formatted GX10 root filesystem look
+small very quickly. Run one catalog model at a time, stop vLLM before switching
+models, and remove the optimizer-owned cache for the completed model unless the
+next command immediately reuses it.
+
+Check the live cache footprint:
+
+```powershell
+ssh altsens@100.84.106.41 df -h /
+ssh altsens@100.84.106.41 du -sh /home/altsens/.cache/huggingface /home/altsens/.cache/huggingface-vllm-optimizer /.cache/huggingface
+```
+
+The committed multi-model profiles use:
+
+```text
+HF_HOME=$HOME/.cache/huggingface-vllm-optimizer
+```
+
+After a one-model block is done, remove only the matching optimizer-owned model
+directory or clear the dedicated optimizer cache if no follow-on run needs it:
+
+```powershell
+ssh altsens@100.84.106.41 rm -rf /home/altsens/.cache/huggingface-vllm-optimizer/hub/models--OWNER--MODEL /home/altsens/.cache/huggingface-vllm-optimizer/xet
+```
+
+Older root-owned model caches under `/.cache/huggingface` require sudo on the
+GX10. The optimizer does not delete them automatically. As of the first
+multi-model pass, the known root-owned stale model cache candidates were GLM
+4.7 Flash AWQ, Qwen3.5 35B FP8, and Gemma 4 26B.
+
 ## Safe First Workflow
 
 Start with local planning and previews:
@@ -82,6 +114,11 @@ uv run vllm-optimizer model-catalog --catalog config/model-catalog.json --out ar
 uv run vllm-optimizer model-smoke-plan --catalog config/model-catalog.json --model gemma-4-e4b-it --out artifacts/models/gemma-4-e4b-it/smoke-plan.json
 uv run vllm-optimizer model-smoke-run --catalog config/model-catalog.json --model gemma-4-e4b-it --config config/local.gx10.json --out artifacts/models/gemma-4-e4b-it/live --timeout-seconds 1200 --confirm-live-run
 ```
+
+After smoke passes, run the conservative baseline and safe-profile sweep for
+that one model before moving to the next model. The safe-profile sweep files are
+under `config/sweeps/*-safe-profiles.json`; GLM and DeepSeek require the
+explicit risky-session gate because their safe profiles pin `moe_backend`.
 
 For one active user's interactive feel, use the single-user recipe instead of a
 high-concurrency saturation recipe:

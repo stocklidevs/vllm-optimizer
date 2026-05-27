@@ -405,3 +405,29 @@ def test_single_user_sweep_plan_uses_one_request_workload() -> None:
     assert "single_user" in plan["objectives"]
     assert plan["trials"][0]["benchmark_plan"]["concurrency"] == 1
     assert plan["candidate_count"] >= 2
+
+
+def test_multi_model_safe_profile_sweeps_are_ready_to_preview() -> None:
+    paths = [
+        Path("config/sweeps/gemma-4-e4b-it-safe-profiles.json"),
+        Path("config/sweeps/glm-4-7-flash-safe-profiles.json"),
+        Path("config/sweeps/qwen3-6-27b-safe-profiles.json"),
+        Path("config/sweeps/qwen3-5-27b-safe-profiles.json"),
+        Path("config/sweeps/deepseek-coder-v2-lite-instruct-safe-profiles.json"),
+    ]
+
+    plans = [build_sweep_plan(load_sweep_definition(path)) for path in paths]
+    previews = [build_sweep_preview(plan) for plan in plans]
+
+    assert [plan["candidate_count"] for plan in plans] == [4, 4, 4, 4, 4]
+    assert all(plan["prompt_set_id"] == "qwen-coding-interactive-concurrency-1-v1" for plan in plans)
+    assert all("single_user" in plan["objectives"] for plan in plans)
+    assert all(preview["blocked"] is False for preview in previews)
+    glm_plan = plans[1]
+    assert glm_plan["has_risky_session_flags"] is True
+    assert glm_plan["allow_risky_session_flags"] is True
+    assert glm_plan["risk_tiers"]["moe_backend"] == "risky-session"
+    deepseek_plan = plans[4]
+    assert deepseek_plan["has_risky_session_flags"] is True
+    assert deepseek_plan["allow_risky_session_flags"] is True
+    assert deepseek_plan["risk_tiers"]["moe_backend"] == "risky-session"
