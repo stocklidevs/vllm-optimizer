@@ -18,3 +18,4 @@
 - [x] T010 Run `npm ci`.
 - [x] T011 Run `npm audit --audit-level=high`.
 - [x] T012 Commit the cleanup branch work.
+- [x] T013 Fix GitHub Actions dependency install to include the `dev` group.

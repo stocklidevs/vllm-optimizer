@@ -25,6 +25,7 @@ uv run pytest tests/unit/test_release_docs.py
 
 ```powershell
 uv sync
+uv sync --group dev
 uv run pytest
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 ```

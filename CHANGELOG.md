@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.3 - 2026-05-27
+
+- Updated CI to install the `dev` dependency group explicitly before running
+  pytest on fresh GitHub Actions runners.
+
 ## 0.56.2 - 2026-05-27
 
 - Added a publication checklist that defines the local gates, GitHub gates, and
