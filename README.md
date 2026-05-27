@@ -1,11 +1,24 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.55.4-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.56.0-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
 
-Deterministic optimization lab for vLLM experiments on a remote GX10.
+Public alpha deterministic optimization lab for vLLM experiments. The project
+can be evaluated locally without a GX10, while live runs remain gated behind an
+ignored local SSH config.
+
+Start here:
+
+- [Setup Guide](docs/SETUP.md)
+- [Optimization Results](docs/RESULTS.md)
+- [Public Release Checklist](docs/PUBLIC_RELEASE.md)
+- [Project Status](docs/PROJECT_STATUS.md)
+- [Roadmap and Autonomy Rules](specs/000-project-roadmap-autonomy/spec.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [License](LICENSE)
 
 The project is spec-driven with SpecKit and currently supports:
 

@@ -2,7 +2,17 @@
 
 Last updated: 2026-05-27
 
-Current release: 0.55.4
+Current release: 0.56.0 public alpha
+
+## Public Alpha Scope
+
+The public alpha is ready for local evaluation, documentation review, and
+careful GX10 reproduction. Local users can run planning, previews, mock/demo
+commands, report generation, cockpit launch, tests, and release-check without a
+remote machine. Live GX10 runs remain optional and explicitly gated.
+
+The CLI artifacts remain the source of truth. The cockpit is a friendlier
+controller and reporting layer over those artifacts, not a separate optimizer.
 
 ## What Exists
 
@@ -84,21 +94,16 @@ promotion if it does not beat baseline.
 ## GX10 Cache Hygiene
 
 The GX10 root filesystem reports 916G total. After removing stale user-owned
-model caches and deleting each one-model-at-a-time optimizer cache, the latest
-disk check showed 578G used and 292G available.
+model caches, root-owned Hugging Face caches, and Docker build cache, the latest
+disk check showed 64G used, 805G available, and 8% usage.
 
-The optimizer-owned caches are now small:
+The remaining top-level usage is ordinary system/project footprint:
 
-- `/home/altsens/.cache/huggingface`: 17M
-- `/home/altsens/.cache/huggingface-vllm-optimizer`: 17M
-
-Remaining older model files are root-owned under `/.cache/huggingface` and
-require sudo to remove:
-
-- `/.cache/huggingface/hub/models--cyankiwi--GLM-4.7-Flash-AWQ-4bit`: 19G
-- `/.cache/huggingface/hub/models--Qwen--Qwen3.5-35B-A3B-FP8`: 35G
-- `/.cache/huggingface/hub/models--google--gemma-4-26B-A4B-it`: 49G
-- `/.cache/huggingface/xet`: 99M
+- `/home`: 21G
+- `/usr`: 16G
+- `/var`: 4.6G
+- `/opt`: 2.4G
+- `/.cache`: 921M
 
 New live model work should continue to run one model at a time, use the
 profile-scoped `HF_HOME=$HOME/.cache/huggingface-vllm-optimizer`, and delete

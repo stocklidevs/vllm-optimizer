@@ -1,7 +1,22 @@
 # vLLM Optimizer Setup Guide
 
-This guide covers local setup, safe verification, and the first commands to run
-before connecting to the GX10.
+This guide covers public alpha setup, safe verification, and the first commands
+to run before connecting to a live GX10.
+
+## Public No-GX10 Quickstart
+
+These commands validate the project without SSH access, model downloads, or live
+vLLM execution:
+
+```powershell
+uv sync
+uv run vllm-optimizer --version
+uv run pytest
+uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
+```
+
+Expected result: version `0.56.0`, passing tests, and a release-check report
+with `overall_status: pass`.
 
 ## Local Environment
 
@@ -10,7 +25,7 @@ Requirements:
 - Python 3.11 or newer
 - `uv`
 - Git
-- Tailscale SSH access for live GX10 runs
+- Tailscale SSH access for optional live GX10 runs
 
 Install and verify locally:
 
@@ -30,7 +45,9 @@ uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json -
 ## GX10 Local Config
 
 Live runs expect a local, ignored target config such as `config/local.gx10.json`.
-Keep credentials and host-specific paths out of committed files.
+Keep credentials and host-specific paths out of committed files. Before sharing
+logs or reports, redact SSH usernames, Tailnet IP addresses when needed, local
+absolute paths, tokens, passwords, and private model-cache paths.
 
 The current GX10 target has used:
 
@@ -51,6 +68,15 @@ Model profiles may export session-scoped environment variables before starting
 vLLM. The committed new-model profiles use `HF_HOME=$HOME/.cache/huggingface-vllm-optimizer`
 so live smoke and benchmark runs avoid root-owned Hugging Face cache locks on
 the GX10 without changing system ownership or deleting existing cache data.
+
+## Optional GX10 Live Path
+
+Once local verification passes and the local config exists, start with previews
+and read-only discovery. Only run live commands after the generated command
+plan and artifact targets look correct.
+
+The public alpha assumes one model at a time. It does not manage Docker cleanup,
+root-owned cache deletion, or persistent system tuning.
 
 ## Model Cache Hygiene
 
@@ -79,10 +105,14 @@ directory or clear the dedicated optimizer cache if no follow-on run needs it:
 ssh altsens@100.84.106.41 rm -rf /home/altsens/.cache/huggingface-vllm-optimizer/hub/models--OWNER--MODEL /home/altsens/.cache/huggingface-vllm-optimizer/xet
 ```
 
-Older root-owned model caches under `/.cache/huggingface` require sudo on the
-GX10. The optimizer does not delete them automatically. As of the first
-multi-model pass, the known root-owned stale model cache candidates were GLM
-4.7 Flash AWQ, Qwen3.5 35B FP8, and Gemma 4 26B.
+After the latest manual cleanup, the GX10 root filesystem reported 916G total,
+64G used, 805G available, and 8% usage. The largest remaining top-level
+directories were `/home` at 21G, `/usr` at 16G, `/var` at 4.6G, `/opt` at 2.4G,
+and `/.cache` under 1G.
+
+Older root-owned model caches require sudo on the GX10. The optimizer does not
+delete them automatically, and any future Docker or root-cache cleanup should
+stay an explicit maintenance action rather than a hidden optimizer behavior.
 
 ## Safe First Workflow
 

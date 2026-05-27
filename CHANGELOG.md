@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.56.0 - 2026-05-27
+
+- Prepared the repository for public alpha publication with MIT licensing,
+  contribution guidance, security reporting guidance, a public release
+  checklist, and a benchmark results narrative.
+- Added release-check validation for required public alpha files so missing
+  public-facing docs fail the release gate.
+- Documented the GX10 result story, including why C8 throughput is aggregate
+  throughput and not per-user streaming speed.
+- Updated setup and project-status docs with the latest GX10 cache cleanup
+  state and one-model-at-a-time live-run hygiene.
+- Verified the public alpha with focused release docs tests, full pytest, and
+  release-check artifacts recorded in `artifacts/catalog/`.
+
 ## 0.55.4 - 2026-05-27
 
 - Created Spec 072 for public alpha release readiness and benchmark results
