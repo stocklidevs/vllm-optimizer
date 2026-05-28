@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.8 - 2026-05-28
+
+- Documented that the optimizer is not GX10-only: it can target other
+  SSH-accessible Linux NVIDIA hosts running vLLM after adapting local config,
+  serve profiles, and conservative sweep ranges.
+
 ## 0.56.7 - 2026-05-27
 
 - Polished the public-alpha first impression with a clearer README entry path,

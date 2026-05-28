@@ -2,12 +2,12 @@
 
 Last updated: 2026-05-27
 
-Current release: 0.56.7 public alpha
+Current release: 0.56.8 public alpha
 
 ## Public Alpha Scope
 
 The public alpha is ready for local evaluation, documentation review, and
-careful GX10 reproduction. Local users can run planning, previews, mock/demo
+careful Linux NVIDIA/vLLM reproduction. Local users can run planning, previews, mock/demo
 commands, report generation, cockpit launch, tests, and release-check without a
 remote machine. Live GX10 runs remain optional and explicitly gated.
 
@@ -16,9 +16,11 @@ controller and reporting layer over those artifacts, not a separate optimizer.
 
 ## What Exists
 
-vLLM Optimizer is a local, deterministic optimization lab for the GX10. The
-CLI remains the source of truth, and the cockpit is a controller and reporting
-surface over the same artifacts.
+vLLM Optimizer is a local, deterministic optimization lab for Linux NVIDIA
+hosts running vLLM. The CLI remains the source of truth, and the cockpit is a
+controller and reporting surface over the same artifacts. The current live
+evidence comes from a GX10-style workflow, so other hosts should adapt profiles
+and sweep ranges conservatively.
 
 The current system can:
 

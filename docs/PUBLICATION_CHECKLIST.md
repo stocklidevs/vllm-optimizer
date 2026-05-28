@@ -58,6 +58,6 @@ After approval:
 
 1. Merge or fast-forward the cleanup branch into `main`.
 2. Push `main` to the public remote.
-3. Tag the public alpha, for example `v0.56.7-alpha`.
+3. Tag the public alpha, for example `v0.56.8-alpha`.
 4. Create the GitHub release notes from `CHANGELOG.md`,
    `docs/RELEASE_NOTES_DRAFT.md`, and `docs/RESULTS.md`.

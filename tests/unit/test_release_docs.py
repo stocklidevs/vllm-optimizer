@@ -42,6 +42,8 @@ def test_readme_links_public_alpha_docs() -> None:
     assert "[Security](SECURITY.md)" in readme
     assert "[License](LICENSE)" in readme
     assert "docs/assets/cockpit-command-center.png" in readme
+    assert "not GX10-only" in readme
+    assert "Linux NVIDIA" in readme
 
 
 def test_public_results_explain_aggregate_throughput() -> None:

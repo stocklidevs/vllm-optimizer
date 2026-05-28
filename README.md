@@ -1,6 +1,6 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.56.7-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.56.8-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
@@ -11,6 +11,10 @@ and turns the evidence into CLI and cockpit reports.
 
 The public alpha can be evaluated locally without a GX10. Live model runs are
 optional and stay behind ignored local SSH config plus explicit safety gates.
+The architecture is not GX10-only: it targets local or SSH-accessible Linux
+hosts with capable NVIDIA GPUs running vLLM. The public alpha is validated on a
+GX10-style setup, so other NVIDIA systems should start with dry-run previews,
+smoke tests, and conservative sweep envelopes.
 
 ![vLLM Optimizer cockpit command center](docs/assets/cockpit-command-center.png)
 
@@ -99,6 +103,15 @@ full table and interpretation.
   Docker storage.
 - Tool-use scoring is scaffolded as an objective family, but parser/JSON
   correctness still needs deeper model-specific validation.
+
+## Target Portability
+
+The optimizer can be adapted to another Linux NVIDIA host when that machine can
+run vLLM and is reachable from your local workstation. In practice, expect to
+adjust the ignored target config and serve profiles for the remote executable
+path, model IDs, served names, ports, cache paths, available VRAM, context
+lengths, and safe sweep ranges. Treat the checked-in GX10 recipes as examples,
+not universal defaults.
 
 ## Capabilities
 

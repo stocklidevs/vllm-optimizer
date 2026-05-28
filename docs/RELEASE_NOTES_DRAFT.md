@@ -1,4 +1,4 @@
-# v0.56.7-alpha Release Notes Draft
+# v0.56.8-alpha Release Notes Draft
 
 vLLM Optimizer is a deterministic public-alpha lab for planning, running, and
 reporting vLLM serving experiments. It is designed for local and self-hosted
@@ -11,8 +11,9 @@ model operators who want evidence before changing serve flags.
 - Deterministic CLI artifacts for plans, previews, live runs, rankings,
   canonical reports, confirmation, and promotion gates.
 - Safe local quickstart that runs without SSH, model downloads, or GPU access.
-- GX10-oriented live workflow with explicit SSH config, risky/session flag
-  gates, and manual promotion.
+- GX10-validated live workflow with explicit SSH config, risky/session flag
+  gates, and manual promotion. Other Linux NVIDIA/vLLM hosts can be targeted by
+  adapting local config, serve profiles, and conservative sweep ranges.
 - Multi-model catalog coverage for Qwen, Gemma, GLM, Qwen 27B variants, and
   DeepSeek Coder V2 Lite Instruct.
 - Public release gates covering pytest, release-check, pinned npm install,
@@ -44,7 +45,9 @@ release body.
 
 ## Known Limitations
 
-- Live validation has primarily followed one GX10-style workflow.
+- Live validation has primarily followed one GX10-style workflow. Other
+  SSH-accessible Linux NVIDIA/vLLM hosts should begin with previews, smoke
+  tests, and conservative sweeps.
 - Results vary by model, quantization, vLLM version, GPU, driver, prompt set,
   and concurrency.
 - Tool-use scoring is still early; parser/JSON correctness needs deeper
@@ -55,7 +58,7 @@ release body.
 ## Suggested GitHub Release Body
 
 ````markdown
-vLLM Optimizer `v0.56.7-alpha` is the first public alpha of a deterministic
+vLLM Optimizer `v0.56.8-alpha` is the first public alpha of a deterministic
 vLLM optimization lab.
 
 It can be cloned and validated locally without SSH or GPU access:

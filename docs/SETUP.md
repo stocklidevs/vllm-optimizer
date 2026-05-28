@@ -1,7 +1,7 @@
 # vLLM Optimizer Setup Guide
 
 This guide covers public alpha setup, safe verification, and the first commands
-to run before connecting to a live GX10.
+to run before connecting to a live Linux NVIDIA/vLLM host.
 
 ## Public No-GX10 Quickstart
 
@@ -15,7 +15,7 @@ uv run pytest
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 ```
 
-Expected result: version `0.56.7`, passing tests, and a release-check report
+Expected result: version `0.56.8`, passing tests, and a release-check report
 with `overall_status: pass`.
 
 ## Local Environment
@@ -25,7 +25,7 @@ Requirements:
 - Python 3.11 or newer
 - `uv`
 - Git
-- configured SSH access for optional live GX10 runs
+- configured SSH access for optional live Linux NVIDIA/vLLM runs
 
 Install and verify locally:
 
@@ -42,12 +42,14 @@ uv run vllm-optimizer artifact-contracts --out artifacts/catalog/artifact-contra
 uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
 ```
 
-## GX10 Local Config
+## Live Host Local Config
 
 Live runs expect a local, ignored target config such as `config/local.gx10.json`.
-Keep credentials and host-specific paths out of committed files. Before sharing
-logs or reports, redact SSH usernames, private host addresses when needed, local
-absolute paths, tokens, passwords, and private model-cache paths.
+The filename is historical; the target can be any SSH-accessible Linux host
+with a capable NVIDIA GPU and a working vLLM installation. Keep credentials and
+host-specific paths out of committed files. Before sharing logs or reports,
+redact SSH usernames, private host addresses when needed, local absolute paths,
+tokens, passwords, and private model-cache paths.
 
 The current GX10 target has used:
 
@@ -69,14 +71,16 @@ vLLM. The committed new-model profiles use `HF_HOME=$HOME/.cache/huggingface-vll
 so live smoke and benchmark runs avoid root-owned Hugging Face cache locks on
 the GX10 without changing system ownership or deleting existing cache data.
 
-## Optional GX10 Live Path
+## Optional Live Host Path
 
 Once local verification passes and the local config exists, start with previews
 and read-only discovery. Only run live commands after the generated command
 plan and artifact targets look correct.
 
 The public alpha assumes one model at a time. It does not manage Docker cleanup,
-root-owned cache deletion, or persistent system tuning.
+root-owned cache deletion, or persistent system tuning. On non-GX10 NVIDIA
+hosts, begin with model smoke checks and conservative sweeps before adapting
+larger context, concurrency, FP8/KV cache, or scheduler settings.
 
 ## Model Cache Hygiene
 
