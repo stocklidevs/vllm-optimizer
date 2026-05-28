@@ -42,8 +42,11 @@ npm audit --audit-level=high
 - [ ] Push the cleanup branch to a private or review remote first.
 - [ ] Confirm GitHub renders README and docs correctly.
 - [ ] Confirm CI passes on the pushed branch.
-- [ ] Confirm repository settings include a clear description and topics such
-  as `vllm`, `llm-inference`, `benchmarking`, `optimizer`, and `spec-kit`.
+- [ ] Confirm repository settings include a clear description, screenshot-rich
+  README rendering, and topics such as `vllm`, `llm-inference`,
+  `benchmarking`, `optimizer`, and `spec-kit`.
+- [ ] Confirm issue templates render for bug reports and model validation
+  reports.
 - [ ] Confirm security reporting is enabled or the fallback contact path in
   `SECURITY.md` is acceptable.
 
@@ -55,5 +58,6 @@ After approval:
 
 1. Merge or fast-forward the cleanup branch into `main`.
 2. Push `main` to the public remote.
-3. Tag the public alpha, for example `v0.56.2-alpha`.
-4. Create the GitHub release notes from `CHANGELOG.md` and `docs/RESULTS.md`.
+3. Tag the public alpha, for example `v0.56.7-alpha`.
+4. Create the GitHub release notes from `CHANGELOG.md`,
+   `docs/RELEASE_NOTES_DRAFT.md`, and `docs/RESULTS.md`.

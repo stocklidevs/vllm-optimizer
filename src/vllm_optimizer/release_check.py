@@ -247,11 +247,14 @@ def check_public_alpha_files(root: Path) -> ReleaseCheck:
         root / "SECURITY.md",
         root / "docs/PUBLIC_RELEASE.md",
         root / "docs/PUBLICATION_CHECKLIST.md",
+        root / "docs/RELEASE_NOTES_DRAFT.md",
         root / "docs/RESULTS.md",
         root / "docs/SETUP.md",
         root / "docs/PROJECT_STATUS.md",
         root / "CHANGELOG.md",
         root / ".github/workflows/ci.yml",
+        root / ".github/ISSUE_TEMPLATE/bug_report.md",
+        root / ".github/ISSUE_TEMPLATE/model_validation_report.md",
     ]
     missing = [path for path in required if not path.exists()]
     if missing:

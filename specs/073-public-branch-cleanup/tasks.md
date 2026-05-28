@@ -22,3 +22,4 @@
 - [x] T014 Remove report test dependency on ignored local artifacts.
 - [x] T015 Remove pipeline and CLI report test dependencies on ignored local artifacts.
 - [x] T016 Fix fresh-clone pipeline fixture baseline override at the sweep config layer.
+- [x] T017 Add public README polish, cockpit screenshot, release notes draft, and issue templates.

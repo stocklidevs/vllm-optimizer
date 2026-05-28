@@ -1,18 +1,24 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.56.6-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.56.7-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
 
-Public alpha deterministic optimization lab for vLLM experiments. The project
-can be evaluated locally without a GX10, while live runs remain gated behind an
-ignored local SSH config.
+Deterministic optimization lab for vLLM serving experiments. It plans safe
+parameter sweeps, runs gated live benchmarks, ranks candidates by objective,
+and turns the evidence into CLI and cockpit reports.
+
+The public alpha can be evaluated locally without a GX10. Live model runs are
+optional and stay behind ignored local SSH config plus explicit safety gates.
+
+![vLLM Optimizer cockpit command center](docs/assets/cockpit-command-center.png)
 
 Start here:
 
 - [Setup Guide](docs/SETUP.md)
 - [Optimization Results](docs/RESULTS.md)
+- [Release Notes Draft](docs/RELEASE_NOTES_DRAFT.md)
 - [Public Release Checklist](docs/PUBLIC_RELEASE.md)
 - [Publication Checklist](docs/PUBLICATION_CHECKLIST.md)
 - [Project Status](docs/PROJECT_STATUS.md)
@@ -20,6 +26,81 @@ Start here:
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 - [License](LICENSE)
+
+## What It Does
+
+vLLM Optimizer is for people who run local or self-hosted vLLM servers and want
+repeatable evidence before changing serve flags. The CLI remains the source of
+truth: every plan, preview, live run, ranking, report, and promotion writes
+local artifacts that can be inspected or reproduced. The cockpit is a local UI
+over those artifacts, not a separate decision engine.
+
+The main public-alpha workflow is:
+
+1. Choose a model/profile and objective such as Balanced, Performance, Single
+   User, Stability, or Tool Use.
+2. Generate a deterministic plan and preview the exact commands.
+3. Run live sweeps only after the explicit local/GX10 gate.
+4. Review the report, select a candidate, and promote only when the promotion
+   gate is intentionally enabled.
+
+## Quickstart
+
+Local verification does not need SSH, model downloads, or a GPU:
+
+```powershell
+uv sync
+uv run vllm-optimizer --version
+uv run pytest
+uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
+```
+
+Start the local cockpit after setup:
+
+```powershell
+uv run vllm-optimizer cockpit-launch
+```
+
+Open `http://127.0.0.1:8787`. Use `--sweep
+config/sweeps/qwen-single-user-interactive.json` when you want one active
+user's responsiveness instead of aggregate concurrent throughput.
+
+## Safety Boundary
+
+This project can generate commands that start and stop vLLM, download large
+model files, run load tests, and write generated profile artifacts. Public
+defaults are intentionally conservative:
+
+- Local secrets belong only in ignored files such as `config/local.gx10.json`.
+- Preview/report commands can run without the GX10.
+- Live SSH execution requires an explicit local config and live-run gate.
+- Risky/session flags and promotion have separate opt-in flags.
+- Persistent Linux, NVIDIA, kernel, service, firmware, Docker, and credential
+  changes are outside the public-alpha optimizer scope.
+
+## Results Snapshot
+
+The strongest observed Qwen result was aggregate throughput under concurrent
+load: `98.415 tok/s` at C8. That means eight requests in flight and should not
+be read as one user receiving a 98 tok/s stream. Single-user improvements were
+much smaller, which is exactly why the cockpit now separates Performance from
+Single User objectives. See [Optimization Results](docs/RESULTS.md) for the
+full table and interpretation.
+
+## Known Limitations
+
+- The public alpha has been validated primarily against one local GX10-style
+  workflow and fixture-backed tests.
+- Live performance is model, quantization, vLLM version, GPU, driver, prompt,
+  and concurrency dependent.
+- The cockpit is local-only and dependency-free at runtime; Playwright is
+  dev-only for screenshots and UI validation.
+- Model cache cleanup is documented but not automated for root-owned caches or
+  Docker storage.
+- Tool-use scoring is scaffolded as an objective family, but parser/JSON
+  correctness still needs deeper model-specific validation.
+
+## Capabilities
 
 The project is spec-driven with SpecKit and currently supports:
 
@@ -181,19 +262,6 @@ The project is spec-driven with SpecKit and currently supports:
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
-
-## Quickstart
-
-See the [Setup Guide](docs/SETUP.md) for local installation, GX10 config
-expectations, safe first commands, and release checks. See
-[Project Status](docs/PROJECT_STATUS.md) for the current release state,
-main workflows, and safety boundary.
-
-```powershell
-uv sync
-uv run vllm-optimizer --version
-uv run pytest
-```
 
 ## Local Demo
 

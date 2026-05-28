@@ -35,11 +35,13 @@ def test_readme_links_public_alpha_docs() -> None:
 
     assert "public alpha" in readme.lower()
     assert "[Optimization Results](docs/RESULTS.md)" in readme
+    assert "[Release Notes Draft](docs/RELEASE_NOTES_DRAFT.md)" in readme
     assert "[Public Release Checklist](docs/PUBLIC_RELEASE.md)" in readme
     assert "[Publication Checklist](docs/PUBLICATION_CHECKLIST.md)" in readme
     assert "[Contributing](CONTRIBUTING.md)" in readme
     assert "[Security](SECURITY.md)" in readme
     assert "[License](LICENSE)" in readme
+    assert "docs/assets/cockpit-command-center.png" in readme
 
 
 def test_public_results_explain_aggregate_throughput() -> None:
@@ -108,3 +110,13 @@ def test_changelog_contains_current_version_release_notes() -> None:
     assert f"## {__version__} -" in changelog
     assert "artifact-contracts" in changelog
     assert "release-check" in changelog
+
+
+def test_public_release_polish_files_exist() -> None:
+    for path in (
+        Path("docs/RELEASE_NOTES_DRAFT.md"),
+        Path("docs/assets/cockpit-command-center.png"),
+        Path(".github/ISSUE_TEMPLATE/bug_report.md"),
+        Path(".github/ISSUE_TEMPLATE/model_validation_report.md"),
+    ):
+        assert path.exists(), path

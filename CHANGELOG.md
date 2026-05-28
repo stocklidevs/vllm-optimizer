@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.7 - 2026-05-27
+
+- Polished the public-alpha first impression with a clearer README entry path,
+  cockpit screenshot, known limitations, release notes draft, and issue
+  templates for bug and model-validation reports.
+- Extended release-check coverage to require the public release-note draft and
+  issue templates before publishing.
+
 ## 0.56.6 - 2026-05-27
 
 - Corrected the fresh-clone optimizer pipeline fixture to override the source
