@@ -20,6 +20,7 @@ def write_web_cockpit(
     report_path: Path | None = None,
     run_index_path: Path | None = None,
     profile_paths: list[Path] | tuple[Path, ...] | None = None,
+    model_catalog_path: Path | None = None,
 ) -> dict[str, str]:
     if not catalog_path.exists():
         raise WebCockpitError(f"catalog path does not exist: {catalog_path}")
@@ -29,6 +30,7 @@ def write_web_cockpit(
     report = _read_optional(report_path, "report")
     run_index = _read_optional(run_index_path, "run index")
     profiles = read_profile_summaries(profile_paths or [])
+    profiles.extend(read_model_catalog_profile_summaries(model_catalog_path))
     html = render_web_cockpit(
         catalog,
         manifest=manifest,
@@ -43,6 +45,7 @@ def write_web_cockpit(
             "report": report_path.as_posix() if report_path else None,
             "run_index": run_index_path.as_posix() if run_index_path else None,
             "profiles": ", ".join(path.as_posix() for path in profile_paths or []) or None,
+            "model_catalog": model_catalog_path.as_posix() if model_catalog_path else None,
         },
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -637,7 +640,7 @@ def render_model_objective_panel(profiles: list[dict[str, Any]]) -> str:
               <p class="eyebrow">Model Selection</p>
               <h2>Model/Profile</h2>
             </div>
-            <p>Profiles define model identity, parser settings, and promoted serve knobs.</p>
+            <p>Profiles define model identity, parser settings, readiness state, and promoted serve knobs.</p>
           </div>
           <div class="profile-strip">{profile_cards}</div>
         </div>
@@ -657,13 +660,16 @@ def render_model_objective_panel(profiles: list[dict[str, Any]]) -> str:
 def render_profile_card(profile: dict[str, Any], active: bool) -> str:
     optional = profile.get("optional_flags", {}) if isinstance(profile.get("optional_flags"), dict) else {}
     knob_summary = ", ".join(f"{key}={value}" for key, value in sorted(optional.items())) or "base serve flags"
+    role = str(profile.get("role") or profile.get("support_status") or "Profile")
+    label = str(profile.get("display_name") or profile.get("profile_id") or "unknown-profile")
+    readiness = str(profile.get("support_status") or profile.get("promotion_status") or "profile")
     return f"""
           <button type="button" class="profile-card {'active' if active else ''}" data-profile-card data-profile-id="{escape(str(profile.get('profile_id') or 'profile'))}">
-            <span>{escape(str(profile.get('role') or 'Profile'))}</span>
-            <strong>{escape(str(profile.get('profile_id') or 'unknown-profile'))}</strong>
+            <span>{escape(role)}</span>
+            <strong>{escape(label)}</strong>
             <small>{escape(str(profile.get('served_model_name') or profile.get('model') or 'unknown model'))}</small>
             <code>{escape(str(profile.get('path') or 'n/a'))}</code>
-            <em>{escape(str(profile.get('tool_call_parser') or 'no parser'))} / {escape(knob_summary)}</em>
+            <em>{escape(str(profile.get('tool_call_parser') or profile.get('tool_support') or 'no parser'))} / {escape(readiness)} / {escape(knob_summary)}</em>
           </button>"""
 
 
@@ -1801,6 +1807,39 @@ def read_profile_summaries(profile_paths: list[Path] | tuple[Path, ...]) -> list
         data = read_json(path)
         if isinstance(data, dict):
             summaries.append(profile_summary(data, path))
+    return summaries
+
+
+def read_model_catalog_profile_summaries(model_catalog_path: Path | None) -> list[dict[str, Any]]:
+    if model_catalog_path is None or not model_catalog_path.exists():
+        return []
+    catalog = read_json(model_catalog_path)
+    models = catalog.get("models")
+    if not isinstance(models, list):
+        return []
+    summaries = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        profile_path = item.get("profile_path")
+        profile_data: dict[str, Any] = {}
+        path = Path(profile_path) if isinstance(profile_path, str) and profile_path else Path()
+        if profile_path and path.exists():
+            loaded = read_json(path)
+            if isinstance(loaded, dict):
+                profile_data = loaded
+        summary = profile_summary(profile_data, path) if profile_data else {"path": profile_path}
+        summary.update(
+            {
+                "model_id": item.get("model_id"),
+                "display_name": item.get("display_name"),
+                "served_model_name": item.get("served_model_name") or summary.get("served_model_name"),
+                "support_status": item.get("support_status"),
+                "tool_support": item.get("tool_support"),
+                "role": item.get("support_status") or "candidate",
+            }
+        )
+        summaries.append(summary)
     return summaries
 
 

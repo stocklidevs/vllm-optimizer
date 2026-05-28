@@ -33,6 +33,12 @@ from .flag_catalog import (
     generate_catalog_from_files,
 )
 from .knob_catalog import KnobCatalogError, write_knob_catalog
+from .model_catalog import (
+    ModelCatalogError,
+    run_model_smoke,
+    write_model_catalog_summary,
+    write_model_smoke_plan,
+)
 from .optimizer_pipeline import OptimizerPipelineError, OptimizerPipelineRequest, run_optimizer_pipeline
 from .planner import build_trial_plan
 from .pipeline_control import PipelineControlError, write_pipeline_control_manifest
@@ -124,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         WebCockpitError,
         ExecutionStatusError,
         KnobCatalogError,
+        ModelCatalogError,
         PipelineControlError,
         SystemTuningError,
         RunBrowserError,
@@ -186,6 +193,32 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser.add_argument("--out", required=True, type=Path)
     smoke_parser.add_argument("--timeout-seconds", type=int, default=900)
     smoke_parser.set_defaults(func=cmd_smoke_serve)
+
+    model_catalog_parser = subparsers.add_parser(
+        "model-catalog", help="List local vLLM model candidates and readiness baselines"
+    )
+    model_catalog_parser.add_argument("--catalog", required=True, type=Path)
+    model_catalog_parser.add_argument("--out", type=Path)
+    model_catalog_parser.set_defaults(func=cmd_model_catalog)
+
+    model_smoke_plan_parser = subparsers.add_parser(
+        "model-smoke-plan", help="Render a model-aware dry-run smoke plan"
+    )
+    model_smoke_plan_parser.add_argument("--catalog", required=True, type=Path)
+    model_smoke_plan_parser.add_argument("--model", required=True)
+    model_smoke_plan_parser.add_argument("--out", required=True, type=Path)
+    model_smoke_plan_parser.set_defaults(func=cmd_model_smoke_plan)
+
+    model_smoke_parser = subparsers.add_parser(
+        "model-smoke-run", help="Run a live model-aware smoke check"
+    )
+    model_smoke_parser.add_argument("--catalog", required=True, type=Path)
+    model_smoke_parser.add_argument("--model", required=True)
+    model_smoke_parser.add_argument("--config", required=True, type=Path)
+    model_smoke_parser.add_argument("--out", required=True, type=Path)
+    model_smoke_parser.add_argument("--timeout-seconds", type=int, default=900)
+    model_smoke_parser.add_argument("--confirm-live-run", action="store_true")
+    model_smoke_parser.set_defaults(func=cmd_model_smoke_run)
 
     benchmark_plan_parser = subparsers.add_parser(
         "benchmark-plan", help="Render a dry-run baseline benchmark plan"
@@ -321,6 +354,7 @@ def build_parser() -> argparse.ArgumentParser:
     web_cockpit_parser.add_argument("--status", type=Path)
     web_cockpit_parser.add_argument("--report", type=Path)
     web_cockpit_parser.add_argument("--run-index", type=Path)
+    web_cockpit_parser.add_argument("--model-catalog", type=Path)
     web_cockpit_parser.add_argument("--profile", action="append", type=Path, default=[])
     web_cockpit_parser.add_argument("--out", required=True, type=Path)
     web_cockpit_parser.set_defaults(func=cmd_web_cockpit)
@@ -645,7 +679,28 @@ def cmd_smoke_serve(args: argparse.Namespace) -> int:
     profile = load_serve_profile(args.profile)
     result = run_smoke_serve(target, profile, args.out, args.timeout_seconds)
     print(str(args.out))
-    return 0 if result["status"] == "completed" else 2
+    return 0 if result["status"] in {"completed", "passed"} else 2
+
+
+def cmd_model_catalog(args: argparse.Namespace) -> int:
+    summary = write_model_catalog_summary(args.catalog, args.out)
+    print(str(args.out) if args.out is not None else summary["model_count"])
+    return 0
+
+
+def cmd_model_smoke_plan(args: argparse.Namespace) -> int:
+    result = write_model_smoke_plan(args.catalog, args.model, args.out)
+    print(result["plan_path"])
+    return 0
+
+
+def cmd_model_smoke_run(args: argparse.Namespace) -> int:
+    if not args.confirm_live_run:
+        raise ModelCatalogError("model-smoke-run requires --confirm-live-run")
+    target = load_target(args.config)
+    result = run_model_smoke(target, args.catalog, args.model, args.out, args.timeout_seconds)
+    print(str(args.out))
+    return 0 if result["status"] in {"completed", "passed"} else 2
 
 
 def cmd_benchmark_plan(args: argparse.Namespace) -> int:
@@ -827,6 +882,7 @@ def cmd_web_cockpit(args: argparse.Namespace) -> int:
         report_path=args.report,
         run_index_path=args.run_index,
         profile_paths=args.profile,
+        model_catalog_path=args.model_catalog,
     )
     print(result["html_path"])
     return 0

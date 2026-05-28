@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "static",
+  "models": [
+    {
+      "model_id": "qwen3-coder-next-awq",
+      "display_name": "Qwen3 Coder Next AWQ 4-bit",
+      "runtime": "local-vllm",
+      "source_model": "cyankiwi/Qwen3-Coder-Next-AWQ-4bit",
+      "served_model_name": "Qwen3-Coder-Next",
+      "profile_path": "config/profiles/qwen3-coder-next-awq-concurrent-recommended.json",
+      "support_status": "measured",
+      "tool_support": "supported",
+      "baseline_notes": "Measured GX10 reference: confirmed C8 profile at 6644.200 ms mean latency and 97.683 tokens/sec.",
+      "source_urls": [
+        "https://huggingface.co/cyankiwi/Qwen3-Coder-Next-AWQ-4bit"
+      ],
+      "default_objectives": ["single_user", "balanced", "throughput", "tool_use"],
+      "warnings": []
+    },
+    {
+      "model_id": "gemma-4-e4b-it",
+      "display_name": "Gemma 4 E4B IT",
+      "runtime": "local-vllm",
+      "source_model": "google/gemma-4-E4B-it",
+      "served_model_name": "Gemma-4-E4B-IT",
+      "profile_path": "config/profiles/gemma-4-e4b-it.json",
+      "support_status": "recipe-captured",
+      "tool_support": "supported",
+      "baseline_notes": "User-provided vLLM serve recipe captured; local GX10 performance baseline pending.",
+      "source_urls": [
+        "https://huggingface.co/google/gemma-4-E4B-it",
+        "https://docs.vllm.ai/projects/recipes/en/stable/Google/Gemma4.html"
+      ],
+      "default_objectives": ["single_user", "balanced", "throughput", "tool_use"],
+      "warnings": ["Requires the Gemma tool chat template on the GX10."]
+    },
+    {
+      "model_id": "glm-4-7-flash",
+      "display_name": "GLM 4.7 Flash",
+      "runtime": "local-vllm",
+      "source_model": "zai-org/GLM-4.7-Flash",
+      "served_model_name": "GLM-4.7-Flash",
+      "profile_path": "config/profiles/glm-4-7-flash.json",
+      "support_status": "candidate",
+      "tool_support": "supported",
+      "baseline_notes": "Upstream vLLM candidate; local smoke and performance baseline pending.",
+      "source_urls": [
+        "https://huggingface.co/zai-org/GLM-4.7-Flash",
+        "https://recipes.vllm.ai/zai-org/GLM-4.7"
+      ],
+      "default_objectives": ["single_user", "balanced", "throughput", "tool_use"],
+      "warnings": ["May require a recent or nightly vLLM build for GLM 4.7 support."]
+    },
+    {
+      "model_id": "qwen3-6-27b",
+      "display_name": "Qwen3.6 27B",
+      "runtime": "local-vllm",
+      "source_model": "Qwen/Qwen3.6-27B",
+      "served_model_name": "Qwen3.6-27B",
+      "profile_path": "config/profiles/qwen3-6-27b.json",
+      "support_status": "candidate",
+      "tool_support": "supported",
+      "baseline_notes": "Upstream vLLM candidate; local memory-fit smoke and performance baseline pending.",
+      "source_urls": [
+        "https://huggingface.co/Qwen/Qwen3.6-27B"
+      ],
+      "default_objectives": ["single_user", "balanced", "throughput", "tool_use"],
+      "warnings": ["Validate memory fit before long-context sweeps."]
+    },
+    {
+      "model_id": "qwen3-5-27b",
+      "display_name": "Qwen3.5 27B",
+      "runtime": "local-vllm",
+      "source_model": "Qwen/Qwen3.5-27B",
+      "served_model_name": "Qwen3.5-27B",
+      "profile_path": "config/profiles/qwen3-5-27b.json",
+      "support_status": "optional",
+      "tool_support": "supported",
+      "baseline_notes": "Optional legacy comparison; local smoke and performance baseline pending.",
+      "source_urls": [
+        "https://huggingface.co/Qwen/Qwen3.5-27B"
+      ],
+      "default_objectives": ["single_user", "balanced", "throughput", "tool_use"],
+      "warnings": ["Lower priority than Qwen3.6 27B unless a generational delta is needed."]
+    },
+    {
+      "model_id": "deepseek-coder-v2-lite-instruct",
+      "display_name": "DeepSeek Coder V2 Lite Instruct",
+      "runtime": "local-vllm",
+      "source_model": "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+      "served_model_name": "DeepSeek-Coder-V2-Lite-Instruct",
+      "profile_path": "config/profiles/deepseek-coder-v2-lite-instruct.json",
+      "support_status": "candidate",
+      "tool_support": "plain-chat-first",
+      "baseline_notes": "Upstream vLLM serve example exists; local plain-chat smoke and performance baseline pending.",
+      "source_urls": [
+        "https://huggingface.co/deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct"
+      ],
+      "default_objectives": ["single_user", "balanced", "throughput"],
+      "warnings": ["Tool behavior requires separate validation after plain-chat readiness."]
+    }
+  ]
+}

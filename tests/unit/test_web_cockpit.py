@@ -150,6 +150,27 @@ def test_web_cockpit_renders_model_profile_selector() -> None:
     assert "if (target === 'single_user') return 'single_user';" in html
 
 
+def test_web_cockpit_renders_model_catalog_readiness_profiles() -> None:
+    html = render_web_cockpit(
+        catalog={"groups": []},
+        profiles=[
+            {
+                "path": "config/profiles/gemma-4-e4b-it.json",
+                "profile_id": "gemma-4-e4b-it",
+                "display_name": "Gemma 4 E4B IT",
+                "served_model_name": "Gemma-4-E4B-IT",
+                "tool_support": "supported",
+                "support_status": "recipe-captured",
+                "role": "recipe-captured",
+            }
+        ],
+    )
+
+    assert "Gemma 4 E4B IT" in html
+    assert "recipe-captured" in html
+    assert "supported / recipe-captured" in html
+
+
 def test_web_cockpit_controller_buttons_copy_commands() -> None:
     html = render_web_cockpit(
         catalog={"groups": []},

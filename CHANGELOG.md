@@ -1,5 +1,136 @@
 # Changelog
 
+## 0.56.7 - 2026-05-27
+
+- Polished the public-alpha first impression with a clearer README entry path,
+  cockpit screenshot, known limitations, release notes draft, and issue
+  templates for bug and model-validation reports.
+- Extended release-check coverage to require the public release-note draft and
+  issue templates before publishing.
+
+## 0.56.6 - 2026-05-27
+
+- Corrected the fresh-clone optimizer pipeline fixture to override the source
+  sweep baseline field instead of the derived plan field.
+
+## 0.56.5 - 2026-05-27
+
+- Removed remaining integration and pipeline test dependencies on ignored local
+  benchmark artifacts, completing the fresh-clone test cleanup.
+
+## 0.56.4 - 2026-05-27
+
+- Removed the last unit-test dependency on ignored local `artifacts/` files so
+  fresh public clones and GitHub Actions can run the report tests.
+
+## 0.56.3 - 2026-05-27
+
+- Updated CI to install the `dev` dependency group explicitly before running
+  pytest on fresh GitHub Actions runners.
+
+## 0.56.2 - 2026-05-27
+
+- Added a publication checklist that defines the local gates, GitHub gates, and
+  explicit stop line before pushing a public branch.
+- Added a GitHub Actions CI workflow for pytest, release-check, pinned npm
+  install, and npm vulnerability audit.
+- Linked the publication checklist from the README and public release checklist.
+- Recorded Spec 073 as the completed public branch cleanup feature.
+
+## 0.56.1 - 2026-05-27
+
+- Scrubbed public-facing setup docs, specs, source messages, and tests of the
+  real private SSH target, private-network product references, and local static
+  machine paths before public alpha publication.
+- Replaced redaction fixtures with documentation-safe placeholder addresses.
+
+## 0.56.0 - 2026-05-27
+
+- Prepared the repository for public alpha publication with MIT licensing,
+  contribution guidance, security reporting guidance, a public release
+  checklist, and a benchmark results narrative.
+- Added release-check validation for required public alpha files so missing
+  public-facing docs fail the release gate.
+- Documented the GX10 result story, including why C8 throughput is aggregate
+  throughput and not per-user streaming speed.
+- Updated setup and project-status docs with the latest GX10 cache cleanup
+  state and one-model-at-a-time live-run hygiene.
+- Verified the public alpha with focused release docs tests, full pytest, and
+  release-check artifacts recorded in `artifacts/catalog/`.
+
+## 0.55.4 - 2026-05-27
+
+- Created Spec 072 for public alpha release readiness and benchmark results
+  presentation, including publishability, safety, fresh-checkout verification,
+  and honest single-user versus aggregate-throughput explanation tasks.
+- Updated active SpecKit pointers to the public alpha release feature.
+
+## 0.55.3 - 2026-05-27
+
+- Added GX10 live-run cache hygiene to the project roadmap and autonomy spec:
+  run one model at a time, clean optimizer-owned model/cache files after each
+  model block, verify disk state before continuing, and keep root-owned Docker
+  or system cache deletion behind explicit user/sudo action.
+
+## 0.55.2 - 2026-05-27
+
+- Added safe single-user, latency, balanced, and throughput profile sweep
+  recipes for Gemma 4 E4B IT, GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and
+  DeepSeek Coder V2 Lite Instruct.
+- Pinned DeepSeek Coder V2 Lite Instruct to `--moe-backend triton` after live
+  smoke exposed the same FlashInfer CUTLASS `ninja` dependency path as GLM.
+- Completed live GX10 smoke, baseline, and safe-profile sweeps for Gemma 4 E4B
+  IT, GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite
+  Instruct.
+- Recorded the first multi-model baseline results: Gemma 24.561 tokens/sec,
+  GLM 30.045 tokens/sec, Qwen3.6 5.636 tokens/sec, Qwen3.5 5.634 tokens/sec,
+  and DeepSeek 47.482 tokens/sec.
+- Added GX10 model cache hygiene documentation after cleaning stale user-owned
+  Hugging Face model caches and returning the root filesystem to 292G free.
+- Added regression coverage proving the multi-model safe-profile sweep recipes
+  generate unblocked previews and keep MoE backend risk gates explicit.
+- Retried Qwen3.6 27B live smoke on the GX10 with a longer startup window; the
+  model reached readiness, answered plain chat, passed the tool probe, and
+  cleaned up.
+
+## 0.55.1 - 2026-05-26
+
+- Added serve-profile environment exports so model smoke and benchmark runs can
+  use a user-owned Hugging Face cache on the GX10.
+- Fixed plain-chat serve profiles so `--tool-call-parser` is omitted when auto
+  tool choice is disabled.
+- Added `moe_backend` as an approved session flag and set GLM 4.7 Flash to
+  `--moe-backend triton`, avoiding the FlashInfer CUTLASS JIT path that
+  requires `ninja`.
+- Increased live smoke and benchmark SSH timeout buffers so long model startup
+  attempts have room to cleanup and write artifacts.
+- Recorded Spec 071 live smoke results for Qwen3 Coder Next, Gemma 4 E4B IT,
+  GLM 4.7 Flash, and the timed-out Qwen3.6 27B attempt.
+
+## 0.55.0 - 2026-05-26
+
+- Added a local vLLM model catalog for Qwen3 Coder Next, Gemma 4 E4B IT, GLM
+  4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite Instruct.
+- Added Gemma, GLM, Qwen 27B, and DeepSeek serve profiles with parser,
+  template, reasoning-parser, and trust-remote-code metadata where needed.
+- Added `model-catalog`, `model-smoke-plan`, and gated `model-smoke-run`
+  commands with model-aware readiness categories and smoke artifacts.
+- Added model-catalog readiness context to the cockpit model/profile selector.
+
+## 0.54.7 - 2026-05-26
+
+- Corrected the Spec 071 model-baseline scope after clarifying that the intended
+  Google model was Gemma 4 E4B IT.
+- Kept the multi-model smoke workflow focused on local vLLM candidates only.
+
+## 0.54.6 - 2026-05-26
+
+- Added a validated model-baseline tracker to the project handoff document for
+  Qwen3 Coder Next, Gemma 4 E4B IT, GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B,
+  and DeepSeek Coder V2 Lite Instruct.
+- Captured the user-provided Gemma 4 E4B IT vLLM serve recipe as the first new
+  local model smoke baseline for Spec 071.
+
 ## 0.54.5 - 2026-05-26
 
 - Added a project status handoff document summarizing current workflows,

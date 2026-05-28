@@ -43,6 +43,7 @@ def build_release_check(root: Path) -> dict[str, Any]:
         check_active_speckit_completion_status(root),
         check_artifact_contracts_command(root),
         check_release_documentation(root),
+        check_public_alpha_files(root),
         check_essential_files(root),
     ]
     status = "fail" if any(check.status == "fail" and check.severity == "error" for check in checks) else "pass"
@@ -237,6 +238,28 @@ def check_release_documentation(root: Path) -> ReleaseCheck:
     if missing:
         return ReleaseCheck("release-documentation", "fail", "error", f"README missing release workflow terms: {', '.join(missing)}", _paths(readme_path))
     return ReleaseCheck("release-documentation", "pass", "warning", "README documents release metadata workflows", _paths(readme_path))
+
+
+def check_public_alpha_files(root: Path) -> ReleaseCheck:
+    required = [
+        root / "LICENSE",
+        root / "CONTRIBUTING.md",
+        root / "SECURITY.md",
+        root / "docs/PUBLIC_RELEASE.md",
+        root / "docs/PUBLICATION_CHECKLIST.md",
+        root / "docs/RELEASE_NOTES_DRAFT.md",
+        root / "docs/RESULTS.md",
+        root / "docs/SETUP.md",
+        root / "docs/PROJECT_STATUS.md",
+        root / "CHANGELOG.md",
+        root / ".github/workflows/ci.yml",
+        root / ".github/ISSUE_TEMPLATE/bug_report.md",
+        root / ".github/ISSUE_TEMPLATE/model_validation_report.md",
+    ]
+    missing = [path for path in required if not path.exists()]
+    if missing:
+        return ReleaseCheck("public-alpha-files", "fail", "error", "public alpha files are missing", _paths(*missing))
+    return ReleaseCheck("public-alpha-files", "pass", "error", "public alpha files exist", _paths(*required))
 
 
 def check_essential_files(root: Path) -> ReleaseCheck:

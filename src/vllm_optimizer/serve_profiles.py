@@ -4,6 +4,7 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import re
 
 from .artifacts import read_json
 
@@ -24,8 +25,12 @@ class ServeProfile:
     gpu_memory_utilization: float
     enable_auto_tool_choice: bool
     tool_call_parser: str
-    performance_mode: str
     optional_flags: dict[str, bool | int | float | str]
+    performance_mode: str | None = None
+    chat_template: str | None = None
+    reasoning_parser: str | None = None
+    trust_remote_code: bool = False
+    environment: dict[str, str] | None = None
 
 
 OPTIONAL_FLAG_RULES: dict[str, dict[str, Any]] = {
@@ -35,6 +40,24 @@ OPTIONAL_FLAG_RULES: dict[str, dict[str, Any]] = {
     "enable_prefix_caching": {"cli": "enable-prefix-caching", "type": bool, "risk_tier": "safe-session"},
     "block_size": {"cli": "block-size", "type": int, "allowed": {8, 16, 32}, "risk_tier": "risky-session"},
     "kv_cache_dtype": {"cli": "kv-cache-dtype", "type": str, "allowed": {"auto", "fp8", "fp8_e5m2"}, "risk_tier": "risky-session"},
+    "moe_backend": {
+        "cli": "moe-backend",
+        "type": str,
+        "allowed": {
+            "aiter",
+            "auto",
+            "cutlass",
+            "deep_gemm",
+            "deep_gemm_mega_moe",
+            "emulation",
+            "flashinfer_cutedsl",
+            "flashinfer_cutlass",
+            "flashinfer_trtllm",
+            "marlin",
+            "triton",
+        },
+        "risk_tier": "risky-session",
+    },
     "enforce_eager": {"cli": "enforce-eager", "type": bool, "risk_tier": "risky-session"},
 }
 
@@ -54,7 +77,14 @@ def parse_serve_profile(data: dict[str, Any]) -> ServeProfile:
     served_model_name = _required_str(data, "served_model_name", errors)
     host = _required_str(data, "host", errors)
     tool_call_parser = _required_str(data, "tool_call_parser", errors)
-    performance_mode = _required_str(data, "performance_mode", errors)
+    performance_mode = _optional_str(data, "performance_mode", errors)
+    chat_template = _optional_str(data, "chat_template", errors)
+    reasoning_parser = _optional_str(data, "reasoning_parser", errors)
+    trust_remote_code = data.get("trust_remote_code", False)
+    if not isinstance(trust_remote_code, bool):
+        errors.append("trust_remote_code must be a boolean")
+        trust_remote_code = False
+    environment = parse_environment(data.get("environment", {}), errors)
     port = _required_int(data, "port", errors)
     max_model_len = _required_int(data, "max_model_len", errors)
     gpu_memory_utilization = _required_number(data, "gpu_memory_utilization", errors)
@@ -81,8 +111,12 @@ def parse_serve_profile(data: dict[str, Any]) -> ServeProfile:
         gpu_memory_utilization=gpu_memory_utilization,
         enable_auto_tool_choice=enable_auto_tool_choice,
         tool_call_parser=tool_call_parser,
-        performance_mode=performance_mode,
         optional_flags=optional_flags,
+        performance_mode=performance_mode,
+        chat_template=chat_template,
+        reasoning_parser=reasoning_parser,
+        trust_remote_code=trust_remote_code,
+        environment=environment,
     )
 
 
@@ -104,14 +138,15 @@ def render_vllm_serve_command(profile: ServeProfile) -> list[str]:
     ]
     if profile.enable_auto_tool_choice:
         command.append("--enable-auto-tool-choice")
-    command.extend(
-        [
-            "--tool-call-parser",
-            profile.tool_call_parser,
-            "--performance-mode",
-            profile.performance_mode,
-        ]
-    )
+        command.extend(["--tool-call-parser", profile.tool_call_parser])
+    if profile.reasoning_parser:
+        command.extend(["--reasoning-parser", profile.reasoning_parser])
+    if profile.chat_template:
+        command.extend(["--chat-template", profile.chat_template])
+    if profile.performance_mode:
+        command.extend(["--performance-mode", profile.performance_mode])
+    if profile.trust_remote_code:
+        command.append("--trust-remote-code")
     for name in sorted(profile.optional_flags):
         value = profile.optional_flags[name]
         rule = OPTIONAL_FLAG_RULES[name]
@@ -174,6 +209,24 @@ def parse_optional_flags(data: Any, errors: list[str]) -> dict[str, bool | int |
     return parsed
 
 
+def parse_environment(data: Any, errors: list[str]) -> dict[str, str]:
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        errors.append("environment must be an object")
+        return {}
+    parsed: dict[str, str] = {}
+    for name, value in sorted(data.items()):
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Z_][A-Z0-9_]*", name):
+            errors.append(f"environment variable {name!r} has an unsafe name")
+            continue
+        if not isinstance(value, str) or not value:
+            errors.append(f"environment.{name} must be a non-empty string")
+            continue
+        parsed[name] = value
+    return parsed
+
+
 def build_serve_plan(profile: ServeProfile) -> dict[str, Any]:
     command = render_vllm_serve_command(profile)
     return {
@@ -198,6 +251,16 @@ def _required_str(data: dict[str, Any], field: str, errors: list[str]) -> str:
     return value
 
 
+def _optional_str(data: dict[str, Any], field: str, errors: list[str]) -> str | None:
+    value = data.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        errors.append(f"{field} must be a non-empty string when provided")
+        return None
+    return value
+
+
 def _required_int(data: dict[str, Any], field: str, errors: list[str]) -> int:
     value = data.get(field)
     if not isinstance(value, int):
@@ -215,6 +278,17 @@ def _required_number(data: dict[str, Any], field: str, errors: list[str]) -> flo
 
 
 def shell_join(command: list[str]) -> str:
-    if command and command[0].startswith("$HOME/"):
-        return " ".join([command[0], shlex.join(command[1:])])
-    return shlex.join(command)
+    return " ".join(_shell_quote_token(token) for token in command)
+
+
+def _shell_quote_token(token: str) -> str:
+    if token.startswith("$HOME/"):
+        return token
+    return shlex.quote(token)
+
+
+def render_environment_exports(profile: ServeProfile) -> str:
+    environment = profile.environment or {}
+    if not environment:
+        return ""
+    return "\n".join(f"export {name}={_shell_quote_token(value)}" for name, value in sorted(environment.items()))

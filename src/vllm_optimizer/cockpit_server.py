@@ -336,7 +336,7 @@ def failure_diagnostics(action: str, error: Exception, config: CockpitServerConf
         likely_cause = "The live run is missing the GX10 connection config."
         next_steps = [
             "Launch the cockpit with --config config/local.gx10.json.",
-            "Confirm the config file still points at the Tailscale SSH target.",
+            "Confirm the config file still points at the configured SSH target.",
         ]
     elif "risky-session sweep requires --allow-risky-session-flags" in lowered:
         likely_cause = (
@@ -351,7 +351,7 @@ def failure_diagnostics(action: str, error: Exception, config: CockpitServerConf
     elif "timeout" in lowered or "timed out" in lowered:
         likely_cause = "A remote step timed out before the benchmark completed."
         next_steps = [
-            "Check whether the GX10 is reachable over Tailscale SSH.",
+            "Check whether the GX10 is reachable over configured SSH.",
             "Inspect the trial server log artifact and increase the timeout if the model is still loading.",
         ]
     else:

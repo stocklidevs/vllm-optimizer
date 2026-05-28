@@ -1,11 +1,106 @@
 # vLLM Optimizer
 
-[![version](https://img.shields.io/badge/version-0.54.5-blue.svg)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.56.7-blue.svg)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](pyproject.toml)
 [![tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests)
 [![SpecKit](https://img.shields.io/badge/SpecKit-enabled-purple.svg)](.specify)
 
-Deterministic optimization lab for vLLM experiments on a remote GX10.
+Deterministic optimization lab for vLLM serving experiments. It plans safe
+parameter sweeps, runs gated live benchmarks, ranks candidates by objective,
+and turns the evidence into CLI and cockpit reports.
+
+The public alpha can be evaluated locally without a GX10. Live model runs are
+optional and stay behind ignored local SSH config plus explicit safety gates.
+
+![vLLM Optimizer cockpit command center](docs/assets/cockpit-command-center.png)
+
+Start here:
+
+- [Setup Guide](docs/SETUP.md)
+- [Optimization Results](docs/RESULTS.md)
+- [Release Notes Draft](docs/RELEASE_NOTES_DRAFT.md)
+- [Public Release Checklist](docs/PUBLIC_RELEASE.md)
+- [Publication Checklist](docs/PUBLICATION_CHECKLIST.md)
+- [Project Status](docs/PROJECT_STATUS.md)
+- [Roadmap and Autonomy Rules](specs/000-project-roadmap-autonomy/spec.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [License](LICENSE)
+
+## What It Does
+
+vLLM Optimizer is for people who run local or self-hosted vLLM servers and want
+repeatable evidence before changing serve flags. The CLI remains the source of
+truth: every plan, preview, live run, ranking, report, and promotion writes
+local artifacts that can be inspected or reproduced. The cockpit is a local UI
+over those artifacts, not a separate decision engine.
+
+The main public-alpha workflow is:
+
+1. Choose a model/profile and objective such as Balanced, Performance, Single
+   User, Stability, or Tool Use.
+2. Generate a deterministic plan and preview the exact commands.
+3. Run live sweeps only after the explicit local/GX10 gate.
+4. Review the report, select a candidate, and promote only when the promotion
+   gate is intentionally enabled.
+
+## Quickstart
+
+Local verification does not need SSH, model downloads, or a GPU:
+
+```powershell
+uv sync
+uv run vllm-optimizer --version
+uv run pytest
+uv run vllm-optimizer release-check --out artifacts/catalog/release-check.json --markdown-out artifacts/catalog/release-check.md
+```
+
+Start the local cockpit after setup:
+
+```powershell
+uv run vllm-optimizer cockpit-launch
+```
+
+Open `http://127.0.0.1:8787`. Use `--sweep
+config/sweeps/qwen-single-user-interactive.json` when you want one active
+user's responsiveness instead of aggregate concurrent throughput.
+
+## Safety Boundary
+
+This project can generate commands that start and stop vLLM, download large
+model files, run load tests, and write generated profile artifacts. Public
+defaults are intentionally conservative:
+
+- Local secrets belong only in ignored files such as `config/local.gx10.json`.
+- Preview/report commands can run without the GX10.
+- Live SSH execution requires an explicit local config and live-run gate.
+- Risky/session flags and promotion have separate opt-in flags.
+- Persistent Linux, NVIDIA, kernel, service, firmware, Docker, and credential
+  changes are outside the public-alpha optimizer scope.
+
+## Results Snapshot
+
+The strongest observed Qwen result was aggregate throughput under concurrent
+load: `98.415 tok/s` at C8. That means eight requests in flight and should not
+be read as one user receiving a 98 tok/s stream. Single-user improvements were
+much smaller, which is exactly why the cockpit now separates Performance from
+Single User objectives. See [Optimization Results](docs/RESULTS.md) for the
+full table and interpretation.
+
+## Known Limitations
+
+- The public alpha has been validated primarily against one local GX10-style
+  workflow and fixture-backed tests.
+- Live performance is model, quantization, vLLM version, GPU, driver, prompt,
+  and concurrency dependent.
+- The cockpit is local-only and dependency-free at runtime; Playwright is
+  dev-only for screenshots and UI validation.
+- Model cache cleanup is documented but not automated for root-owned caches or
+  Docker storage.
+- Tool-use scoring is scaffolded as an objective family, but parser/JSON
+  correctness still needs deeper model-specific validation.
+
+## Capabilities
 
 The project is spec-driven with SpecKit and currently supports:
 
@@ -151,22 +246,22 @@ The project is spec-driven with SpecKit and currently supports:
 - Single-user performance is available as a cockpit target and deterministic
   sweep recipe. It uses a one-request interactive workload and ranks candidates
   by responsiveness instead of aggregate concurrent throughput.
+- A local vLLM model catalog records Qwen, Gemma, GLM, Qwen 27B, and DeepSeek
+  candidates with deterministic smoke plans, parser/template metadata, and
+  model-aware readiness artifacts before any expensive sweeps run.
+- New-model live runs can export session-scoped profile environment variables;
+  the GLM profile also pins `--moe-backend triton` to avoid the GX10
+  FlashInfer CUTLASS JIT dependency path during smoke readiness.
+- Conservative safe-profile sweep recipes are available for Gemma 4 E4B IT,
+  GLM 4.7 Flash, Qwen3.6 27B, Qwen3.5 27B, and DeepSeek Coder V2 Lite
+  Instruct, with first GX10 baseline and ranking results recorded in the
+  project status handoff.
+- The multi-model workflow documents one-model-at-a-time cache hygiene with a
+  dedicated optimizer `HF_HOME` and explicit cleanup notes for stale model
+  files on the GX10.
 
 Persistent Linux/NVIDIA tuning is intentionally not implemented yet. It will be
 handled by separate specs with explicit safety gates.
-
-## Quickstart
-
-See the [Setup Guide](docs/SETUP.md) for local installation, GX10 config
-expectations, safe first commands, and release checks. See
-[Project Status](docs/PROJECT_STATUS.md) for the current release state,
-main workflows, and safety boundary.
-
-```powershell
-uv sync
-uv run vllm-optimizer --version
-uv run pytest
-```
 
 ## Local Demo
 
@@ -176,6 +271,8 @@ uv run vllm-optimizer dry-run --plan artifacts/demo/trial-plan.json --out artifa
 uv run vllm-optimizer rank --plan artifacts/demo/trial-plan.json --results tests/fixtures/results/throughput.jsonl --out artifacts/demo/report.json
 uv run vllm-optimizer discover --config tests/fixtures/discovery/local.gx10.mock.json --executor mock --mock-results tests/fixtures/discovery/mock_outputs.json --out artifacts/discovery/mock
 uv run vllm-optimizer serve-plan --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/demo/qwen-serve-plan.json
+uv run vllm-optimizer model-catalog --catalog config/model-catalog.json --out artifacts/models/catalog.json
+uv run vllm-optimizer model-smoke-plan --catalog config/model-catalog.json --model gemma-4-e4b-it --out artifacts/models/gemma-4-e4b-it/smoke-plan.json
 uv run vllm-optimizer benchmark-plan --profile config/profiles/qwen3-coder-next-awq.json --prompts config/prompts/qwen-baseline.json --out artifacts/benchmarks/qwen-baseline/plan.json
 uv run vllm-optimizer sweep-plan --sweep config/sweeps/qwen-small-sweep.json --out artifacts/sweeps/qwen-small/plan.json
 uv run vllm-optimizer sweep-preview --plan artifacts/sweeps/qwen-small/plan.json --out artifacts/sweeps/qwen-small/preview.json
@@ -405,6 +502,14 @@ Smoke serve:
 ```powershell
 uv run vllm-optimizer smoke-serve-plan --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/smoke/qwen/plan.json
 uv run vllm-optimizer smoke-serve --config config/local.gx10.json --profile config/profiles/qwen3-coder-next-awq.json --out artifacts/smoke/qwen --timeout-seconds 1200
+```
+
+Model-aware smoke checks:
+
+```powershell
+uv run vllm-optimizer model-catalog --catalog config/model-catalog.json --out artifacts/models/catalog.json
+uv run vllm-optimizer model-smoke-plan --catalog config/model-catalog.json --model gemma-4-e4b-it --out artifacts/models/gemma-4-e4b-it/smoke-plan.json
+uv run vllm-optimizer model-smoke-run --catalog config/model-catalog.json --model gemma-4-e4b-it --config config/local.gx10.json --out artifacts/models/gemma-4-e4b-it/live --timeout-seconds 1200 --confirm-live-run
 ```
 
 Baseline benchmark:

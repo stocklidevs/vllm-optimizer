@@ -122,6 +122,11 @@ Unless the user explicitly redirects, Codex should:
 - Run focused tests for changed behavior and broader tests when shared modules or CLI surfaces change.
 - Preserve existing user changes and avoid unrelated refactors.
 - Continue spec-by-spec without asking for routine approval when requirements are already captured here or in the active feature spec.
+- For GX10 live model smoke, benchmark, or sweep work, run one model at a time.
+  Use the dedicated optimizer Hugging Face cache when profiles define it, stop
+  vLLM before switching models, remove optimizer-owned model/cache files after
+  each completed or aborted model block unless the next step immediately reuses
+  that same model, and verify disk state before continuing.
 
 ## Autonomy Rules
 
@@ -135,17 +140,20 @@ Codex may proceed without additional user input when:
 Codex must pause or ask before:
 
 - Making persistent Linux, NVIDIA, firmware, kernel, boot, or system service changes on the GX10.
-- Changing credentials, SSH identity, Tailscale settings, or remote access assumptions.
+- Changing credentials, SSH identity, private network settings, or remote access assumptions.
 - Deleting user data, resetting git history, force-pushing, or overwriting unrelated user edits.
 - Auto-promoting a profile or configuration without the explicit promotion gate required by the relevant spec.
 - Choosing between materially different product directions that are not already decided here.
 - Adding external hosted services, cloud dependencies, or network-facing deployment changes.
+- Deleting root-owned model caches, Docker images, Docker build caches,
+  container data, or other non-optimizer system storage on the GX10. These
+  cleanup actions require explicit user approval and sudo/user action.
 
 ## Current Active Feature
 
 The current active implementation target is:
 
-- `specs/070-single-user-performance-target/spec.md`
+- `specs/071-multi-model-smoke/spec.md`
 
 This roadmap should guide future specs, but it should not replace `.specify/feature.json` as the active feature pointer.
 

@@ -25,7 +25,7 @@ for artifacts, serve profiles, benchmark execution, safety, and ranking
 **Testing**: pytest unit and integration tests
 
 **Target Platform**: Local controller on Windows; remote Asus GX10 over
-Tailscale SSH for approved live runs
+configured SSH for approved live runs
 
 **Project Type**: Python CLI
 

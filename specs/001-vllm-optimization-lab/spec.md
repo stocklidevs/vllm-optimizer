@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Build a deterministic vLLM optimization lab that can define objective families, generate reproducible experiment plans, safely execute dry-run and live benchmark workflows against an Asus GX10 over Tailscale SSH, collect raw artifacts and telemetry, and rank vLLM configurations for throughput, latency, memory efficiency, tool-call reliability, structured output validity, long-context stability, serving stability, and balanced weighted profiles."
+**Input**: User description: "Build a deterministic vLLM optimization lab that can define objective families, generate reproducible experiment plans, safely execute dry-run and live benchmark workflows against an Asus GX10 over configured SSH, collect raw artifacts and telemetry, and rank vLLM configurations for throughput, latency, memory efficiency, tool-call reliability, structured output validity, long-context stability, serving stability, and balanced weighted profiles."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -84,7 +84,7 @@ benchmark runs and verify scoring, ranking, and report traceability.
 
 - A generated parameter combination is invalid for the selected model or vLLM
   version.
-- The GX10 is unreachable over Tailscale SSH during live execution.
+- The GX10 is unreachable over configured SSH during live execution.
 - vLLM fails to start, exits early, or emits an out-of-memory error.
 - Benchmark output is partial because a run is interrupted.
 - Telemetry is missing from one source but benchmark output exists.
@@ -174,7 +174,7 @@ benchmark runs and verify scoring, ranking, and report traceability.
 
 - The primary user is the project operator running the local controller from
   this repository.
-- The GX10 is reachable through Tailscale SSH when live execution is later
+- The GX10 is reachable through configured SSH when live execution is later
   enabled.
 - Initial development prioritizes deterministic local planning, dry-run
   previews, and fixture-based result ranking before live remote mutation.

@@ -8,6 +8,7 @@ from vllm_optimizer.serve_profiles import (
     load_serve_profile,
     parse_serve_profile,
     render_vllm_serve_command,
+    shell_join,
 )
 
 
@@ -36,6 +37,50 @@ def test_load_qwen_profile_renders_user_command() -> None:
         "--performance-mode",
         "interactivity",
     ]
+
+
+def test_load_gemma_profile_renders_user_command_with_chat_template() -> None:
+    profile = load_serve_profile(Path("config/profiles/gemma-4-e4b-it.json"))
+
+    command = render_vllm_serve_command(profile)
+
+    assert command == [
+        "$HOME/qwen3next-venv/bin/vllm",
+        "serve",
+        "google/gemma-4-E4B-it",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+        "--served-model-name",
+        "Gemma-4-E4B-IT",
+        "--max-model-len",
+        "16384",
+        "--gpu-memory-utilization",
+        "0.80",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "gemma4",
+        "--chat-template",
+        "$HOME/vllm-templates/tool_chat_template_gemma4.jinja",
+    ]
+
+    assert "--chat-template $HOME/vllm-templates/tool_chat_template_gemma4.jinja" in shell_join(command)
+
+
+def test_load_glm_profile_renders_reasoning_parser_and_trust_remote_code() -> None:
+    profile = load_serve_profile(Path("config/profiles/glm-4-7-flash.json"))
+
+    command = render_vllm_serve_command(profile)
+
+    assert profile.environment["HF_HOME"] == "$HOME/.cache/huggingface-vllm-optimizer"
+    assert "--tool-call-parser" in command
+    assert "glm47" in command
+    assert "--reasoning-parser" in command
+    assert "glm45" in command
+    assert "--moe-backend" in command
+    assert "triton" in command
+    assert "--trust-remote-code" in command
 
 
 def test_build_serve_plan_is_dry_run_only() -> None:
@@ -98,6 +143,28 @@ def test_optional_flags_render_when_approved() -> None:
     assert "32" in command
     assert "--enable-chunked-prefill" in command
     assert "--enable-prefix-caching" not in command
+
+
+def test_tool_parser_is_omitted_when_auto_tool_choice_is_disabled() -> None:
+    profile = parse_serve_profile(
+        {
+            "profile_id": "plain-chat",
+            "model": "m",
+            "served_model_name": "m",
+            "host": "0.0.0.0",
+            "port": 8001,
+            "max_model_len": 16384,
+            "gpu_memory_utilization": 0.8,
+            "enable_auto_tool_choice": False,
+            "tool_call_parser": "auto",
+            "vllm_executable": "vllm",
+        }
+    )
+
+    command = render_vllm_serve_command(profile)
+
+    assert "--enable-auto-tool-choice" not in command
+    assert "--tool-call-parser" not in command
 
 
 def test_optional_flags_reject_unknown_flags() -> None:

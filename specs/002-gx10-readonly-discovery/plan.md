@@ -25,7 +25,7 @@ with JSON raw probe logs and JSON normalized summary
 **Testing**: pytest unit and integration tests with mock executor fixtures
 
 **Target Platform**: Local Windows controller; remote Linux GX10 later through
-Tailscale SSH
+configured SSH
 
 **Project Type**: Python CLI plus importable library
 

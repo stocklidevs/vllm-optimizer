@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vllm_optimizer.artifacts import read_json
+from vllm_optimizer.artifacts import read_json, write_json
 from vllm_optimizer.optimizer_pipeline import (
     OptimizerPipelineError,
     OptimizerPipelineRequest,
@@ -83,10 +83,11 @@ def test_pipeline_preview_rebuilds_stale_safety_allowance(tmp_path: Path) -> Non
 
 
 def test_pipeline_report_mode_ranks_existing_results_and_writes_report(tmp_path: Path) -> None:
+    sweep_path = _write_test_sweep(tmp_path)
     run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="preview",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
         )
     )
@@ -111,7 +112,7 @@ def test_pipeline_report_mode_ranks_existing_results_and_writes_report(tmp_path:
     result = run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="report",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
         )
     )
@@ -124,10 +125,11 @@ def test_pipeline_report_mode_ranks_existing_results_and_writes_report(tmp_path:
 
 
 def test_pipeline_report_mode_rejects_stale_ranking_from_previous_sweep(tmp_path: Path) -> None:
+    sweep_path = _write_test_sweep(tmp_path)
     run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="preview",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
         )
     )
@@ -147,7 +149,7 @@ def test_pipeline_report_mode_rejects_stale_ranking_from_previous_sweep(tmp_path
     run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="report",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
         )
     )
@@ -175,6 +177,7 @@ def test_pipeline_run_mode_requires_remote_config(tmp_path: Path) -> None:
 
 
 def test_pipeline_confirm_mode_writes_candidate_and_report_without_promotion(tmp_path: Path) -> None:
+    sweep_path = _write_test_sweep(tmp_path)
     ranking = _write_confirm_fixture(tmp_path)
     current_profile = tmp_path / "current-profile.json"
     prompts = tmp_path / "prompts.json"
@@ -186,7 +189,7 @@ def test_pipeline_confirm_mode_writes_candidate_and_report_without_promotion(tmp
     result = run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="confirm",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
             current_profile_path=current_profile,
             prompts_path=prompts,
@@ -207,6 +210,7 @@ def test_pipeline_confirm_mode_writes_candidate_and_report_without_promotion(tmp
 
 
 def test_pipeline_confirm_mode_promotes_only_when_allowed(tmp_path: Path) -> None:
+    sweep_path = _write_test_sweep(tmp_path)
     _write_confirm_fixture(tmp_path)
     current_profile = tmp_path / "current-profile.json"
     prompts = tmp_path / "prompts.json"
@@ -218,7 +222,7 @@ def test_pipeline_confirm_mode_promotes_only_when_allowed(tmp_path: Path) -> Non
     result = run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="confirm",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
             current_profile_path=current_profile,
             prompts_path=prompts,
@@ -239,6 +243,7 @@ def test_pipeline_confirm_mode_promotes_only_when_allowed(tmp_path: Path) -> Non
 
 
 def test_pipeline_full_mode_runs_confirmation_benchmarks_without_promotion(tmp_path: Path) -> None:
+    sweep_path = _write_test_sweep(tmp_path)
     calls: list[tuple[str, Path]] = []
     current_profile = tmp_path / "current-profile.json"
     prompts = tmp_path / "prompts.json"
@@ -259,7 +264,7 @@ def test_pipeline_full_mode_runs_confirmation_benchmarks_without_promotion(tmp_p
     result = run_optimizer_pipeline(
         OptimizerPipelineRequest(
             mode="full",
-            sweep_path=Path("config/sweeps/qwen-small-sweep.json"),
+            sweep_path=sweep_path,
             out_dir=tmp_path,
             config_path=Path("config/gx10.example.json"),
             current_profile_path=current_profile,
@@ -324,6 +329,24 @@ def _result_row(trial_id: str, candidate_id: str, latency: float, throughput: fl
         '"artifact_paths":{"summary":"summary.json"}'
         "}"
     )
+
+
+def _write_test_sweep(tmp_path: Path) -> Path:
+    baseline_path = tmp_path / "baseline-summary.json"
+    write_json(
+        baseline_path,
+        {
+            "mean_latency_ms": 1000.0,
+            "aggregate_tokens_per_second": 47.5,
+            "success_count": 1,
+            "failure_count": 0,
+        },
+    )
+    sweep = read_json(Path("config/sweeps/qwen-small-sweep.json"))
+    sweep["baseline_summary"] = baseline_path.as_posix()
+    sweep_path = tmp_path / "qwen-small-sweep.json"
+    write_json(sweep_path, sweep)
+    return sweep_path
 
 
 def _write_confirm_fixture(tmp_path: Path) -> Path:
@@ -400,8 +423,6 @@ def _write_confirm_fixture(tmp_path: Path) -> Path:
             }
         ],
     }
-    from vllm_optimizer.artifacts import write_json
-
     write_json(live / "ranking.json", ranking)
     return live / "ranking.json"
 
@@ -435,8 +456,6 @@ def _write_full_results(tmp_path: Path) -> None:
             ]
         }
     }
-    from vllm_optimizer.artifacts import write_json
-
     write_json(trial_dir / "plan.json", source_plan)
     (tmp_path / "live" / "results.jsonl").write_text(
         "{"
@@ -451,8 +470,6 @@ def _write_full_results(tmp_path: Path) -> None:
 
 
 def _write_profile(path: Path, profile_id: str) -> None:
-    from vllm_optimizer.artifacts import write_json
-
     write_json(
         path,
         {
@@ -473,8 +490,6 @@ def _write_profile(path: Path, profile_id: str) -> None:
 
 
 def _write_prompt_set(path: Path) -> None:
-    from vllm_optimizer.artifacts import write_json
-
     write_json(
         path,
         {
@@ -493,8 +508,6 @@ def _write_prompt_set(path: Path) -> None:
 
 
 def _write_summary(path: Path, latency: float, throughput: float) -> None:
-    from vllm_optimizer.artifacts import write_json
-
     path.parent.mkdir(parents=True, exist_ok=True)
     write_json(
         path,
